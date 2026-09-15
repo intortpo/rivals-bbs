@@ -1,0 +1,27 @@
+# Context & Domain Model: Rivals BBS
+
+This document defines the ubiquitous language, architectural boundaries, and core design principles for the Rivals BBS multiplayer game.
+
+## Ubiquitous Language
+
+- **Rival / Avatar**: The in-game player representation, rendered in blocky Roblox R6-style (6 distinct parts: Head, Torso, Left Arm, Right Arm, Left Leg, Right Leg).
+- **Duel**: A 1v1 match between two players, typically scored first-to-5 frags.
+- **FFA (Free-For-All)**: An arena match where every player fights independently up to a frag limit.
+- **Frag / Elimination**: Successfully depleting an opponent's health points (HP) to 0.
+- **Brick Shatter**: The signature Roblox-style death effect where an avatar's limbs detach with physics impulses and tumble away as individual bricks.
+- **Slide**: A high-momentum ground maneuver that lowers the player's collision height, provides a temporary forward speed burst, and tilts the camera.
+- **Slide-Cancel**: Tapping Jump during a slide to retain momentum into the air while resetting ground friction.
+- **Jump Pad**: An arena entity that propels any player who steps on it upward and forward with an audio whoosh.
+- **Touch HUD**: The full-screen mobile touch interface comprising the dynamic thumbstick, look drag area, fire cluster, and status displays.
+- **Dynamic Thumbstick**: A floating virtual joystick on the left half of the screen that anchors wherever the player touches down.
+- **Look Zone**: The right surface of the touch screen used for directional camera yaw and pitch aiming.
+- **ADS (Aim Down Sights)**: Toggling camera zoom (reducing Field of View) and reducing touch look sensitivity for precise ranged shooting.
+- **QR Match Link**: An encoded URL (`http://<lan-ip>:3000/?room=<ROOM_ID>`) rendered as a scannable QR code on the host's screen.
+- **Room / Match Session**: A server-side state machine managing connected players, round state (`WAITING`, `STARTING`, `PLAYING`, `ROUND_OVER`), score, and snapshot replication.
+
+## System Boundaries
+
+1. **Client Engine (`src/client/engine/`)**: Three.js rendering, lighting, map geometry, procedural animations, particle effects, and synthesized audio.
+2. **Controls Layer (`src/client/controls/`)**: Touch and pointer event processing, normalizing inputs into standard motion vectors and actions.
+3. **Networking Layer (`src/client/network/` & `src/server/`)**: Socket.IO transport, client-side snapshot interpolation, server-side room lifecycle and damage verification.
+4. **UI Layer (`src/client/ui/`)**: Touch HUD, QR generator, camera QR scanner, lobby management, and scoreboards.

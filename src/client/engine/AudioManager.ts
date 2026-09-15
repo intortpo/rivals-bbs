@@ -1,0 +1,264 @@
+import { WeaponType } from '../../shared/types.js';
+
+export class AudioManager {
+  private ctx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
+  private isMuted: boolean = false;
+
+  constructor() {
+    // Lazy init on first user touch / interaction
+  }
+
+  private initContext(): void {
+    if (!this.ctx) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        this.ctx = new AudioContextClass();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        this.masterGain.connect(this.ctx.destination);
+      }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  public touchUnlock(): void {
+    this.initContext();
+  }
+
+  public setMuted(muted: boolean): void {
+    this.isMuted = muted;
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setValueAtTime(muted ? 0 : 0.4, this.ctx.currentTime);
+    }
+  }
+
+  public playShoot(weapon: WeaponType): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+
+    if (weapon === 'katana') {
+      // Blade swoosh
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(450, t);
+      osc.frequency.exponentialRampToValueAtTime(120, t + 0.12);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(t);
+      osc.stop(t + 0.12);
+      return;
+    }
+
+    // Gunshot noise burst
+    const bufferSize = this.ctx.sampleRate * 0.1;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = weapon === 'shotgun' ? 'lowpass' : 'bandpass';
+    filter.frequency.setValueAtTime(weapon === 'sniper' ? 800 : 1600, t);
+
+    const noiseGain = this.ctx.createGain();
+    const duration = weapon === 'sniper' ? 0.35 : weapon === 'shotgun' ? 0.28 : 0.1;
+    noiseGain.gain.setValueAtTime(weapon === 'sniper' ? 0.8 : 0.5, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+
+    noise.start(t);
+    noise.stop(t + duration);
+
+    // Punch sub-oscillator
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'triangle';
+    const startFreq = weapon === 'sniper' ? 180 : weapon === 'shotgun' ? 150 : 130;
+    subOsc.frequency.setValueAtTime(startFreq, t);
+    subOsc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+
+    subGain.gain.setValueAtTime(0.6, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.masterGain);
+
+    subOsc.start(t);
+    subOsc.stop(t + 0.08);
+  }
+
+  public playHit(isHeadshot: boolean): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    if (isHeadshot) {
+      // High crisp headshot chime ("ding-dong")
+      osc.frequency.setValueAtTime(2400, t);
+      osc.frequency.setValueAtTime(3200, t + 0.05);
+      gain.gain.setValueAtTime(0.5, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(t);
+      osc.stop(t + 0.22);
+    } else {
+      // Standard body hit tic
+      osc.frequency.setValueAtTime(1400, t);
+      gain.gain.setValueAtTime(0.35, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(t);
+      osc.stop(t + 0.07);
+    }
+  }
+
+  public playJump(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(550, t + 0.12);
+
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  }
+
+  public playSlide(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    // Friction whoosh
+    const bufferSize = this.ctx.sampleRate * 0.4;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(600, t);
+    filter.frequency.linearRampToValueAtTime(300, t + 0.4);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.4);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    noise.start(t);
+    noise.stop(t + 0.4);
+  }
+
+  public playReload(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    // Two mechanical clicks
+    [0, 0.18].forEach((offset) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, t + offset);
+      gain.gain.setValueAtTime(0.15, t + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.04);
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t + offset);
+      osc.stop(t + offset + 0.04);
+    });
+  }
+
+  public playOofDeath(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    // Classic Roblox "Oof" pitch bend
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(260, t);
+    osc.frequency.exponentialRampToValueAtTime(140, t + 0.25);
+
+    gain.gain.setValueAtTime(0.4, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, t);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.28);
+  }
+
+  public playCountdownTick(count: number): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(count === 0 ? 880 : 440, t);
+
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + (count === 0 ? 0.3 : 0.1));
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + (count === 0 ? 0.3 : 0.1));
+  }
+}
