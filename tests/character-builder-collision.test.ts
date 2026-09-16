@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import fs from 'fs';
+import path from 'path';
 import * as THREE from 'three';
 import { io as ioc, Socket as ClientSocket } from 'socket.io-client';
 import { createServer } from 'http';
@@ -306,5 +308,116 @@ describe('Modal Cursor & Weapon Firing Protection', () => {
     mockElements['#grammar-reload-overlay'].style.display = 'none';
     assert.strictEqual(isAnyModalOpen(), false);
     assert.strictEqual(isFiring(), true, 'Weapon firing active when no modals are open');
+  });
+});
+
+// 5. Skeleton Arm Direction & Procedural Animation Verification
+describe('Skeleton Arm Direction & Procedural Animation Verification', () => {
+  function buildTestSkeleton() {
+    const glbPath = path.resolve(process.cwd(), 'public/models/characters/creative_character.glb');
+    const glb = fs.readFileSync(glbPath);
+    const jsonLen = glb.readUInt32LE(12);
+    const gltf = JSON.parse(glb.toString('utf8', 20, 20 + jsonLen));
+
+    const nodes = gltf.nodes.map((n: any) => {
+      const obj = new THREE.Object3D();
+      obj.name = n.name || '';
+      if (n.translation) obj.position.fromArray(n.translation);
+      if (n.rotation) obj.quaternion.fromArray(n.rotation);
+      if (n.scale) obj.scale.fromArray(n.scale);
+      return obj;
+    });
+
+    gltf.nodes.forEach((n: any, idx: number) => {
+      if (n.children) n.children.forEach((c: number) => nodes[idx].add(nodes[c]));
+    });
+
+    const root = nodes[43]; // Root
+    const getB = (name: string) => nodes.find((x: any) => x.name === name)!;
+    return { root, getB };
+  }
+
+  it('should orient arms naturally forward in Character Builder studio pose without pulling backwards', () => {
+    const { root, getB } = buildTestSkeleton();
+    const leftArm = getB('LeftArm');
+    const leftForeArm = getB('LeftForeArm');
+    const rightArm = getB('RightArm');
+    const rightForeArm = getB('RightForeArm');
+
+    leftArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0, -0.05)));
+    leftForeArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 0)));
+    rightArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0, 0.05)));
+    rightForeArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 0)));
+
+    root.updateMatrixWorld(true);
+
+    const lhPos = getB('LeftHand').getWorldPosition(new THREE.Vector3());
+    const rhPos = getB('RightHand').getWorldPosition(new THREE.Vector3());
+
+    // Hands must be forward (Z >= 0), never pulled behind torso (Z < 0)
+    assert.ok(lhPos.z >= 0, `LeftHand Z must be forward (got ${lhPos.z.toFixed(3)})`);
+    assert.ok(rhPos.z >= 0, `RightHand Z must be forward (got ${rhPos.z.toFixed(3)})`);
+    assert.ok(Math.abs(lhPos.x - (-rhPos.x)) < 0.01, 'Hands must be symmetrically positioned relative to torso');
+    console.log(`✓ Verified Studio Pose: LeftHand=[${lhPos.toArray().map(v=>v.toFixed(2))}], RightHand=[${rhPos.toArray().map(v=>v.toFixed(2))}]`);
+  });
+
+  it('should produce alternating running strides with trailing knee flexion', () => {
+    const { root, getB } = buildTestSkeleton();
+    const leftUpLeg = getB('LeftUpLeg');
+    const rightUpLeg = getB('RightUpLeg');
+    const leftLeg = getB('LeftLeg');
+    const rightLeg = getB('RightLeg');
+    const leftFoot = getB('LeftFoot');
+    const rightFoot = getB('RightFoot');
+
+    const qLeftUpLegInit = leftUpLeg.quaternion.clone();
+    const qRightUpLegInit = rightUpLeg.quaternion.clone();
+    const qLeftLegInit = leftLeg.quaternion.clone();
+    const qRightLegInit = rightLeg.quaternion.clone();
+
+    // Stride at phase t = pi/2
+    const legAngle = 0.48;
+    leftUpLeg.quaternion.multiplyQuaternions(qLeftUpLegInit, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), legAngle));
+    rightUpLeg.quaternion.multiplyQuaternions(qRightUpLegInit, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), legAngle));
+
+    const leftKneeAngle = Math.max(0, legAngle) * 0.7;
+    const rightKneeAngle = Math.max(0, -legAngle) * 0.7;
+    leftLeg.quaternion.multiplyQuaternions(qLeftLegInit, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), leftKneeAngle));
+    rightLeg.quaternion.multiplyQuaternions(qRightLegInit, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -rightKneeAngle));
+
+    root.updateMatrixWorld(true);
+    const lfPos = leftFoot.getWorldPosition(new THREE.Vector3());
+    const rfPos = rightFoot.getWorldPosition(new THREE.Vector3());
+
+    // Left foot trailing behind, Right foot forward
+    assert.ok(lfPos.z < 0, `Left foot must be backswing (Z < 0, got ${lfPos.z.toFixed(2)})`);
+    assert.ok(rfPos.z > 0, `Right foot must be forward stride (Z > 0, got ${rfPos.z.toFixed(2)})`);
+    assert.ok(lfPos.y > rfPos.y, 'Trailing foot knee flexion must lift trailing foot above lead foot');
+    console.log(`✓ Verified Alternating Stride: Trailing foot Z=${lfPos.z.toFixed(2)}, Leading foot Z=${rfPos.z.toFixed(2)}`);
+  });
+
+  it('should position hands forward at chest height in combat ready stance', () => {
+    const { root, getB } = buildTestSkeleton();
+    const rightArm = getB('RightArm');
+    const rightForeArm = getB('RightForeArm');
+    const leftArm = getB('LeftArm');
+    const leftForeArm = getB('LeftForeArm');
+
+    rightArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0, 0.75)));
+    rightForeArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.7, 0.2, 0)));
+    leftArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.1, 0, -0.65)));
+    leftForeArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.9, -0.3, 0)));
+
+    root.updateMatrixWorld(true);
+
+    const rhPos = getB('RightHand').getWorldPosition(new THREE.Vector3());
+    const lhPos = getB('LeftHand').getWorldPosition(new THREE.Vector3());
+
+    // Both hands forward in front of chest (Z > 0.25m, Y >= 1.15m)
+    assert.ok(rhPos.z > 0.25, `Right hand forward (got Z=${rhPos.z.toFixed(3)})`);
+    assert.ok(lhPos.z > 0.25, `Left hand forward (got Z=${lhPos.z.toFixed(3)})`);
+    assert.ok(rhPos.y >= 1.15, `Right hand at chest height (got Y=${rhPos.y.toFixed(3)})`);
+    assert.ok(lhPos.y >= 1.15, `Left hand at chest height (got Y=${lhPos.y.toFixed(3)})`);
+    console.log(`✓ Verified Combat Ready: RightHand=[${rhPos.toArray().map(v=>v.toFixed(2))}], LeftHand=[${lhPos.toArray().map(v=>v.toFixed(2))}]`);
   });
 });

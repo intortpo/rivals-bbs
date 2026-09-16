@@ -23,6 +23,10 @@ export class CharacterBuilderUI {
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer | null;
   private previewMesh: THREE.Group | null = null;
+  private spineBone: THREE.Object3D | null = null;
+  private initialSpineQ: THREE.Quaternion = new THREE.Quaternion();
+  private scratchQ: THREE.Quaternion = new THREE.Quaternion();
+  private scratchAxisX: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
   private animFrameId: number | null = null;
   private clock = new THREE.Clock();
 
@@ -500,14 +504,27 @@ export class CharacterBuilderUI {
       clone.scale.set(0.60, 0.60, 0.60);
       clone.position.set(0, 0, 0);
 
-      // Relax arms into tactical combat stance
+      // Relax arms into clean natural studio pose: arms hang naturally by sides, elbows slightly flexed forward
       const leftArm = clone.getObjectByName('LeftArm');
       if (leftArm) {
-        leftArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.2, Math.PI * 0.35)));
+        leftArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0, -0.05)));
+      }
+      const leftForeArm = clone.getObjectByName('LeftForeArm');
+      if (leftForeArm) {
+        leftForeArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 0)));
       }
       const rightArm = clone.getObjectByName('RightArm');
       if (rightArm) {
-        rightArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.2, -Math.PI * 0.35)));
+        rightArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0, 0.05)));
+      }
+      const rightForeArm = clone.getObjectByName('RightForeArm');
+      if (rightForeArm) {
+        rightForeArm.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 0)));
+      }
+
+      this.spineBone = clone.getObjectByName('Spine') || null;
+      if (this.spineBone) {
+        this.initialSpineQ.copy(this.spineBone.quaternion);
       }
 
       this.previewMesh = clone;
@@ -581,7 +598,13 @@ export class CharacterBuilderUI {
 
         // Subtle idle breathing animation
         const time = this.clock.getElapsedTime();
-        this.previewMesh.position.y = Math.sin(time * 2.2) * 0.012;
+        this.previewMesh.position.y = Math.sin(time * 2.2) * 0.008;
+
+        if (this.spineBone) {
+          const breath = Math.sin(time * 2.2) * 0.015;
+          this.scratchQ.setFromAxisAngle(this.scratchAxisX, breath);
+          this.spineBone.quaternion.multiplyQuaternions(this.initialSpineQ, this.scratchQ);
+        }
       }
 
       if (this.renderer && this.scene && this.camera) {

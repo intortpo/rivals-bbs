@@ -249,8 +249,10 @@ export class CharacterModel {
   private leftForeArmBone: THREE.Object3D | null = null;
   private rightArmBone: THREE.Object3D | null = null;
   private rightForeArmBone: THREE.Object3D | null = null;
-  private leftLegBone: THREE.Object3D | null = null;
-  private rightLegBone: THREE.Object3D | null = null;
+  private leftUpLegBone: THREE.Object3D | null = null;
+  private rightUpLegBone: THREE.Object3D | null = null;
+  private leftKneeBone: THREE.Object3D | null = null;
+  private rightKneeBone: THREE.Object3D | null = null;
 
   // Rest transforms cached for pristine deformation
   private initialHipsPos: THREE.Vector3 = new THREE.Vector3();
@@ -268,6 +270,7 @@ export class CharacterModel {
   }
 
   private animTime: number = 0;
+  private recoilImpulse: number = 0;
   private isDead: boolean = false;
   private equippedWeaponMeshes: Map<WeaponType, THREE.Group> = new Map();
 
@@ -287,6 +290,18 @@ export class CharacterModel {
   private static readonly _axisZ = new THREE.Vector3(0, 0, 1);
   private static readonly _axisX = new THREE.Vector3(1, 0, 0);
   private static readonly _deltaQ = new THREE.Quaternion();
+  private static readonly _deltaQ2 = new THREE.Quaternion();
+
+  // Static precomputed combat ready quaternions (zero runtime allocation)
+  private static readonly _combatRightArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0, 0.75));
+  private static readonly _combatRightForeArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.7, 0.2, 0));
+  private static readonly _combatLeftArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.1, 0, -0.65));
+  private static readonly _combatLeftForeArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.9, -0.3, 0));
+
+  private static readonly _katanaRightArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.3, 0, 0.5));
+  private static readonly _katanaRightForeArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0.1, 0));
+  private static readonly _katanaLeftArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0, -0.2));
+  private static readonly _katanaLeftForeArmDelta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, -0.1, 0));
 
   constructor(
     scene: THREE.Scene,
@@ -415,10 +430,12 @@ export class CharacterModel {
     this.leftForeArmBone = clone.getObjectByName('LeftForeArm') || null;
     this.rightArmBone = clone.getObjectByName('RightArm') || null;
     this.rightForeArmBone = clone.getObjectByName('RightForeArm') || null;
-    this.leftLegBone = clone.getObjectByName('LeftUpLeg') || null;
-    this.rightLegBone = clone.getObjectByName('RightUpLeg') || null;
+    this.leftUpLegBone = clone.getObjectByName('LeftUpLeg') || null;
+    this.rightUpLegBone = clone.getObjectByName('RightUpLeg') || null;
+    this.leftKneeBone = clone.getObjectByName('LeftLeg') || null;
+    this.rightKneeBone = clone.getObjectByName('RightLeg') || null;
 
-    // Cache initial bind-pose transforms for faithful animation deformation
+    // Cache initial pristine bind-pose transforms for faithful deformation
     if (this.hipsBone) {
       this.initialHipsPos.copy(this.hipsBone.position);
       this.initialBoneRotations.set('Hips', this.hipsBone.quaternion.clone());
@@ -430,8 +447,10 @@ export class CharacterModel {
       ['LeftForeArm', this.leftForeArmBone],
       ['RightArm', this.rightArmBone],
       ['RightForeArm', this.rightForeArmBone],
-      ['LeftUpLeg', this.leftLegBone],
-      ['RightUpLeg', this.rightLegBone]
+      ['LeftUpLeg', this.leftUpLegBone],
+      ['RightUpLeg', this.rightUpLegBone],
+      ['LeftLeg', this.leftKneeBone],
+      ['RightLeg', this.rightKneeBone]
     ] as const;
 
     for (const [name, bone] of trackedBones) {
@@ -440,33 +459,36 @@ export class CharacterModel {
       }
     }
 
-    // Relax arms from T-pose into natural tactical combat stance
+    // Set initial combat ready pose on arms
+    const isKatana = this.currentWeapon === 'katana';
+    const rArmDelta = isKatana ? CharacterModel._katanaRightArmDelta : CharacterModel._combatRightArmDelta;
+    const rForeArmDelta = isKatana ? CharacterModel._katanaRightForeArmDelta : CharacterModel._combatRightForeArmDelta;
+    const lArmDelta = isKatana ? CharacterModel._katanaLeftArmDelta : CharacterModel._combatLeftArmDelta;
+    const lForeArmDelta = isKatana ? CharacterModel._katanaLeftForeArmDelta : CharacterModel._combatLeftForeArmDelta;
+
     const qLeftArm = this.initialBoneRotations.get('LeftArm');
     if (this.leftArmBone && qLeftArm) {
-      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.2, Math.PI * 0.35));
-      this.leftArmBone.quaternion.multiplyQuaternions(qLeftArm, delta);
+      this.leftArmBone.quaternion.multiplyQuaternions(qLeftArm, lArmDelta);
     }
     const qLeftForeArm = this.initialBoneRotations.get('LeftForeArm');
     if (this.leftForeArmBone && qLeftForeArm) {
-      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.15, Math.PI * 0.15));
-      this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArm, delta);
+      this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArm, lForeArmDelta);
     }
     const qRightArm = this.initialBoneRotations.get('RightArm');
     if (this.rightArmBone && qRightArm) {
-      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.2, -Math.PI * 0.35));
-      this.rightArmBone.quaternion.multiplyQuaternions(qRightArm, delta);
+      this.rightArmBone.quaternion.multiplyQuaternions(qRightArm, rArmDelta);
     }
     const qRightForeArm = this.initialBoneRotations.get('RightForeArm');
     if (this.rightForeArmBone && qRightForeArm) {
-      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.15, -Math.PI * 0.15));
-      this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArm, delta);
+      this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArm, rForeArmDelta);
     }
 
     // Attach weapon socket to right hand prop
     const handProp = clone.getObjectByName('RightHandProp') || clone.getObjectByName('RightHand');
     if (handProp) {
       this.weaponSocket.position.set(0, 0, 0);
-      this.weaponSocket.rotation.set(0, 0, 0);
+      // Socket rotation so that equipped weapon points forward along character line of sight (+Z)
+      this.weaponSocket.quaternion.setFromEuler(new THREE.Euler(-2.28, 0.16, -1.03));
       handProp.add(this.weaponSocket);
     } else {
       this.weaponSocket.position.set(0.3, 0.9, 0.3);
@@ -498,6 +520,11 @@ export class CharacterModel {
         const wClone = cached.clone(true);
         wClone.scale.set(0.7, 0.7, 0.7);
         wClone.position.set(0, -0.05, 0.1);
+        if (t === 'katana') {
+          wClone.rotation.set(Math.PI / 2, 0, 0);
+        } else {
+          wClone.rotation.set(0, -Math.PI / 2, 0);
+        }
         wClone.visible = t === this.currentWeapon;
         this.weaponSocket.add(wClone);
         this.equippedWeaponMeshes.set(t, wClone);
@@ -587,11 +614,7 @@ export class CharacterModel {
   }
 
   public triggerRecoil(): void {
-    const qRightArm = this.initialBoneRotations.get('RightArm');
-    if (this.rightArmBone && qRightArm) {
-      CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, -0.15);
-      this.rightArmBone.quaternion.multiply(CharacterModel._deltaQ);
-    }
+    this.recoilImpulse = 0.25;
   }
 
   public update(
@@ -603,46 +626,118 @@ export class CharacterModel {
   ): void {
     if (this.isDead) return;
 
-    const qLeftLegInit = this.initialBoneRotations.get('LeftUpLeg');
-    const qRightLegInit = this.initialBoneRotations.get('RightUpLeg');
+    const qLeftUpLegInit = this.initialBoneRotations.get('LeftUpLeg');
+    const qRightUpLegInit = this.initialBoneRotations.get('RightUpLeg');
+    const qLeftKneeInit = this.initialBoneRotations.get('LeftLeg');
+    const qRightKneeInit = this.initialBoneRotations.get('RightLeg');
     const qSpineInit = this.initialBoneRotations.get('Spine');
     const qHeadInit = this.initialBoneRotations.get('Head');
+    const qLeftArmInit = this.initialBoneRotations.get('LeftArm');
+    const qLeftForeArmInit = this.initialBoneRotations.get('LeftForeArm');
+    const qRightArmInit = this.initialBoneRotations.get('RightArm');
+    const qRightForeArmInit = this.initialBoneRotations.get('RightForeArm');
 
-    // Running leg swing animation along local Z axis (zero-allocation bone deformation)
-    if (isMoving && !isSliding) {
-      this.animTime += delta * 11;
-      const legAngle = Math.sin(this.animTime) * 0.45;
-
-      if (this.leftLegBone && qLeftLegInit) {
-        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, legAngle);
-        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, CharacterModel._deltaQ);
-      }
-      if (this.rightLegBone && qRightLegInit) {
-        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -legAngle);
-        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, CharacterModel._deltaQ);
-      }
-    } else if (isJumping) {
-      // Jumping posture
-      if (this.leftLegBone && qLeftLegInit) {
-        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, 0.28);
-        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, CharacterModel._deltaQ);
-      }
-      if (this.rightLegBone && qRightLegInit) {
-        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -0.22);
-        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, CharacterModel._deltaQ);
-      }
-    } else {
-      // Idle recovery to rest pose
-      if (this.leftLegBone && qLeftLegInit) {
-        this.leftLegBone.quaternion.slerp(qLeftLegInit, Math.min(1, delta * 12));
-      }
-      if (this.rightLegBone && qRightLegInit) {
-        this.rightLegBone.quaternion.slerp(qRightLegInit, Math.min(1, delta * 12));
-      }
+    // Decay recoil impulse
+    if (this.recoilImpulse > 0) {
+      this.recoilImpulse = Math.max(0, this.recoilImpulse - delta * 3.5);
     }
 
-    // Sliding posture: hips offset relative to initialHipsPos.y
-    if (isSliding) {
+    const isKatana = this.currentWeapon === 'katana';
+    const rArmDelta = isKatana ? CharacterModel._katanaRightArmDelta : CharacterModel._combatRightArmDelta;
+    const rForeArmDelta = isKatana ? CharacterModel._katanaRightForeArmDelta : CharacterModel._combatRightForeArmDelta;
+    const lArmDelta = isKatana ? CharacterModel._katanaLeftArmDelta : CharacterModel._combatLeftArmDelta;
+    const lForeArmDelta = isKatana ? CharacterModel._katanaLeftForeArmDelta : CharacterModel._combatLeftForeArmDelta;
+
+    // 1. Locomotion / Running leg swing & knee flexion (alternating stride)
+    if (isMoving && !isSliding) {
+      this.animTime += delta * 11;
+      const legAngle = Math.sin(this.animTime) * 0.48;
+
+      // Leg swing: LeftUpLeg & RightUpLeg alternate smoothly
+      if (this.leftUpLegBone && qLeftUpLegInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, legAngle);
+        this.leftUpLegBone.quaternion.multiplyQuaternions(qLeftUpLegInit, CharacterModel._deltaQ);
+      }
+      if (this.rightUpLegBone && qRightUpLegInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, legAngle);
+        this.rightUpLegBone.quaternion.multiplyQuaternions(qRightUpLegInit, CharacterModel._deltaQ);
+      }
+
+      // Knee bend on backswing (flex trailing leg, lift foot)
+      const leftKneeAngle = Math.max(0, legAngle) * 0.7;
+      const rightKneeAngle = Math.max(0, -legAngle) * 0.7;
+
+      if (this.leftKneeBone && qLeftKneeInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, leftKneeAngle);
+        this.leftKneeBone.quaternion.multiplyQuaternions(qLeftKneeInit, CharacterModel._deltaQ);
+      }
+      if (this.rightKneeBone && qRightKneeInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -rightKneeAngle);
+        this.rightKneeBone.quaternion.multiplyQuaternions(qRightKneeInit, CharacterModel._deltaQ);
+      }
+
+      // Upper body running lean into movement
+      if (this.spineBone && qSpineInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, 0.12);
+        this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
+      }
+
+      // Arm swing/bob during run
+      const armBob = Math.cos(this.animTime) * 0.08;
+      if (this.rightArmBone && qRightArmInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, armBob - this.recoilImpulse);
+        CharacterModel._deltaQ2.multiplyQuaternions(rArmDelta, CharacterModel._deltaQ);
+        this.rightArmBone.quaternion.multiplyQuaternions(qRightArmInit, CharacterModel._deltaQ2);
+      }
+      if (this.rightForeArmBone && qRightForeArmInit) {
+        this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArmInit, rForeArmDelta);
+      }
+      if (this.leftArmBone && qLeftArmInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -armBob);
+        CharacterModel._deltaQ2.multiplyQuaternions(lArmDelta, CharacterModel._deltaQ);
+        this.leftArmBone.quaternion.multiplyQuaternions(qLeftArmInit, CharacterModel._deltaQ2);
+      }
+      if (this.leftForeArmBone && qLeftForeArmInit) {
+        this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArmInit, lForeArmDelta);
+      }
+
+    } else if (isJumping) {
+      // 2. Jumping Posture (bilateral knee tuck)
+      if (this.leftUpLegBone && qLeftUpLegInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, 0.22);
+        this.leftUpLegBone.quaternion.multiplyQuaternions(qLeftUpLegInit, CharacterModel._deltaQ);
+      }
+      if (this.rightUpLegBone && qRightUpLegInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -0.22);
+        this.rightUpLegBone.quaternion.multiplyQuaternions(qRightUpLegInit, CharacterModel._deltaQ);
+      }
+      if (this.leftKneeBone && qLeftKneeInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, 0.35);
+        this.leftKneeBone.quaternion.multiplyQuaternions(qLeftKneeInit, CharacterModel._deltaQ);
+      }
+      if (this.rightKneeBone && qRightKneeInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -0.35);
+        this.rightKneeBone.quaternion.multiplyQuaternions(qRightKneeInit, CharacterModel._deltaQ);
+      }
+
+      // Arm stability during jump
+      if (this.rightArmBone && qRightArmInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -this.recoilImpulse);
+        CharacterModel._deltaQ2.multiplyQuaternions(rArmDelta, CharacterModel._deltaQ);
+        this.rightArmBone.quaternion.multiplyQuaternions(qRightArmInit, CharacterModel._deltaQ2);
+      }
+      if (this.rightForeArmBone && qRightForeArmInit) {
+        this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArmInit, rForeArmDelta);
+      }
+      if (this.leftArmBone && qLeftArmInit) {
+        this.leftArmBone.quaternion.multiplyQuaternions(qLeftArmInit, lArmDelta);
+      }
+      if (this.leftForeArmBone && qLeftForeArmInit) {
+        this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArmInit, lForeArmDelta);
+      }
+
+    } else if (isSliding) {
+      // 3. Sliding Posture (hips drop, lead leg extends, trailing leg tucks)
       if (this.hipsBone) {
         this.hipsBone.position.y = this.initialHipsPos.y - 0.35;
       }
@@ -650,19 +745,91 @@ export class CharacterModel {
         CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, 0.35);
         this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
       }
-    } else {
-      if (this.hipsBone) {
-        this.hipsBone.position.y = this.initialHipsPos.y;
+      if (this.leftUpLegBone && qLeftUpLegInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, 0.38);
+        this.leftUpLegBone.quaternion.multiplyQuaternions(qLeftUpLegInit, CharacterModel._deltaQ);
       }
+      if (this.leftKneeBone && qLeftKneeInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, 0.45);
+        this.leftKneeBone.quaternion.multiplyQuaternions(qLeftKneeInit, CharacterModel._deltaQ);
+      }
+      if (this.rightUpLegBone && qRightUpLegInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -0.42);
+        this.rightUpLegBone.quaternion.multiplyQuaternions(qRightUpLegInit, CharacterModel._deltaQ);
+      }
+      if (this.rightKneeBone && qRightKneeInit) {
+        this.rightKneeBone.quaternion.slerp(qRightKneeInit, Math.min(1, delta * 12));
+      }
+
+      // Arms in combat stance during slide
+      if (this.rightArmBone && qRightArmInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -this.recoilImpulse);
+        CharacterModel._deltaQ2.multiplyQuaternions(rArmDelta, CharacterModel._deltaQ);
+        this.rightArmBone.quaternion.multiplyQuaternions(qRightArmInit, CharacterModel._deltaQ2);
+      }
+      if (this.rightForeArmBone && qRightForeArmInit) {
+        this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArmInit, rForeArmDelta);
+      }
+      if (this.leftArmBone && qLeftArmInit) {
+        this.leftArmBone.quaternion.multiplyQuaternions(qLeftArmInit, lArmDelta);
+      }
+      if (this.leftForeArmBone && qLeftForeArmInit) {
+        this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArmInit, lForeArmDelta);
+      }
+
+    } else {
+      // 4. Idle Stance (subtle breathing cycle & combat ready pose)
+      this.animTime += delta * 2.2;
+      const breath = Math.sin(this.animTime) * 0.015;
+
+      if (this.hipsBone) {
+        this.hipsBone.position.y = this.initialHipsPos.y + breath * 0.005;
+      }
+
+      // Legs recover to rest pose
+      if (this.leftUpLegBone && qLeftUpLegInit) {
+        this.leftUpLegBone.quaternion.slerp(qLeftUpLegInit, Math.min(1, delta * 12));
+      }
+      if (this.rightUpLegBone && qRightUpLegInit) {
+        this.rightUpLegBone.quaternion.slerp(qRightUpLegInit, Math.min(1, delta * 12));
+      }
+      if (this.leftKneeBone && qLeftKneeInit) {
+        this.leftKneeBone.quaternion.slerp(qLeftKneeInit, Math.min(1, delta * 12));
+      }
+      if (this.rightKneeBone && qRightKneeInit) {
+        this.rightKneeBone.quaternion.slerp(qRightKneeInit, Math.min(1, delta * 12));
+      }
+
+      // Subtle chest breathing & pitch tracking
+      const clampedPitch = THREE.MathUtils.clamp(-pitch, -0.6, 0.6);
       if (this.spineBone && qSpineInit) {
-        this.spineBone.quaternion.slerp(qSpineInit, Math.min(1, delta * 10));
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, breath + clampedPitch * 0.3);
+        this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
+      }
+
+      // Arms in combat ready stance with subtle breathing sway & recoil
+      if (this.rightArmBone && qRightArmInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, breath * 0.5 - this.recoilImpulse);
+        CharacterModel._deltaQ2.multiplyQuaternions(rArmDelta, CharacterModel._deltaQ);
+        this.rightArmBone.quaternion.multiplyQuaternions(qRightArmInit, CharacterModel._deltaQ2);
+      }
+      if (this.rightForeArmBone && qRightForeArmInit) {
+        this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArmInit, rForeArmDelta);
+      }
+      if (this.leftArmBone && qLeftArmInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -breath * 0.5);
+        CharacterModel._deltaQ2.multiplyQuaternions(lArmDelta, CharacterModel._deltaQ);
+        this.leftArmBone.quaternion.multiplyQuaternions(qLeftArmInit, CharacterModel._deltaQ2);
+      }
+      if (this.leftForeArmBone && qLeftForeArmInit) {
+        this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArmInit, lForeArmDelta);
       }
     }
 
-    // Head pitch tracking
+    // 5. Head Pitch Tracking
     if (this.headBone && qHeadInit) {
       const clampedPitch = THREE.MathUtils.clamp(-pitch, -0.6, 0.6);
-      CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, clampedPitch);
+      CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, clampedPitch * 0.7);
       this.headBone.quaternion.multiplyQuaternions(qHeadInit, CharacterModel._deltaQ);
     }
   }
