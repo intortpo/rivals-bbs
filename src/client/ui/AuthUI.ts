@@ -140,7 +140,7 @@ export class AuthUI {
         </div>
 
         <p style="font-size: 12px; color: #8da2c0; margin: 0 0 16px 0;">
-          BBS School Portal (<strong style="color: #00d2ff;">@bbs.ac.th</strong>) — Track grammar mastery & combat stats!
+          Enter your username and password to track grammar drills & combat stats!
         </p>
 
         <!-- Tabs -->
@@ -153,17 +153,16 @@ export class AuthUI {
 
         <!-- Login Form -->
         <form id="auth-form-login" style="display: flex; flex-direction: column; gap: 12px;">
-          <input type="text" id="login-identifier" class="lobby-input" placeholder="BBS Email (@bbs.ac.th) or Username" autocomplete="username" required>
+          <input type="text" id="login-username" class="lobby-input" placeholder="Username" autocomplete="username" required>
           <input type="password" id="login-password" class="lobby-input" placeholder="Password" autocomplete="current-password" required>
           <button type="submit" class="btn btn-primary" style="padding: 12px; font-size: 16px; margin-top: 6px;">Sign In</button>
         </form>
 
         <!-- Register Form -->
         <form id="auth-form-register" style="display: none; flex-direction: column; gap: 12px;">
-          <input type="email" id="reg-email" class="lobby-input" placeholder="Email: student@bbs.ac.th" autocomplete="email" required>
-          <input type="text" id="reg-username" class="lobby-input" placeholder="Pilot Name (e.g. Alex_BBS)" autocomplete="username" required>
+          <input type="text" id="reg-username" class="lobby-input" placeholder="Choose Username (3-20 chars)" autocomplete="username" required>
           <input type="password" id="reg-password" class="lobby-input" placeholder="Password (min 4 chars)" autocomplete="new-password" required>
-          <button type="submit" class="btn btn-primary" style="padding: 12px; font-size: 16px; margin-top: 6px; background: linear-gradient(135deg, #00ff88, #00d2ff); color: #000;">Register @bbs.ac.th</button>
+          <button type="submit" class="btn btn-primary" style="padding: 12px; font-size: 16px; margin-top: 6px; background: linear-gradient(135deg, #00ff88, #00d2ff); color: #000;">Create Account</button>
         </form>
 
         <div style="margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px;">
@@ -202,7 +201,7 @@ export class AuthUI {
     // Submit Login
     document.getElementById('auth-form-login')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const identifierInput = (document.getElementById('login-identifier') as HTMLInputElement)?.value;
+      const usernameInput = (document.getElementById('login-username') as HTMLInputElement)?.value?.trim();
       const passwordInput = (document.getElementById('login-password') as HTMLInputElement)?.value;
       const errEl = document.getElementById('auth-modal-error');
 
@@ -210,7 +209,7 @@ export class AuthUI {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: identifierInput, password: passwordInput })
+          body: JSON.stringify({ username: usernameInput, password: passwordInput })
         });
         const data = await res.json();
         if (!res.ok) {
@@ -230,13 +229,17 @@ export class AuthUI {
     // Submit Register
     document.getElementById('auth-form-register')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const emailInput = (document.getElementById('reg-email') as HTMLInputElement)?.value?.trim().toLowerCase();
       const usernameInput = (document.getElementById('reg-username') as HTMLInputElement)?.value?.trim();
       const passwordInput = (document.getElementById('reg-password') as HTMLInputElement)?.value;
       const errEl = document.getElementById('auth-modal-error');
 
-      if (!emailInput || !emailInput.endsWith('@bbs.ac.th')) {
-        if (errEl) errEl.textContent = 'Registration requires a valid BBS email ending with @bbs.ac.th.';
+      if (!usernameInput || usernameInput.length < 3) {
+        if (errEl) errEl.textContent = 'Username must be at least 3 characters long.';
+        return;
+      }
+
+      if (!passwordInput || passwordInput.length < 4) {
+        if (errEl) errEl.textContent = 'Password must be at least 4 characters long.';
         return;
       }
 
@@ -244,7 +247,7 @@ export class AuthUI {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailInput, username: usernameInput, password: passwordInput })
+          body: JSON.stringify({ username: usernameInput, password: passwordInput })
         });
         const data = await res.json();
         if (!res.ok) {

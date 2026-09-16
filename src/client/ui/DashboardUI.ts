@@ -105,7 +105,7 @@ export class DashboardUI {
           </div>
           <div style="flex: 1;">
             <div id="dash-username" style="font-size: 18px; font-weight: 900; color: white;">Guest Pilot</div>
-            <div id="dash-email" style="font-size: 12px; color: #8da2c0;">Not signed in with @bbs.ac.th</div>
+            <div id="dash-status" style="font-size: 12px; color: #8da2c0;">Local Guest Session</div>
           </div>
         </div>
 
@@ -214,7 +214,7 @@ export class DashboardUI {
 
     const rankEl = document.getElementById('dash-pilot-rank');
     const userEl = document.getElementById('dash-username');
-    const emailEl = document.getElementById('dash-email');
+    const statusEl = document.getElementById('dash-status');
 
     const winRateEl = document.getElementById('dash-win-rate');
     const matchesEl = document.getElementById('dash-matches-count');
@@ -230,7 +230,7 @@ export class DashboardUI {
 
     if (u) {
       if (userEl) userEl.textContent = u.username;
-      if (emailEl) emailEl.textContent = u.email;
+      if (statusEl) statusEl.textContent = '⭐ Registered Pilot • Active';
 
       const games = stats?.gamesPlayed || 0;
       const wins = stats?.wins || 0;
@@ -324,7 +324,7 @@ export class DashboardUI {
       }
     } else {
       if (userEl) userEl.textContent = '👤 Guest Pilot';
-      if (emailEl) emailEl.textContent = 'Sign in with @bbs.ac.th to save progress';
+      if (statusEl) statusEl.textContent = 'Sign in to save career progress';
       if (rankEl) rankEl.textContent = 'RANK: 🔰 GUEST PILOT';
       if (winRateEl) winRateEl.textContent = '0%';
       if (matchesEl) matchesEl.textContent = '0 Matches';

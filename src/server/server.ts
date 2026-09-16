@@ -56,12 +56,12 @@ const localIp = getLocalIpAddress();
 
 // Auth Endpoints
 app.post('/api/auth/register', (req, res) => {
-  const { email, username, password } = req.body || {};
-  if (!email || !password) {
-    res.status(400).json({ error: 'BBS Email (@bbs.ac.th) and password are required.' });
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    res.status(400).json({ error: 'Username and password are required.' });
     return;
   }
-  const result = userManager.register(String(email), String(username || ''), String(password));
+  const result = userManager.register(String(username), String(password));
   if (!result.success) {
     res.status(400).json({ error: result.error });
     return;
@@ -70,10 +70,10 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 app.post('/api/auth/login', (req, res) => {
-  const { email, username, identifier, password } = req.body || {};
-  const id = identifier || email || username;
+  const { username, identifier, email, password } = req.body || {};
+  const id = username || identifier || email;
   if (!id || !password) {
-    res.status(400).json({ error: 'Email/username and password are required.' });
+    res.status(400).json({ error: 'Username and password are required.' });
     return;
   }
   const result = userManager.login(String(id), String(password));

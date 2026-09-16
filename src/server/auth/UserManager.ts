@@ -27,7 +27,7 @@ export interface UserStats {
 
 export interface UserRecord {
   id: string;
-  email: string;
+  email?: string;
   username: string;
   displayName: string;
   salt: string;
@@ -122,27 +122,13 @@ export class UserManager {
   }
 
   public register(
-    email: string,
     username: string,
-    password: string
+    password: string,
+    email?: string
   ): { success: true; user: PublicUserProfile; token: string } | { success: false; error: string } {
-    // 1. Mandatory @bbs.ac.th email validation
-    const emailTrimmed = (email || '').trim().toLowerCase();
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@bbs\.ac\.th$/i;
-    if (!emailTrimmed || !emailRegex.test(emailTrimmed)) {
-      return {
-        success: false,
-        error: 'Registration is restricted to BBS school community. You must enter an email ending with @bbs.ac.th.'
-      };
-    }
-
-    if (this.usersByEmail.has(emailTrimmed)) {
-      return { success: false, error: 'An account with this @bbs.ac.th email already exists.' };
-    }
-
-    // 2. Username validation
-    const trimmedUser = (username || emailTrimmed.split('@')[0]).trim();
-    if (trimmedUser.length < 3 || trimmedUser.length > 20) {
+    // 1. Username validation
+    const trimmedUser = (username || '').trim();
+    if (!trimmedUser || trimmedUser.length < 3 || trimmedUser.length > 20) {
       return { success: false, error: 'Username must be between 3 and 20 characters.' };
     }
     if (!/^[a-zA-Z0-9._-]+$/.test(trimmedUser)) {
@@ -154,9 +140,15 @@ export class UserManager {
       return { success: false, error: 'Username is already taken.' };
     }
 
-    // 3. Password validation
+    // 2. Password validation
     if (!password || password.length < 4) {
       return { success: false, error: 'Password must be at least 4 characters long.' };
+    }
+
+    // 3. Optional email check if provided
+    const emailTrimmed = email ? email.trim().toLowerCase() : undefined;
+    if (emailTrimmed && this.usersByEmail.has(emailTrimmed)) {
+      return { success: false, error: 'An account with this email already exists.' };
     }
 
     const salt = crypto.randomBytes(16).toString('hex');
@@ -165,7 +157,7 @@ export class UserManager {
 
     const newRecord: UserRecord = {
       id: userId,
-      email: emailTrimmed,
+      ...(emailTrimmed ? { email: emailTrimmed } : {}),
       username: trimmedUser,
       displayName: trimmedUser,
       salt,
@@ -187,7 +179,9 @@ export class UserManager {
     };
 
     this.users.set(lowerUserKey, newRecord);
-    this.usersByEmail.set(emailTrimmed, newRecord);
+    if (emailTrimmed) {
+      this.usersByEmail.set(emailTrimmed, newRecord);
+    }
     this.usersById.set(userId, newRecord);
     this.saveUsers();
 
@@ -200,19 +194,23 @@ export class UserManager {
   }
 
   public login(
-    identifier: string,
+    usernameOrIdentifier: string,
     password: string
   ): { success: true; user: PublicUserProfile; token: string } | { success: false; error: string } {
-    const trimmedId = (identifier || '').trim().toLowerCase();
-    // Allow login via email or username
-    const record = this.usersByEmail.get(trimmedId) || this.users.get(trimmedId);
+    const trimmedId = (usernameOrIdentifier || '').trim().toLowerCase();
+    if (!trimmedId || !password) {
+      return { success: false, error: 'Username and password are required.' };
+    }
+
+    // Allow login via username (primary) or legacy email
+    const record = this.users.get(trimmedId) || this.usersByEmail.get(trimmedId);
     if (!record) {
-      return { success: false, error: 'Invalid @bbs.ac.th email/username or password.' };
+      return { success: false, error: 'Invalid username or password.' };
     }
 
     const computed = this.hashPassword(password, record.salt);
     if (computed !== record.passwordHash) {
-      return { success: false, error: 'Invalid @bbs.ac.th email/username or password.' };
+      return { success: false, error: 'Invalid username or password.' };
     }
 
     record.lastLoginAt = Date.now();
