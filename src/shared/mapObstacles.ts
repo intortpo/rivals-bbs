@@ -11,7 +11,8 @@ export interface BoundingBox {
 export function lineIntersectsBox(
   p1: [number, number, number],
   p2: [number, number, number],
-  box: BoundingBox
+  box: BoundingBox,
+  epsilon: number = 0.02
 ): boolean {
   const [x1, y1, z1] = p1;
   const [x2, y2, z2] = p2;
@@ -22,8 +23,8 @@ export function lineIntersectsBox(
   const dy = y2 - y1;
   const dz = z2 - z1;
 
-  let tmin = 0.0;
-  let tmax = 1.0;
+  let tmin = epsilon;
+  let tmax = 1.0 - epsilon;
 
   // X slab
   if (Math.abs(dx) < 1e-6) {

@@ -167,26 +167,26 @@ export const NETWORK = {
 };
 
 export const MAP_SPAWNS = [
-  { x: -18, y: 1.5, z: -18, yaw: Math.PI / 4 },
-  { x: 18, y: 1.5, z: 18, yaw: -3 * Math.PI / 4 },
-  { x: -18, y: 1.5, z: 18, yaw: -Math.PI / 4 },
-  { x: 18, y: 1.5, z: -18, yaw: 3 * Math.PI / 4 },
-  { x: 0, y: 1.5, z: -20, yaw: 0 },
-  { x: 0, y: 1.5, z: 20, yaw: Math.PI }
+  { x: -18, y: 0.0, z: -18, yaw: Math.PI / 4 },
+  { x: 18, y: 0.0, z: 18, yaw: -3 * Math.PI / 4 },
+  { x: -18, y: 0.0, z: 18, yaw: -Math.PI / 4 },
+  { x: 18, y: 0.0, z: -18, yaw: 3 * Math.PI / 4 },
+  { x: 0, y: 0.0, z: -20, yaw: 0 },
+  { x: 0, y: 0.0, z: 20, yaw: Math.PI }
 ];
 
 export const CITY_SPAWNS = [
-  { x: 0, y: 1.0, z: 0, yaw: 0 }, // Central Fountain Plaza
-  { x: 0, y: 1.0, z: -48, yaw: 0 }, // North Boulevard
-  { x: 0, y: 1.0, z: 48, yaw: Math.PI }, // South Avenue
-  { x: -35, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Station
-  { x: 35, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Tower
+  { x: 0, y: 0.0, z: 0, yaw: 0 }, // Central Fountain Plaza
+  { x: 0, y: 0.0, z: -48, yaw: 0 }, // North Boulevard
+  { x: 0, y: 0.0, z: 48, yaw: Math.PI }, // South Avenue
+  { x: -35, y: 0.0, z: 0, yaw: Math.PI / 2 }, // West Station
+  { x: 35, y: 0.0, z: 0, yaw: -Math.PI / 2 }, // East Tower
   { x: 0, y: 16.5, z: 22, yaw: Math.PI } // Rooftop Sniper Nest
 ];
 
 export const CYBER_SPIRE_SPAWNS = [
-  { x: 0, y: 1.0, z: -4, yaw: 0 },
-  { x: 0, y: 1.0, z: 4, yaw: Math.PI },
+  { x: 0, y: 0.0, z: -4, yaw: 0 },
+  { x: 0, y: 0.0, z: 4, yaw: Math.PI },
   { x: 0, y: 4.0, z: -22, yaw: 0 }, // North Tower
   { x: 0, y: 4.0, z: 22, yaw: Math.PI }, // South Tower
   { x: -22, y: 3.0, z: 0, yaw: Math.PI / 2 }, // West Helipad
@@ -195,39 +195,39 @@ export const CYBER_SPIRE_SPAWNS = [
 ];
 
 export const QUANTUM_LAB_SPAWNS = [
-  { x: -22, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Lab Bay
-  { x: 22, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Lab Bay
-  { x: 0, y: 1.0, z: -22, yaw: 0 }, // North Access
-  { x: 0, y: 1.0, z: 22, yaw: Math.PI }, // South Access
+  { x: -22, y: 0.0, z: 0, yaw: Math.PI / 2 }, // West Lab Bay
+  { x: 22, y: 0.0, z: 0, yaw: -Math.PI / 2 }, // East Lab Bay
+  { x: 0, y: 0.0, z: -22, yaw: 0 }, // North Access
+  { x: 0, y: 0.0, z: 22, yaw: Math.PI }, // South Access
   { x: 0, y: 4.5, z: 0, yaw: 0 }, // Observation Deck
-  { x: -14, y: 1.0, z: 12, yaw: -Math.PI / 4 },
-  { x: 14, y: 1.0, z: -12, yaw: 3 * Math.PI / 4 }
+  { x: -14, y: 0.0, z: 12, yaw: -Math.PI / 4 },
+  { x: 14, y: 0.0, z: -12, yaw: 3 * Math.PI / 4 }
 ];
 
 export const MAGMA_FOUNDRY_SPAWNS = [
-  { x: 0, y: 1.0, z: -22, yaw: 0 }, // North Furnace
-  { x: 0, y: 1.0, z: 22, yaw: Math.PI }, // South Furnace
-  { x: -22, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Slag Pour
-  { x: 22, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Tank
-  { x: 0, y: 1.0, z: 0, yaw: 0 }, // Central Crucible
+  { x: 0, y: 0.0, z: -22, yaw: 0 }, // North Furnace
+  { x: 0, y: 0.0, z: 22, yaw: Math.PI }, // South Furnace
+  { x: -22, y: 0.0, z: 0, yaw: Math.PI / 2 }, // West Slag Pour
+  { x: 22, y: 0.0, z: 0, yaw: -Math.PI / 2 }, // East Tank
+  { x: 0, y: 0.0, z: 0, yaw: 0 }, // Central Crucible
   { x: 0, y: 5.5, z: 6, yaw: Math.PI } // High Crane Gantry
 ];
 
 export const SUBZERO_STATION_SPAWNS = [
-  { x: 0, y: 1.0, z: -24, yaw: 0 }, // North Bunker
-  { x: 0, y: 1.0, z: 24, yaw: Math.PI }, // South Depot
-  { x: -20, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Trench
-  { x: 20, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Container Yard
+  { x: 0, y: 0.0, z: -24, yaw: 0 }, // North Bunker
+  { x: 0, y: 0.0, z: 24, yaw: Math.PI }, // South Depot
+  { x: -20, y: 0.0, z: 0, yaw: Math.PI / 2 }, // West Trench
+  { x: 20, y: 0.0, z: 0, yaw: -Math.PI / 2 }, // East Container Yard
   { x: 0, y: 5.0, z: 0, yaw: 0 }, // Radar Roof
-  { x: -16, y: 1.0, z: -16, yaw: Math.PI / 4 }
+  { x: -16, y: 0.0, z: -16, yaw: Math.PI / 4 }
 ];
 
 export const SKY_SANCTUARY_SPAWNS = [
-  { x: 0, y: 1.0, z: 0, yaw: 0 }, // Central Shrine
-  { x: 0, y: 1.0, z: -26, yaw: 0 }, // North Cloud Garden
-  { x: 0, y: 1.0, z: 26, yaw: Math.PI }, // South Cloud Garden
-  { x: -26, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Meditation Terrace
-  { x: 26, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Bell Tower
+  { x: 0, y: 0.0, z: 0, yaw: 0 }, // Central Shrine
+  { x: 0, y: 0.0, z: -26, yaw: 0 }, // North Cloud Garden
+  { x: 0, y: 0.0, z: 26, yaw: Math.PI }, // South Cloud Garden
+  { x: -26, y: 0.0, z: 0, yaw: Math.PI / 2 }, // West Meditation Terrace
+  { x: 26, y: 0.0, z: 0, yaw: -Math.PI / 2 }, // East Bell Tower
   { x: 0, y: 4.5, z: 0, yaw: Math.PI } // Shrine Pavilion Terrace
 ];
 
@@ -267,16 +267,16 @@ export const TEAM_COLORS: Record<TeamColor, string> = {
 
 export const TEAM_SPAWNS: Record<'blue' | 'red', { x: number; y: number; z: number; yaw: number }[]> = {
   blue: [
-    { x: -6, y: 1.0, z: 46, yaw: Math.PI },
-    { x: 0, y: 1.0, z: 48, yaw: Math.PI },
-    { x: 6, y: 1.0, z: 46, yaw: Math.PI },
-    { x: 0, y: 1.0, z: 38, yaw: Math.PI }
+    { x: -6, y: 0.0, z: 46, yaw: Math.PI },
+    { x: 0, y: 0.0, z: 48, yaw: Math.PI },
+    { x: 6, y: 0.0, z: 46, yaw: Math.PI },
+    { x: 0, y: 0.0, z: 38, yaw: Math.PI }
   ],
   red: [
-    { x: -6, y: 1.0, z: -46, yaw: 0 },
-    { x: 0, y: 1.0, z: -48, yaw: 0 },
-    { x: 6, y: 1.0, z: -46, yaw: 0 },
-    { x: 0, y: 1.0, z: -38, yaw: 0 }
+    { x: -6, y: 0.0, z: -46, yaw: 0 },
+    { x: 0, y: 0.0, z: -48, yaw: 0 },
+    { x: 6, y: 0.0, z: -46, yaw: 0 },
+    { x: 0, y: 0.0, z: -38, yaw: 0 }
   ]
 };
 
@@ -289,26 +289,26 @@ export function getTeamSpawn(team: 'blue' | 'red', index: number, mapName?: stri
   }
   if (mapName === 'Quantum Lab') {
     const list = team === 'blue'
-      ? [{ x: -22, y: 1.0, z: -3, yaw: Math.PI / 2 }, { x: -22, y: 1.0, z: 3, yaw: Math.PI / 2 }]
-      : [{ x: 22, y: 1.0, z: -3, yaw: -Math.PI / 2 }, { x: 22, y: 1.0, z: 3, yaw: -Math.PI / 2 }];
+      ? [{ x: -22, y: 0.0, z: -3, yaw: Math.PI / 2 }, { x: -22, y: 0.0, z: 3, yaw: Math.PI / 2 }]
+      : [{ x: 22, y: 0.0, z: -3, yaw: -Math.PI / 2 }, { x: 22, y: 0.0, z: 3, yaw: -Math.PI / 2 }];
     return list[index % list.length];
   }
   if (mapName === 'Magma Foundry') {
     const list = team === 'blue'
-      ? [{ x: -3, y: 1.0, z: 22, yaw: Math.PI }, { x: 3, y: 1.0, z: 22, yaw: Math.PI }]
-      : [{ x: -3, y: 1.0, z: -22, yaw: 0 }, { x: 3, y: 1.0, z: -22, yaw: 0 }];
+      ? [{ x: -3, y: 0.0, z: 22, yaw: Math.PI }, { x: 3, y: 0.0, z: 22, yaw: Math.PI }]
+      : [{ x: -3, y: 0.0, z: -22, yaw: 0 }, { x: 3, y: 0.0, z: -22, yaw: 0 }];
     return list[index % list.length];
   }
   if (mapName === 'Subzero Station') {
     const list = team === 'blue'
-      ? [{ x: -4, y: 1.0, z: 24, yaw: Math.PI }, { x: 4, y: 1.0, z: 24, yaw: Math.PI }]
-      : [{ x: -4, y: 1.0, z: -24, yaw: 0 }, { x: 4, y: 1.0, z: -24, yaw: 0 }];
+      ? [{ x: -4, y: 0.0, z: 24, yaw: Math.PI }, { x: 4, y: 0.0, z: 24, yaw: Math.PI }]
+      : [{ x: -4, y: 0.0, z: -24, yaw: 0 }, { x: 4, y: 0.0, z: -24, yaw: 0 }];
     return list[index % list.length];
   }
   if (mapName === 'Sky Sanctuary') {
     const list = team === 'blue'
-      ? [{ x: -3, y: 1.0, z: 26, yaw: Math.PI }, { x: 3, y: 1.0, z: 26, yaw: Math.PI }]
-      : [{ x: -3, y: 1.0, z: -26, yaw: 0 }, { x: 3, y: 1.0, z: -26, yaw: 0 }];
+      ? [{ x: -3, y: 0.0, z: 26, yaw: Math.PI }, { x: 3, y: 0.0, z: 26, yaw: Math.PI }]
+      : [{ x: -3, y: 0.0, z: -26, yaw: 0 }, { x: 3, y: 0.0, z: -26, yaw: 0 }];
     return list[index % list.length];
   }
 

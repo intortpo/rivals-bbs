@@ -22,11 +22,19 @@ import {
   hasLineOfSight
 } from '../../shared/mapObstacles.js';
 
-interface ActiveBot {
+export type BotAIState = 'patrol' | 'hunt' | 'take_cover' | 'telegraph' | 'attack';
+
+export interface ActiveBot {
   bot: PlayerNetworkState;
   archetype: BotArchetype;
   lastFireTime: number;
   seed: number;
+  aiState: BotAIState;
+  stateTimer: number;
+  lastSeenTargetPos: [number, number, number] | null;
+  patrolNode: [number, number, number];
+  telegraphUntil: number;
+  coverPosition: [number, number, number] | null;
 }
 
 export class WaveManager {
@@ -178,7 +186,13 @@ export class WaveManager {
           bot: botPlayer,
           archetype: arch,
           lastFireTime: Date.now() + spawnGraceBase + Math.random() * 1500,
-          seed: Math.random() * 100
+          seed: Math.random() * 100,
+          aiState: 'attack',
+          stateTimer: 0,
+          lastSeenTargetPos: null,
+          patrolNode: [spawnPoint.x, spawnPoint.y, spawnPoint.z],
+          telegraphUntil: 0,
+          coverPosition: null
         });
       }
     }
@@ -197,6 +211,51 @@ export class WaveManager {
     if (this.onStateChange) this.onStateChange();
   }
 
+
+  private getTerrainHeight(x: number, z: number): number {
+    let groundY = 0.0;
+    const botRadius = 0.4;
+    for (let i = 0; i < this.mapObstacles.length; i++) {
+      const obs = this.mapObstacles[i];
+      if (
+        x + botRadius > obs.min[0] &&
+        x - botRadius < obs.max[0] &&
+        z + botRadius > obs.min[2] &&
+        z - botRadius < obs.max[2]
+      ) {
+        if (obs.max[1] > groundY && obs.max[1] <= 12.0) {
+          groundY = Math.max(groundY, obs.max[1]);
+        }
+      }
+    }
+    return groundY;
+  }
+
+  private findNearestCover(bot: PlayerNetworkState, target: PlayerNetworkState): [number, number, number] | null {
+    let bestCover: [number, number, number] | null = null;
+    let bestDistSq = Infinity;
+
+    for (const obs of this.mapObstacles) {
+      const centerX = (obs.min[0] + obs.max[0]) / 2;
+      const centerZ = (obs.min[2] + obs.max[2]) / 2;
+      const height = obs.max[1] - obs.min[1];
+      if (height < 1.4) continue;
+
+      const distSq = (centerX - bot.x) ** 2 + (centerZ - bot.z) ** 2;
+      if (distSq > 28 * 28 || distSq < 1) continue;
+
+      const sideX = centerX > target.x ? obs.max[0] + 0.8 : obs.min[0] - 0.8;
+      const sideZ = centerZ > target.z ? obs.max[2] + 0.8 : obs.min[2] - 0.8;
+
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        bestCover = [sideX, bot.y, sideZ];
+      }
+    }
+
+    return bestCover;
+  }
+
   public tick(dt: number): void {
     if (this.status !== 'active') return;
 
@@ -211,7 +270,6 @@ export class WaveManager {
       if (allHumans.length > 0) {
         this.status = 'game_over';
         this.updateWaveState();
-        // End match in defeat
         const pseudoWinner = allHumans[0];
         this.onEndGame(pseudoWinner, 'none');
         return;
@@ -256,6 +314,9 @@ export class WaveManager {
         continue;
       }
 
+      // Ground clamping to floor / platforms
+      bot.y = this.getTerrainHeight(bot.x, bot.z);
+
       // 1. Target selection: nearest living human player
       let target: PlayerNetworkState | null = null;
       let minDistSq = Infinity;
@@ -268,109 +329,188 @@ export class WaveManager {
         }
       }
 
-      if (!target) continue;
-
-      const dx = target.x - bot.x;
-      const dz = target.z - bot.z;
-      const dist = Math.sqrt(minDistSq);
-
-      // Desired yaw to face target
-      const targetYaw = Math.atan2(-dx, -dz);
-      bot.yaw = targetYaw;
-
-      // 2. Navigation & Steer
-      if (dist > 0.1) {
-        let dirX = dx / dist;
-        let dirZ = dz / dist;
-
-        // Add organic lateral strafing
-        const strafeTime = (now / 1000) + seed;
-        const strafeX = -dirZ * Math.sin(strafeTime * 2.5) * 0.4;
-        const strafeZ = dirX * Math.sin(strafeTime * 2.5) * 0.4;
-
-        let moveX = dirX + strafeX;
-        let moveZ = dirZ + strafeZ;
-        const moveMag = Math.hypot(moveX, moveZ);
-        if (moveMag > 0) {
-          moveX /= moveMag;
-          moveZ /= moveMag;
-        }
-
-        const prefRange = archetype.preferredRange;
-
-        if (dist > prefRange) {
-          // Rush forward
-          bot.x += moveX * archetype.speed * dt;
-          bot.z += moveZ * archetype.speed * dt;
-          bot.vx = moveX * archetype.speed;
-          bot.vz = moveZ * archetype.speed;
-        } else if (dist < prefRange - 2 && archetype.role !== 'rusher') {
-          // Back up slightly if not a melee rusher
-          bot.x -= dirX * archetype.speed * 0.4 * dt;
-          bot.z -= dirZ * archetype.speed * 0.4 * dt;
-          bot.vx = -dirX * archetype.speed * 0.4;
-          bot.vz = -dirZ * archetype.speed * 0.4;
-        } else {
-          // Circle strafe
-          bot.x += strafeX * archetype.speed * dt;
-          bot.z += strafeZ * archetype.speed * dt;
-          bot.vx = strafeX * archetype.speed;
-          bot.vz = strafeZ * archetype.speed;
-        }
-
-        // Avoid central fountain collision (radius 4.5m at origin)
-        if (isCity && (bot.x ** 2 + bot.z ** 2 < 25)) {
-          const fDist = Math.hypot(bot.x, bot.z) || 1;
-          bot.x += (bot.x / fDist) * 3.0 * dt;
-          bot.z += (bot.z / fDist) * 3.0 * dt;
-        }
-
-        // Resolve solid building and cover collisions for bots with tangential sliding
-        const botRadius = 0.6;
-        for (let oIdx = 0; oIdx < this.mapObstacles.length; oIdx++) {
-          const obs = this.mapObstacles[oIdx];
-          // Quick broadphase: check if bot is in horizontal vicinity
-          if (
-            bot.x + botRadius > obs.min[0] &&
-            bot.x - botRadius < obs.max[0] &&
-            bot.z + botRadius > obs.min[2] &&
-            bot.z - botRadius < obs.max[2]
-          ) {
-            // Check vertical overlap (bot height ~2m)
-            const botFeet = bot.y;
-            const botHead = bot.y + 1.8;
-            if (botFeet >= obs.max[1] - 0.2 || botHead <= obs.min[1] + 0.1) {
-              continue;
-            }
-
-            const dx1 = Math.abs(bot.x + botRadius - obs.min[0]);
-            const dx2 = Math.abs(obs.max[0] - (bot.x - botRadius));
-            const dz1 = Math.abs(bot.z + botRadius - obs.min[2]);
-            const dz2 = Math.abs(obs.max[2] - (bot.z - botRadius));
-
-            const min = Math.min(dx1, dx2, dz1, dz2);
-            if (min === dx1) {
-              bot.x = obs.min[0] - botRadius;
-              if (bot.vx > 0) bot.vx = 0;
-            } else if (min === dx2) {
-              bot.x = obs.max[0] + botRadius;
-              if (bot.vx < 0) bot.vx = 0;
-            } else if (min === dz1) {
-              bot.z = obs.min[2] - botRadius;
-              if (bot.vz > 0) bot.vz = 0;
-            } else if (min === dz2) {
-              bot.z = obs.max[2] + botRadius;
-              if (bot.vz < 0) bot.vz = 0;
-            }
-          }
-        }
-
-        // Clamp to map boundaries
-        bot.x = Math.max(-boundX, Math.min(boundX, bot.x));
-        bot.z = Math.max(-boundZ, Math.min(boundZ, bot.z));
+      if (!target) {
+        active.aiState = 'patrol';
+        continue;
       }
 
-      // Early wave scaling: gentler aim and longer cooldowns during introductory waves
+      const dx = target.x - bot.x;
+      const dy = (target.y + 1.1) - (bot.y + 1.1);
+      const dz = target.z - bot.z;
+      const dist = Math.sqrt(minDistSq) || 0.01;
+      const dist3D = Math.hypot(dx, dy, dz) || 0.01;
+
+      // Desired 3D aim angles towards target
+      const targetYaw = Math.atan2(-dx, -dz);
+      const targetPitch = Math.asin(Math.max(-0.95, Math.min(0.95, dy / dist3D)));
+
+      // Smooth turning towards target
+      let yawDiff = targetYaw - bot.yaw;
+      while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+      while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+      const maxTurn = 10.0 * dt;
+      bot.yaw += Math.max(-maxTurn, Math.min(maxTurn, yawDiff));
+      bot.pitch = targetPitch;
+
+      // 2. Line of Sight & Sensory Perception
+      const botEye: [number, number, number] = [bot.x, bot.y + 1.2, bot.z];
+      const targetBody: [number, number, number] = [target.x, target.y + 1.0, target.z];
+      const hasLOS = hasLineOfSight(botEye, targetBody, this.mapObstacles);
+
+      const fwdX = -Math.sin(bot.yaw);
+      const fwdZ = -Math.cos(bot.yaw);
+      const dot = (fwdX * dx + fwdZ * dz) / dist;
+      const inVisionCone = dot > 0.25 || dist < 14;
+      const canSeeTarget = hasLOS && inVisionCone;
+
+      // 3. State-Driven Goal Machine Transitions
+      if (canSeeTarget) {
+        active.lastSeenTargetPos = [target.x, target.y, target.z];
+        if (bot.health < bot.maxHealth * 0.35 && active.aiState !== 'take_cover' && active.coverPosition === null) {
+          const cover = this.findNearestCover(bot, target);
+          if (cover) {
+            active.aiState = 'take_cover';
+            active.coverPosition = cover;
+            active.stateTimer = 3.0;
+          }
+        } else if (active.aiState === 'patrol' || active.aiState === 'hunt') {
+          active.aiState = 'attack';
+        }
+      } else {
+        if (active.aiState === 'attack') {
+          if (active.lastSeenTargetPos) {
+            active.aiState = 'hunt';
+            active.stateTimer = 4.0;
+          } else {
+            active.aiState = 'patrol';
+          }
+        } else if (active.aiState === 'hunt') {
+          active.stateTimer -= dt;
+          if (active.stateTimer <= 0) {
+            active.aiState = 'patrol';
+            active.lastSeenTargetPos = null;
+          }
+        }
+      }
+
+      // 4. Navigation & Steering
+      if (active.aiState === 'take_cover' && active.coverPosition) {
+        active.stateTimer -= dt;
+        const cdx = active.coverPosition[0] - bot.x;
+        const cdz = active.coverPosition[2] - bot.z;
+        const cdist = Math.hypot(cdx, cdz);
+        if (active.stateTimer <= 0 || cdist < 0.8) {
+          active.aiState = 'attack';
+          active.coverPosition = null;
+        } else {
+          bot.vx = (cdx / cdist) * archetype.speed * 1.1;
+          bot.vz = (cdz / cdist) * archetype.speed * 1.1;
+          bot.x += bot.vx * dt;
+          bot.z += bot.vz * dt;
+        }
+      } else if (active.aiState === 'hunt' && active.lastSeenTargetPos) {
+        const hdx = active.lastSeenTargetPos[0] - bot.x;
+        const hdz = active.lastSeenTargetPos[2] - bot.z;
+        const hdist = Math.hypot(hdx, hdz);
+        if (hdist > 0.8) {
+          bot.vx = (hdx / hdist) * archetype.speed;
+          bot.vz = (hdz / hdist) * archetype.speed;
+          bot.x += bot.vx * dt;
+          bot.z += bot.vz * dt;
+        } else {
+          active.aiState = 'patrol';
+        }
+      } else if (active.aiState === 'telegraph') {
+        // Bracing to fire: stop to aim
+        bot.vx = 0;
+        bot.vz = 0;
+      } else {
+        // Default attack / patrol navigation towards target
+        if (dist > 0.1) {
+          let dirX = dx / dist;
+          let dirZ = dz / dist;
+
+          const strafeTime = (now / 1000) + seed;
+          const strafeX = -dirZ * Math.sin(strafeTime * 2.5) * 0.4;
+          const strafeZ = dirX * Math.sin(strafeTime * 2.5) * 0.4;
+
+          let moveX = dirX + strafeX;
+          let moveZ = dirZ + strafeZ;
+          const moveMag = Math.hypot(moveX, moveZ) || 1;
+          moveX /= moveMag;
+          moveZ /= moveMag;
+
+          const prefRange = archetype.preferredRange;
+
+          if (dist > prefRange) {
+            bot.x += moveX * archetype.speed * dt;
+            bot.z += moveZ * archetype.speed * dt;
+            bot.vx = moveX * archetype.speed;
+            bot.vz = moveZ * archetype.speed;
+          } else if (dist < prefRange - 2 && archetype.role !== 'rusher') {
+            bot.x -= dirX * archetype.speed * 0.4 * dt;
+            bot.z -= dirZ * archetype.speed * 0.4 * dt;
+            bot.vx = -dirX * archetype.speed * 0.4;
+            bot.vz = -dirZ * archetype.speed * 0.4;
+          } else {
+            bot.x += strafeX * archetype.speed * dt;
+            bot.z += strafeZ * archetype.speed * dt;
+            bot.vx = strafeX * archetype.speed;
+            bot.vz = strafeZ * archetype.speed;
+          }
+        }
+      }
+
+      // Avoid central fountain collision (radius 4.5m at origin)
+      if (isCity && (bot.x ** 2 + bot.z ** 2 < 25)) {
+        const fDist = Math.hypot(bot.x, bot.z) || 1;
+        bot.x += (bot.x / fDist) * 3.0 * dt;
+        bot.z += (bot.z / fDist) * 3.0 * dt;
+      }
+
+      // Resolve solid building and cover collisions for bots with tangential sliding
+      const botRadius = 0.6;
+      for (let oIdx = 0; oIdx < this.mapObstacles.length; oIdx++) {
+        const obs = this.mapObstacles[oIdx];
+        if (
+          bot.x + botRadius > obs.min[0] &&
+          bot.x - botRadius < obs.max[0] &&
+          bot.z + botRadius > obs.min[2] &&
+          bot.z - botRadius < obs.max[2]
+        ) {
+          const botFeet = bot.y;
+          const botHead = bot.y + 1.8;
+          if (botFeet >= obs.max[1] - 0.2 || botHead <= obs.min[1] + 0.1) {
+            continue;
+          }
+
+          const dx1 = Math.abs(bot.x + botRadius - obs.min[0]);
+          const dx2 = Math.abs(obs.max[0] - (bot.x - botRadius));
+          const dz1 = Math.abs(bot.z + botRadius - obs.min[2]);
+          const dz2 = Math.abs(obs.max[2] - (bot.z - botRadius));
+
+          const min = Math.min(dx1, dx2, dz1, dz2);
+          if (min === dx1) {
+            bot.x = obs.min[0] - botRadius;
+            if (bot.vx > 0) bot.vx = 0;
+          } else if (min === dx2) {
+            bot.x = obs.max[0] + botRadius;
+            if (bot.vx < 0) bot.vx = 0;
+          } else if (min === dz1) {
+            bot.z = obs.min[2] - botRadius;
+            if (bot.vz > 0) bot.vz = 0;
+          } else if (min === dz2) {
+            bot.z = obs.max[2] + botRadius;
+            if (bot.vz < 0) bot.vz = 0;
+          }
+        }
+      }
+
+      // Clamp to map boundaries
+      bot.x = Math.max(-boundX, Math.min(boundX, bot.x));
+      bot.z = Math.max(-boundZ, Math.min(boundZ, bot.z));
+
+      // 5. Combat & Firing
       let waveAccuracyMult = 1.0;
       let waveCooldownMult = 1.0;
       if (this.currentWave === 1) {
@@ -384,79 +524,78 @@ export class WaveManager {
         waveCooldownMult = 1.1;
       }
 
-      // 3. Combat & Firing
       const weaponStats = WEAPONS[archetype.weapon];
       const inRange = dist <= (weaponStats ? weaponStats.range : 30);
       const effectiveCooldown = archetype.fireCooldown * waveCooldownMult;
 
-      if (inRange && now - active.lastFireTime >= effectiveCooldown * 1000) {
-        // Melee check: Blade Rusher must be in close range to swing katana
-        if (archetype.weapon === 'katana' && dist > 2.6) {
-          continue;
+      if (inRange && (archetype.weapon !== 'katana' || dist <= 2.6)) {
+        if (hasLOS && active.aiState !== 'telegraph' && now - active.lastFireTime >= effectiveCooldown * 1000) {
+          active.aiState = 'telegraph';
+          active.telegraphUntil = now + (this.currentWave === 1 ? 280 : 200);
         }
+      }
 
-        // Line-of-Sight check: verify solid buildings or vehicles do not block line to target
-        const botEye: [number, number, number] = [bot.x, bot.y + 1.2, bot.z];
-        const targetBody: [number, number, number] = [target.x, target.y + 1.0, target.z];
+      if (active.aiState === 'telegraph' && now >= active.telegraphUntil) {
+        active.aiState = 'attack';
+
+        // Re-verify line of sight before pulling the trigger
         if (!hasLineOfSight(botEye, targetBody, this.mapObstacles)) {
-          continue; // View blocked by building! Bot continues navigating towards target.
+          active.lastFireTime = now;
+          continue;
         }
 
         active.lastFireTime = now;
 
-        // Emit visual fire event to room
-        this.io.to(this.roomState.roomId).emit('player_fired', {
-          shooterId: bot.id,
-          weaponType: bot.currentWeapon,
-          origin: [bot.x, bot.y + 1.2, bot.z],
-          direction: [Math.sin(-bot.yaw), 0, Math.cos(bot.yaw)],
-          hitPoint: [target.x, target.y + 1.2, target.z]
-        });
+        // True 3D forward direction from bot to target (NEVER shooting backward!)
+        const dirX = dx / dist3D;
+        const dirY = dy / dist3D;
+        const dirZ = dz / dist3D;
 
-        // Determine hit registration based on accuracy with distance falloff and wave scaling
+        // Hit registration roll
         const distFalloff = Math.max(0.35, 1 - (dist / 35));
         const effectiveAccuracy = archetype.accuracy * waveAccuracyMult * distFalloff;
         const hitRoll = Math.random();
+        const isHit = hitRoll < effectiveAccuracy;
+        const isHeadshot = isHit && Math.random() < 0.05;
 
-        if (hitRoll < effectiveAccuracy) {
-          // Reduced bot headshot chance (5% instead of 12%) to eliminate random 1-shots
-          const isHeadshot = Math.random() < 0.05;
+        let hitPoint: [number, number, number];
+        if (isHit) {
+          hitPoint = [target.x, target.y + (isHeadshot ? 1.4 : 1.0), target.z];
+        } else {
+          // Whiz-by tracer passing forward near player
+          const missOffX = (Math.random() - 0.5) * 1.6;
+          const missOffY = (Math.random() - 0.5) * 1.2;
+          const missOffZ = (Math.random() - 0.5) * 1.6;
+          hitPoint = [target.x + missOffX, target.y + 1.1 + missOffY, target.z + missOffZ];
+        }
 
-          // Controlled, fair bot damage per weapon / archetype
+        // Emit visual fire event
+        this.io.to(this.roomState.roomId).emit('player_fired', {
+          shooterId: bot.id,
+          weaponType: bot.currentWeapon,
+          origin: [bot.x, bot.y + 1.1, bot.z],
+          direction: [dirX, dirY, dirZ],
+          hitPoint
+        });
+
+        if (isHit) {
           let damage: number;
-          if (bot.currentWeapon === 'railgun') {
-            damage = 45;
-          } else if (bot.currentWeapon === 'plasma_launcher') {
-            damage = 35;
-          } else if (bot.currentWeapon === 'arc_disruptor') {
-            damage = 16;
-          } else if (bot.currentWeapon === 'needle_carbine') {
-            damage = 18;
-          } else {
+          if (bot.currentWeapon === 'railgun') damage = 45;
+          else if (bot.currentWeapon === 'plasma_launcher') damage = 35;
+          else if (bot.currentWeapon === 'arc_disruptor') damage = 16;
+          else if (bot.currentWeapon === 'needle_carbine') damage = 18;
+          else {
             switch (archetype.role) {
-              case 'rusher':
-                damage = 30; // Down from 75 (gives player time to react and escape)
-                break;
-              case 'sniper':
-                damage = 40; // Down from 95 (no instant wipe across map)
-                break;
-              case 'heavy':
-                damage = 22; // Down from 26+
-                break;
-              case 'boss':
-                damage = 24; // Standard rifle damage (no quad damage)
-                break;
+              case 'rusher': damage = 30; break;
+              case 'sniper': damage = 40; break;
+              case 'heavy': damage = 22; break;
+              case 'boss': damage = 24; break;
               case 'scout':
-              default:
-                damage = 18; // Down from 24
-                break;
+              default: damage = 18; break;
             }
           }
 
-          if (isHeadshot) {
-            damage = Math.round(damage * 1.35); // Capped multiplier (1.35x instead of 2.0x)
-          }
-
+          if (isHeadshot) damage = Math.round(damage * 1.35);
           this.applyDamageToPlayer(target, bot, damage, isHeadshot, bot.currentWeapon);
         }
       }

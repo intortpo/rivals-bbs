@@ -23,11 +23,13 @@ import { WeaponManager } from '../engine/WeaponManager.js';
 interface RemotePlayerEntry {
   model: CharacterModel;
   targetPos: THREE.Vector3;
+  prevPos: THREE.Vector3;
   targetYaw: number;
   targetPitch: number;
   isSliding: boolean;
   isJumping: boolean;
   isDead: boolean;
+  moveSpeedSmoothed: number;
 }
 
 export class NetworkClient {
@@ -380,11 +382,13 @@ export class NetworkClient {
         this.remotePlayers.set(id, {
           model,
           targetPos: new THREE.Vector3(pState.x, pState.y, pState.z),
+          prevPos: new THREE.Vector3(pState.x, pState.y, pState.z),
           targetYaw: pState.yaw,
           targetPitch: pState.pitch,
           isSliding: pState.isSliding,
           isJumping: pState.isJumping,
-          isDead: pState.isDead
+          isDead: pState.isDead,
+          moveSpeedSmoothed: 0
         });
       }
     }
@@ -394,27 +398,52 @@ export class NetworkClient {
     for (const [id, data] of Object.entries(snapshot.players)) {
       if (id === this.myId) continue;
 
-      const remote = this.remotePlayers.get(id);
-      if (remote) {
-        remote.targetPos.set(data.x, data.y, data.z);
-        remote.targetYaw = data.yaw;
-        remote.targetPitch = data.pitch;
-        remote.isSliding = data.isSliding;
-        remote.isJumping = data.isJumping;
+      let remote = this.remotePlayers.get(id);
+      if (!remote) {
+        // Fallback: spawn remote model if snapshot references new entity
+        const model = new CharacterModel(
+          this.scene,
+          id,
+          data.isBot ? 'Hostile Unit' : 'Pilot',
+          '#ff2a55',
+          false,
+          0
+        );
+        model.root.position.set(data.x, data.y, data.z);
+        model.root.rotation.y = data.yaw;
+        remote = {
+          model,
+          targetPos: new THREE.Vector3(data.x, data.y, data.z),
+          prevPos: new THREE.Vector3(data.x, data.y, data.z),
+          targetYaw: data.yaw,
+          targetPitch: data.pitch,
+          isSliding: data.isSliding,
+          isJumping: data.isJumping,
+          isDead: data.isDead,
+          moveSpeedSmoothed: 0
+        };
+        this.remotePlayers.set(id, remote);
+      }
 
-        // Check if remote was dead and respawned
-        if (remote.isDead && !data.isDead) {
-          remote.isDead = false;
-          remote.model.respawn(data.x, data.y, data.z, data.yaw);
-        } else if (!remote.isDead && data.isDead) {
-          remote.isDead = true;
-          remote.model.shatterIntoBricks();
-        }
+      remote.prevPos.copy(remote.targetPos);
+      remote.targetPos.set(data.x, data.y, data.z);
+      remote.targetYaw = data.yaw;
+      remote.targetPitch = data.pitch;
+      remote.isSliding = data.isSliding;
+      remote.isJumping = data.isJumping;
 
-        // Sync equipped weapon on remote avatar
-        if (data.currentWeapon && remote.model.currentWeapon !== data.currentWeapon) {
-          remote.model.setEquippedWeapon(data.currentWeapon);
-        }
+      // Check if remote was dead and respawned
+      if (remote.isDead && !data.isDead) {
+        remote.isDead = false;
+        remote.model.respawn(data.x, data.y, data.z, data.yaw);
+      } else if (!remote.isDead && data.isDead) {
+        remote.isDead = true;
+        remote.model.shatterIntoBricks();
+      }
+
+      // Sync equipped weapon on remote avatar
+      if (data.currentWeapon && remote.model.currentWeapon !== data.currentWeapon) {
+        remote.model.setEquippedWeapon(data.currentWeapon);
       }
     }
   }
@@ -435,7 +464,11 @@ export class NetworkClient {
         delta * 18
       );
 
-      const isMoving = remote.model.root.position.distanceTo(remote.targetPos) > 0.08;
+      // Smooth move speed tracking: decay smoothly instead of abrupt 1-frame cut
+      const currentDist = remote.model.root.position.distanceTo(remote.targetPos);
+      const targetSpeed = currentDist > 0.03 ? 1.0 : 0.0;
+      remote.moveSpeedSmoothed = THREE.MathUtils.lerp(remote.moveSpeedSmoothed, targetSpeed, delta * 10);
+      const isMoving = remote.moveSpeedSmoothed > 0.12;
 
       // Update procedural animation
       remote.model.update(
@@ -445,6 +478,9 @@ export class NetworkClient {
         remote.isJumping,
         remote.targetPitch
       );
+
+      // CRITICAL: Synchronize world matrix immediately after interpolation so raycasting against child colliders evaluates current frame position!
+      remote.model.root.updateMatrixWorld(true);
     }
   }
 
@@ -452,8 +488,7 @@ export class NetworkClient {
     const meshes: THREE.Object3D[] = [];
     for (const remote of this.remotePlayers.values()) {
       if (!remote.isDead) {
-        meshes.push(remote.model.torsoMesh);
-        meshes.push(remote.model.headMesh);
+        meshes.push(...remote.model.targetableColliders);
       }
     }
     return meshes;

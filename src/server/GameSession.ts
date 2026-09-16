@@ -720,7 +720,8 @@ export class GameSession {
         activePowerup: p.activePowerup,
         team: p.team,
         isDead: p.isDead,
-        currentWeapon: p.currentWeapon
+        currentWeapon: p.currentWeapon,
+        isBot: p.isBot
       };
     }
 

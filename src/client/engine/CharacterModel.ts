@@ -262,12 +262,25 @@ export class CharacterModel {
   // Hitbox meshes for precise raycasting
   public headCollider!: THREE.Mesh;
   public bodyCollider!: THREE.Mesh;
+  public pelvisCollider!: THREE.Mesh;
+  public leftLegCollider!: THREE.Mesh;
+  public rightLegCollider!: THREE.Mesh;
 
   public get torsoMesh(): THREE.Mesh {
     return this.bodyCollider;
   }
   public get headMesh(): THREE.Mesh {
     return this.headCollider;
+  }
+
+  public get targetableColliders(): THREE.Object3D[] {
+    return [
+      this.headCollider,
+      this.bodyCollider,
+      this.pelvisCollider,
+      this.leftLegCollider,
+      this.rightLegCollider
+    ].filter(Boolean);
   }
 
   private animTime: number = 0;
@@ -346,22 +359,45 @@ export class CharacterModel {
       depthWrite: false
     });
 
-    // Body / Torso Box: Height 0.70m, Width 0.40m, Depth 0.30m (proportional to 0.60 avatar scale)
-    const bodyGeo = new THREE.BoxGeometry(0.40, 0.70, 0.30);
-    this.bodyCollider = new THREE.Mesh(bodyGeo, hitMat);
-    this.bodyCollider.position.set(0, 0.58, 0);
-    this.bodyCollider.userData = { playerId: this.playerId, isHeadshot: false };
-    this.root.add(this.bodyCollider);
-
-    // Head Sphere: Radius 0.16m, elevated at y = 1.10m
-    const headGeo = new THREE.SphereGeometry(0.16, 12, 12);
+    // 1. Head Sphere: Radius 0.18m, elevated at y = 1.10m
+    const headGeo = new THREE.SphereGeometry(0.18, 12, 12);
     this.headCollider = new THREE.Mesh(headGeo, hitMat);
     this.headCollider.position.set(0, 1.10, 0);
-    this.headCollider.userData = { playerId: this.playerId, isHeadshot: true };
+    this.headCollider.userData = { playerId: this.playerId, isHead: true, isHeadshot: true, part: 'head' };
     this.root.add(this.headCollider);
+
+    // 2. Upper Chest & Torso: Width 0.46m, Height 0.40m, Depth 0.28m, centered at y = 0.80m
+    const chestGeo = new THREE.BoxGeometry(0.46, 0.40, 0.28);
+    this.bodyCollider = new THREE.Mesh(chestGeo, hitMat);
+    this.bodyCollider.position.set(0, 0.80, 0);
+    this.bodyCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'chest' };
+    this.root.add(this.bodyCollider);
+
+    // 3. Pelvis / Lower Abdomen: Width 0.42m, Height 0.30m, Depth 0.26m, centered at y = 0.50m
+    const pelvisGeo = new THREE.BoxGeometry(0.42, 0.30, 0.26);
+    this.pelvisCollider = new THREE.Mesh(pelvisGeo, hitMat);
+    this.pelvisCollider.position.set(0, 0.50, 0);
+    this.pelvisCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'pelvis' };
+    this.root.add(this.pelvisCollider);
+
+    // 4. Left Leg: Width 0.20m, Height 0.48m, Depth 0.22m, centered at x = -0.11m, y = 0.24m
+    const leftLegGeo = new THREE.BoxGeometry(0.20, 0.48, 0.22);
+    this.leftLegCollider = new THREE.Mesh(leftLegGeo, hitMat);
+    this.leftLegCollider.position.set(-0.11, 0.24, 0);
+    this.leftLegCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'leftLeg' };
+    this.root.add(this.leftLegCollider);
+
+    // 5. Right Leg: Width 0.20m, Height 0.48m, Depth 0.22m, centered at x = 0.11m, y = 0.24m
+    const rightLegGeo = new THREE.BoxGeometry(0.20, 0.48, 0.22);
+    this.rightLegCollider = new THREE.Mesh(rightLegGeo, hitMat);
+    this.rightLegCollider.position.set(0.11, 0.24, 0);
+    this.rightLegCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'rightLeg' };
+    this.root.add(this.rightLegCollider);
   }
 
   private loadCharacterMesh(): void {
+    if (typeof window === 'undefined') return;
+
     if (CharacterModel.cachedCharacterGLTF) {
       this.attachClonedModel(CharacterModel.cachedCharacterGLTF);
       return;
@@ -540,6 +576,8 @@ export class CharacterModel {
   }
 
   private buildNameplate(): void {
+    if (typeof document === 'undefined') return;
+
     this.nameplateGroup = new THREE.Group();
     this.nameplateGroup.position.y = 1.45; // Placed right above compact character head
 

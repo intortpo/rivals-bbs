@@ -656,7 +656,7 @@ export class WeaponManager {
 
         if (obj && obj.userData?.playerId) {
           hitPlayerId = obj.userData.playerId;
-          isHeadshot = Boolean(hit.object.userData?.isHead);
+          isHeadshot = Boolean(hit.object.userData?.isHead || hit.object.userData?.isHeadshot);
           break; // Hit enemy!
         }
 
@@ -697,7 +697,7 @@ export class WeaponManager {
         }
         if (obj && obj.userData?.playerId) {
           hitPlayerId = obj.userData.playerId;
-          isHeadshot = Boolean(hits[0].object.userData?.isHead);
+          isHeadshot = Boolean(hits[0].object.userData?.isHead || hits[0].object.userData?.isHeadshot);
         }
       }
 
@@ -751,7 +751,7 @@ export class WeaponManager {
         if (obj && obj.userData?.playerId) {
           if (!hitPlayerId) {
             hitPlayerId = obj.userData.playerId;
-            isHeadshot = Boolean(hit.object.userData?.isHead);
+            isHeadshot = Boolean(hit.object.userData?.isHead || hit.object.userData?.isHeadshot);
           }
         } else {
           // Solid map geometry stops the line
@@ -783,7 +783,7 @@ export class WeaponManager {
       }
       if (obj && obj.userData?.playerId) {
         hitPlayerId = obj.userData.playerId;
-        isHeadshot = Boolean(hit.object.userData?.isHead);
+        isHeadshot = Boolean(hit.object.userData?.isHead || hit.object.userData?.isHeadshot);
         hitPointVec = hit.point;
         break;
       } else {

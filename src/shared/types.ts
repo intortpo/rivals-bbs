@@ -178,6 +178,7 @@ export interface WorldSnapshot {
     team?: TeamColor;
     isDead: boolean;
     currentWeapon: WeaponType;
+    isBot?: boolean;
   }>;
 }
 

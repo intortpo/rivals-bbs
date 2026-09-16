@@ -15,6 +15,7 @@ import { GrammarReloadUI } from './ui/GrammarReloadUI.js';
 import { SettingsUI } from './ui/SettingsUI.js';
 import { DashboardUI } from './ui/DashboardUI.js';
 import { CharacterBuilderUI } from './ui/CharacterBuilderUI.js';
+import { LoadingScreenUI } from './ui/LoadingScreenUI.js';
 import { NetworkClient } from './network/NetworkClient.js';
 import { MOVEMENT, NETWORK, WEAPON_ORDER } from '../shared/constants.js';
 import { TeamColor } from '../shared/types.js';
@@ -31,6 +32,7 @@ class GameApp {
   private settingsUI!: SettingsUI;
   private dashboardUI!: DashboardUI;
   private characterBuilderUI!: CharacterBuilderUI;
+  private loadingScreenUI!: LoadingScreenUI;
   private qrManager!: QRManager;
   private lobbyUI!: LobbyUI;
   private authUI!: AuthUI;
@@ -106,6 +108,7 @@ class GameApp {
     });
     this.renderer.applyGraphicsQuality(this.settingsUI.settings.graphicsQuality);
     this.dashboardUI = new DashboardUI(this.appContainer);
+    this.loadingScreenUI = new LoadingScreenUI(this.appContainer);
     this.qrManager = new QRManager();
     this.mapBuilder = new MapBuilder(this.renderer.scene, 'Cartoon City', 'twilight');
 
@@ -264,7 +267,15 @@ class GameApp {
       if (codeInput) codeInput.value = roomParam.toUpperCase();
     }
 
-    // 7. Start Render & Game Loop
+    // 7. Interactive Asset Loading Screen (Preload character models, weapon GLBs, audio buffers & warm up shaders)
+    await this.loadingScreenUI.preloadGameAssets(
+      this.renderer.scene,
+      this.renderer.camera,
+      this.renderer.renderer,
+      this.audio
+    );
+
+    // 8. Start Render & Game Loop
     requestAnimationFrame(this.gameLoop.bind(this));
   }
 
