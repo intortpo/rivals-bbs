@@ -72,7 +72,7 @@ export class GameSession {
 
     if ((is4v4 || isWave) && (team === 'blue' || team === 'red')) {
       const teamPlayers = Object.values(this.roomState.players).filter(p => !p.isBot && p.team === team);
-      spawn = getTeamSpawn(team, teamPlayers.length);
+      spawn = getTeamSpawn(team, teamPlayers.length, this.roomState.mapName);
     } else {
       const spawns = getMapSpawns(this.roomState.mapName);
       const spawnIndex = Object.keys(this.roomState.players).length % spawns.length;
@@ -169,7 +169,9 @@ export class GameSession {
       if (p.isBot) continue;
       let spawn: { x: number; y: number; z: number; yaw: number };
       if ((is4v4 || isWave) && (p.team === 'blue' || p.team === 'red')) {
-        spawn = p.team === 'blue' ? getTeamSpawn('blue', blueIdx++) : getTeamSpawn('red', redIdx++);
+        spawn = p.team === 'blue'
+          ? getTeamSpawn('blue', blueIdx++, this.roomState.mapName)
+          : getTeamSpawn('red', redIdx++, this.roomState.mapName);
       } else {
         spawn = spawns[index % spawns.length];
       }
@@ -625,7 +627,7 @@ export class GameSession {
 
   private respawnPlayer(player: PlayerNetworkState): void {
     let spawn: { x: number; y: number; z: number; yaw: number };
-    if (this.roomState.mode === '4v4' && (player.team === 'blue' || player.team === 'red')) {
+    if ((this.roomState.mode === '4v4' || this.roomState.mode === 'wave') && (player.team === 'blue' || player.team === 'red')) {
       const idx = Math.floor(Math.random() * 4);
       spawn = getTeamSpawn(player.team, idx, this.roomState.mapName);
     } else {

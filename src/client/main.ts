@@ -18,7 +18,7 @@ import { CharacterBuilderUI } from './ui/CharacterBuilderUI.js';
 import { LoadingScreenUI } from './ui/LoadingScreenUI.js';
 import { NetworkClient } from './network/NetworkClient.js';
 import { ProjectileManager } from './engine/ProjectileManager.js';
-import { MOVEMENT, NETWORK, WEAPON_ORDER } from '../shared/constants.js';
+import { MOVEMENT, NETWORK, WEAPON_ORDER, getMapSpawns } from '../shared/constants.js';
 import { TeamColor } from '../shared/types.js';
 
 class GameApp {
@@ -300,7 +300,19 @@ class GameApp {
           this.currentHp = myState.health;
           this.currentShield = myState.shieldHp;
           this.playerPos.set(myState.x, myState.y, myState.z);
-          this.playerYaw = myState.yaw;
+          if (this.mapBuilder) {
+            const gLevel = this.mapBuilder.getGroundLevel(this.playerPos);
+            if (gLevel <= -3.0) {
+              const safeSpawns = getMapSpawns(this.mapBuilder.mapName);
+              const anchor = safeSpawns[0] || { x: 0, y: 0.0, z: 0, yaw: 0 };
+              this.playerPos.set(anchor.x, anchor.y, anchor.z);
+              this.playerYaw = anchor.yaw;
+            } else {
+              this.playerYaw = myState.yaw;
+            }
+          } else {
+            this.playerYaw = myState.yaw;
+          }
           this.playerVel.set(0, 0, 0);
           this.hud.updateHealth(myState.health);
           this.hud.updateShield(myState.shieldHp);
@@ -502,7 +514,19 @@ class GameApp {
     if (myState) {
       this.myTeam = myState.team || 'none';
       this.playerPos.set(myState.x, myState.y, myState.z);
-      this.playerYaw = myState.yaw;
+      if (this.mapBuilder) {
+        const gLevel = this.mapBuilder.getGroundLevel(this.playerPos);
+        if (gLevel <= -3.0) {
+          const safeSpawns = getMapSpawns(this.mapBuilder.mapName);
+          const anchor = safeSpawns[0] || { x: 0, y: 0.0, z: 0, yaw: 0 };
+          this.playerPos.set(anchor.x, anchor.y, anchor.z);
+          this.playerYaw = anchor.yaw;
+        } else {
+          this.playerYaw = myState.yaw;
+        }
+      } else {
+        this.playerYaw = myState.yaw;
+      }
       this.playerVel.set(0, 0, 0);
     }
 

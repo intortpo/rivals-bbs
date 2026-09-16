@@ -169,9 +169,11 @@ export class WaveManager {
         const botId = `bot_w${waveNum}_${botIndex++}`;
         const spawnPoint = spawns[(botIndex + 2) % spawns.length];
 
-        // Offset spawn slightly to prevent bots overlapping
-        const offsetX = (Math.random() - 0.5) * 4;
-        const offsetZ = (Math.random() - 0.5) * 4;
+        // Offset spawn slightly to prevent bots overlapping; tightly bounded on void maps
+        const isVoidMap = this.mapName === 'Cyber Spire' || this.mapName === 'Magma Foundry' || this.mapName === 'Sky Sanctuary';
+        const jitterRange = arch.role === 'boss' ? 0 : (isVoidMap ? 0.6 : 2.0);
+        const offsetX = (Math.random() - 0.5) * jitterRange;
+        const offsetZ = (Math.random() - 0.5) * jitterRange;
 
         // Early wave grace period: Wave 1 gives 3.5s-5.0s, Wave 2 gives 3.0s-4.5s, Wave 3+ gives 2.5s-4.0s
         const spawnGraceBase = waveNum === 1 ? 3500 : waveNum === 2 ? 3000 : 2500;
