@@ -52,6 +52,24 @@ class GameApp {
   private myTeam: TeamColor = 'none';
   private isDead: boolean = false;
 
+  // Movement feel & responsive input enhancements
+  private jumpBufferTimer: number = 0;
+  private coyoteTimer: number = 0;
+  private hasJumpedThisAirtime: boolean = false;
+
+  // Camera & viewmodel feel
+  private cameraRoll: number = 0;
+  private bobTimer: number = 0;
+  private swayOffsetX: number = 0;
+  private swayOffsetY: number = 0;
+
+  // Pre-allocated scratch vectors to prevent GC spikes in tick loop
+  private _scratchForward = new THREE.Vector3();
+  private _scratchRight = new THREE.Vector3();
+  private _scratchMoveDir = new THREE.Vector3();
+  private _scratchCamPos = new THREE.Vector3();
+  private _scratchCamDir = new THREE.Vector3();
+
   private lastTime: number = performance.now();
   private inputSendTimer: number = 0;
 
@@ -452,18 +470,37 @@ class GameApp {
   }
 
   private updatePlayerMovement(delta: number): void {
-    // 1. Look rotation
+    // 1. Look rotation & Viewmodel sway
     const look = this.input.getLookDeltas();
     this.playerYaw -= look.yaw;
     this.playerPitch = Math.max(-1.4, Math.min(1.4, this.playerPitch - look.pitch));
+
+    // Dynamic viewmodel sway: weapon lags slightly behind fast pans and smoothly catches up
+    this.swayOffsetX = THREE.MathUtils.lerp(this.swayOffsetX, Math.max(-0.06, Math.min(0.06, -look.yaw * 0.8)), delta * 15);
+    this.swayOffsetY = THREE.MathUtils.lerp(this.swayOffsetY, Math.max(-0.05, Math.min(0.05, -look.pitch * 0.8)), delta * 15);
+    this.weaponManager.viewModelContainer.position.set(this.swayOffsetX, this.swayOffsetY, 0);
 
     // 2. Input movement vector
     const move = this.input.getMoveVector();
     const isMovingInput = Math.abs(move.forward) > 0.05 || Math.abs(move.right) > 0.05;
 
-    // Movement forward/right relative to yaw
-    const forward = new THREE.Vector3(-Math.sin(this.playerYaw), 0, -Math.cos(this.playerYaw));
-    const right = new THREE.Vector3(Math.cos(this.playerYaw), 0, -Math.sin(this.playerYaw));
+    // Movement forward/right relative to yaw using scratch vectors (no per-frame allocations)
+    this._scratchForward.set(-Math.sin(this.playerYaw), 0, -Math.cos(this.playerYaw));
+    this._scratchRight.set(Math.cos(this.playerYaw), 0, -Math.sin(this.playerYaw));
+
+    // Jump buffering & coyote timing
+    if (this.input.isJumping()) {
+      this.jumpBufferTimer = 0.12; // 120ms jump buffer
+    } else if (this.jumpBufferTimer > 0) {
+      this.jumpBufferTimer -= delta;
+    }
+
+    if (this.isGrounded) {
+      this.coyoteTimer = 0.10; // 100ms coyote time
+      this.hasJumpedThisAirtime = false;
+    } else {
+      this.coyoteTimer -= delta;
+    }
 
     // 3. Sliding mechanic
     const slideRequested = this.input.isSliding();
@@ -471,11 +508,14 @@ class GameApp {
       // Initiate slide boost
       this.isSliding = true;
       this.slideTimer = MOVEMENT.SLIDE_DURATION_MAX;
-      this.slideDirection.copy(forward).multiplyScalar(move.forward).add(right.clone().multiplyScalar(move.right)).normalize();
+      this.slideDirection.copy(this._scratchForward).multiplyScalar(move.forward)
+        .addScaledVector(this._scratchRight, move.right).normalize();
       this.playerVel.x = this.slideDirection.x * MOVEMENT.SLIDE_INITIAL_SPEED;
       this.playerVel.z = this.slideDirection.z * MOVEMENT.SLIDE_INITIAL_SPEED;
       this.audio.playSlide();
     }
+
+    const canJump = (this.isGrounded || (this.coyoteTimer > 0 && !this.hasJumpedThisAirtime)) && this.jumpBufferTimer > 0;
 
     if (this.isSliding) {
       this.slideTimer -= delta;
@@ -488,11 +528,13 @@ class GameApp {
 
       this.fx.spawnSlideDust(this.playerPos);
 
-      // Slide-cancel jump!
-      if (this.input.isJumping() && this.isGrounded) {
+      // Slide-cancel jump with jump buffer
+      if (canJump) {
         this.playerVel.y = MOVEMENT.JUMP_VELOCITY * MOVEMENT.SLIDE_JUMP_BOOST;
         this.isGrounded = false;
         this.isSliding = false;
+        this.jumpBufferTimer = 0;
+        this.hasJumpedThisAirtime = true;
         this.audio.playJump();
       }
 
@@ -503,21 +545,33 @@ class GameApp {
       // Normal walk / sprint with speed boost support
       const speedMult = this.powerupManager.getSpeedMultiplier();
       const targetSpeed = MOVEMENT.WALK_SPEED * speedMult;
-      const moveDir = forward.clone().multiplyScalar(move.forward).add(right.clone().multiplyScalar(move.right));
-      this.playerVel.x = moveDir.x * targetSpeed;
-      this.playerVel.z = moveDir.z * targetSpeed;
+      this._scratchMoveDir.copy(this._scratchForward).multiplyScalar(move.forward)
+        .addScaledVector(this._scratchRight, move.right);
+      this.playerVel.x = this._scratchMoveDir.x * targetSpeed;
+      this.playerVel.z = this._scratchMoveDir.z * targetSpeed;
 
-      // Regular jump
-      if (this.input.isJumping()) {
+      // Regular jump with buffer & coyote
+      if (canJump) {
         this.playerVel.y = MOVEMENT.JUMP_VELOCITY;
         this.isGrounded = false;
+        this.jumpBufferTimer = 0;
+        this.hasJumpedThisAirtime = true;
         this.audio.playJump();
       }
+    } else if (canJump) {
+      // Coyote time jump after stepping off ledge
+      this.playerVel.y = MOVEMENT.JUMP_VELOCITY;
+      this.coyoteTimer = 0;
+      this.jumpBufferTimer = 0;
+      this.hasJumpedThisAirtime = true;
+      this.audio.playJump();
     }
 
-    // 4. Gravity & Vertical motion
+    // 4. Gravity & Vertical motion (in-place math, no Vector3 allocation)
     this.playerVel.y -= MOVEMENT.GRAVITY * delta;
-    this.playerPos.add(this.playerVel.clone().multiplyScalar(delta));
+    this.playerPos.x += this.playerVel.x * delta;
+    this.playerPos.y += this.playerVel.y * delta;
+    this.playerPos.z += this.playerVel.z * delta;
 
     // Floor collision & Jump pads
     const groundLevel = this.mapBuilder.getGroundLevel(this.playerPos);
@@ -535,14 +589,25 @@ class GameApp {
       this.audio.playJump();
     }
 
-    // Simple boundary & obstacle collision clamping
+    // Boundary & obstacle collision clamping
     this.resolveArenaCollisions();
 
-    // 5. Update Camera
-    const eyeHeight = this.isSliding ? MOVEMENT.SLIDE_EYE_HEIGHT : MOVEMENT.EYE_HEIGHT;
+    // 5. Update Camera (Roll tilt, dynamic head bob, and position)
+    const targetRoll = this.isSliding ? -0.05 : -move.right * 0.025;
+    this.cameraRoll = THREE.MathUtils.lerp(this.cameraRoll, targetRoll, delta * 14);
+
+    if (this.isGrounded && isMovingInput) {
+      this.bobTimer += delta * (this.isSliding ? 14 : 10);
+    } else {
+      this.bobTimer = 0;
+    }
+    const bobOffset = this.isGrounded && isMovingInput ? Math.sin(this.bobTimer) * 0.035 : 0;
+
+    const eyeHeight = (this.isSliding ? MOVEMENT.SLIDE_EYE_HEIGHT : MOVEMENT.EYE_HEIGHT) + bobOffset;
     this.renderer.camera.position.set(this.playerPos.x, this.playerPos.y + eyeHeight, this.playerPos.z);
     this.renderer.camera.rotation.y = this.playerYaw;
     this.renderer.camera.rotation.x = this.playerPitch;
+    this.renderer.camera.rotation.z = this.cameraRoll;
 
     // Crosshair dynamic spread
     this.hud.updateCrosshairSpread(isMovingInput, this.isSliding);
@@ -642,15 +707,18 @@ class GameApp {
         if (fireRes.fired) {
           this.audio.playShoot(this.weaponManager.currentWeaponType);
 
-          const camPos = new THREE.Vector3();
-          this.renderer.camera.getWorldPosition(camPos);
-          const camDir = new THREE.Vector3();
-          this.renderer.camera.getWorldDirection(camDir);
+          this.renderer.camera.getWorldPosition(this._scratchCamPos);
+          this.renderer.camera.getWorldDirection(this._scratchCamDir);
+
+          // Subtle visceral camera recoil punch on fire
+          const recoilKick = this.weaponManager.currentWeaponType === 'sniper' ? 0.032
+            : this.weaponManager.currentWeaponType === 'shotgun' ? 0.024 : 0.012;
+          this.playerPitch = Math.min(1.4, this.playerPitch + recoilKick);
 
           this.networkClient.sendFire({
             weaponType: this.weaponManager.currentWeaponType,
-            origin: [camPos.x, camPos.y, camPos.z],
-            direction: [camDir.x, camDir.y, camDir.z],
+            origin: [this._scratchCamPos.x, this._scratchCamPos.y, this._scratchCamPos.z],
+            direction: [this._scratchCamDir.x, this._scratchCamDir.y, this._scratchCamDir.z],
             targetPlayerId: fireRes.hitPlayerId,
             isHeadshot: fireRes.isHeadshot,
             hitPoint: fireRes.hitPoint

@@ -5,8 +5,14 @@ import { WEAPONS } from '../../shared/constants.js';
 
 interface Tracer {
   line: THREE.Line;
-  start: THREE.Vector3;
-  end: THREE.Vector3;
+  posAttr: THREE.BufferAttribute;
+  startX: number;
+  startY: number;
+  startZ: number;
+  endX: number;
+  endY: number;
+  endZ: number;
+  dist: number;
   progress: number;
   speed: number;
 }
@@ -43,6 +49,7 @@ export class WeaponManager {
   public static cachedWeaponModels: Map<WeaponType, THREE.Group> = new Map();
 
   private tracers: Tracer[] = [];
+  private tracerPool: Tracer[] = [];
   private sceneRef: THREE.Scene;
 
   // Recoil recovery
@@ -406,23 +413,60 @@ export class WeaponManager {
   }
 
   public spawnTracer(from: THREE.Vector3, to: THREE.Vector3): void {
-    const geo = new THREE.BufferGeometry().setFromPoints([from, from.clone()]);
-    const mat = new THREE.LineBasicMaterial({
-      color: this.currentWeaponType === 'sniper' ? '#ff3366' : '#ffee55',
-      linewidth: 2,
-      transparent: true,
-      opacity: 0.85
-    });
-    const line = new THREE.Line(geo, mat);
-    this.sceneRef.add(line);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dz = to.z - from.z;
+    const dist = Math.hypot(dx, dy, dz) || 1;
 
-    this.tracers.push({
-      line,
-      start: from.clone(),
-      end: to.clone(),
-      progress: 0,
-      speed: 160 // units/sec
-    });
+    let tr = this.tracerPool.pop();
+    if (!tr) {
+      const positions = new Float32Array(6);
+      const geo = new THREE.BufferGeometry();
+      const posAttr = new THREE.BufferAttribute(positions, 3);
+      geo.setAttribute('position', posAttr);
+      const mat = new THREE.LineBasicMaterial({
+        color: '#ffee55',
+        linewidth: 2,
+        transparent: true,
+        opacity: 0.85
+      });
+      const line = new THREE.Line(geo, mat);
+      tr = {
+        line,
+        posAttr,
+        startX: 0,
+        startY: 0,
+        startZ: 0,
+        endX: 0,
+        endY: 0,
+        endZ: 0,
+        dist: 1,
+        progress: 0,
+        speed: 180
+      };
+    }
+
+    (tr.line.material as THREE.LineBasicMaterial).color.set(
+      this.currentWeaponType === 'sniper' ? '#ff3366' : '#ffee55'
+    );
+
+    tr.startX = from.x;
+    tr.startY = from.y;
+    tr.startZ = from.z;
+    tr.endX = to.x;
+    tr.endY = to.y;
+    tr.endZ = to.z;
+    tr.dist = dist;
+    tr.progress = 0;
+
+    // Set initial position
+    const pArr = tr.posAttr.array as Float32Array;
+    pArr[0] = from.x; pArr[1] = from.y; pArr[2] = from.z;
+    pArr[3] = from.x; pArr[4] = from.y; pArr[5] = from.z;
+    tr.posAttr.needsUpdate = true;
+
+    this.sceneRef.add(tr.line);
+    this.tracers.push(tr);
   }
 
   public update(delta: number): void {
@@ -467,21 +511,30 @@ export class WeaponManager {
       this.viewModelPivot.rotation.x = this.recoilRotation.x;
     }
 
-    // Update bullet tracers
+    // Update bullet tracers without vector allocations
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const tr = this.tracers[i];
-      const dist = tr.start.distanceTo(tr.end);
-      tr.progress += (tr.speed * delta) / (dist || 1);
+      tr.progress += (tr.speed * delta) / tr.dist;
 
       if (tr.progress >= 1.0) {
         this.sceneRef.remove(tr.line);
-        tr.line.geometry.dispose();
-        (tr.line.material as THREE.Material).dispose();
+        this.tracerPool.push(tr);
         this.tracers.splice(i, 1);
       } else {
-        const head = tr.start.clone().lerp(tr.end, tr.progress);
-        const tail = tr.start.clone().lerp(tr.end, Math.max(0, tr.progress - 0.2));
-        tr.line.geometry.setFromPoints([tail, head]);
+        const pArr = tr.posAttr.array as Float32Array;
+        const tailProgress = Math.max(0, tr.progress - 0.2);
+
+        // Tail vertex
+        pArr[0] = tr.startX + (tr.endX - tr.startX) * tailProgress;
+        pArr[1] = tr.startY + (tr.endY - tr.startY) * tailProgress;
+        pArr[2] = tr.startZ + (tr.endZ - tr.startZ) * tailProgress;
+
+        // Head vertex
+        pArr[3] = tr.startX + (tr.endX - tr.startX) * tr.progress;
+        pArr[4] = tr.startY + (tr.endY - tr.startY) * tr.progress;
+        pArr[5] = tr.startZ + (tr.endZ - tr.startZ) * tr.progress;
+
+        tr.posAttr.needsUpdate = true;
       }
     }
   }

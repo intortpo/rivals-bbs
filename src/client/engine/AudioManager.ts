@@ -3,6 +3,7 @@ import { WeaponType } from '../../shared/types.js';
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private sharedNoiseBuffer: AudioBuffer | null = null;
   private isMuted: boolean = false;
   public masterVolume: number = 0.8;
   public sfxVolume: number = 0.8;
@@ -20,6 +21,14 @@ export class AudioManager {
         this.masterGain = this.ctx.createGain();
         this.updateMasterVolume();
         this.masterGain.connect(this.ctx.destination);
+
+        // Pre-generate 1.0 second of white noise buffer once to avoid per-sound memory allocations
+        const length = Math.floor(this.ctx.sampleRate * 1.0);
+        this.sharedNoiseBuffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+        const data = this.sharedNoiseBuffer.getChannelData(0);
+        for (let i = 0; i < length; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
@@ -79,16 +88,9 @@ export class AudioManager {
       return;
     }
 
-    // Gunshot noise burst
-    const bufferSize = this.ctx.sampleRate * 0.1;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-
+    // Gunshot noise burst from shared noise buffer
     const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
+    noise.buffer = this.sharedNoiseBuffer;
 
     const filter = this.ctx.createBiquadFilter();
     filter.type = weapon === 'shotgun' ? 'lowpass' : 'bandpass';
@@ -184,16 +186,9 @@ export class AudioManager {
     if (!this.ctx || !this.masterGain) return;
 
     const t = this.ctx.currentTime;
-    // Friction whoosh
-    const bufferSize = this.ctx.sampleRate * 0.4;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-
+    // Friction whoosh from shared noise buffer
     const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
+    noise.buffer = this.sharedNoiseBuffer;
 
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';

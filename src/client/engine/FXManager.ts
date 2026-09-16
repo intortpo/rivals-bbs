@@ -1,14 +1,19 @@
 import * as THREE from 'three';
 
-interface DamageNumber {
+interface PooledDamageSprite {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  texture: THREE.CanvasTexture;
   sprite: THREE.Sprite;
   vy: number;
   life: number;
   maxLife: number;
+  active: boolean;
 }
 
 interface DustParticle {
   mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
   vx: number;
   vy: number;
   vz: number;
@@ -17,8 +22,16 @@ interface DustParticle {
 
 export class FXManager {
   private scene: THREE.Scene;
-  private damageNumbers: DamageNumber[] = [];
+  
+  // Pooled damage sprites
+  private damageSpritePool: PooledDamageSprite[] = [];
+  private static readonly MAX_DAMAGE_SPRITES = 10;
+
+  // Pooled dust particles
   private dustParticles: DustParticle[] = [];
+  private dustPool: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
+  private static readonly dustGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+  private static readonly MAX_ACTIVE_DUST = 24;
 
   // Hitmarker UI elements
   private hitmarkerEl: HTMLElement | null = null;
@@ -72,11 +85,32 @@ export class FXManager {
   }
 
   public spawnDamageNumber(pos: [number, number, number], damage: number, isHeadshot: boolean): void {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    // Find or create an available pooled damage sprite
+    let pooled = this.damageSpritePool.find(p => !p.active);
+    if (!pooled && this.damageSpritePool.length < FXManager.MAX_DAMAGE_SPRITES) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false
+      });
+      const sprite = new THREE.Sprite(spriteMat);
+      pooled = { canvas, ctx, texture, sprite, vy: 1.8, life: 0.9, maxLife: 0.9, active: false };
+      this.damageSpritePool.push(pooled);
+    } else if (!pooled) {
+      // Reuse oldest active sprite if pool is at capacity
+      pooled = this.damageSpritePool[0];
+      this.scene.remove(pooled.sprite);
+    }
+
+    const { canvas, ctx, texture, sprite } = pooled;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.font = isHeadshot ? '900 52px system-ui, sans-serif' : 'bold 44px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -91,13 +125,8 @@ export class FXManager {
     ctx.fillStyle = isHeadshot ? '#ff2a55' : '#ffea00';
     ctx.fillText(text, 128, 64);
 
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthTest: false
-    });
-    const sprite = new THREE.Sprite(spriteMat);
+    texture.needsUpdate = true;
+    sprite.material.opacity = 1.0;
     sprite.scale.set(isHeadshot ? 2.5 : 1.8, isHeadshot ? 1.25 : 0.9, 1);
     sprite.position.set(
       pos[0] + (Math.random() - 0.5) * 0.4,
@@ -105,33 +134,43 @@ export class FXManager {
       pos[2] + (Math.random() - 0.5) * 0.4
     );
 
-    this.scene.add(sprite);
+    pooled.life = 0.9;
+    pooled.maxLife = 0.9;
+    pooled.vy = 1.8;
+    pooled.active = true;
 
-    this.damageNumbers.push({
-      sprite,
-      vy: 1.8,
-      life: 0.9,
-      maxLife: 0.9
-    });
+    if (!sprite.parent) {
+      this.scene.add(sprite);
+    }
   }
 
   public spawnSlideDust(pos: THREE.Vector3): void {
-    const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-    const mat = new THREE.MeshBasicMaterial({
-      color: '#cbd5e1',
-      transparent: true,
-      opacity: 0.6
-    });
-    const mesh = new THREE.Mesh(geo, mat);
+    if (this.dustParticles.length >= FXManager.MAX_ACTIVE_DUST) return;
+
+    let item = this.dustPool.pop();
+    if (!item) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: '#cbd5e1',
+        transparent: true,
+        opacity: 0.6
+      });
+      const mesh = new THREE.Mesh(FXManager.dustGeometry, mat);
+      item = { mesh, mat };
+    }
+
+    const { mesh, mat } = item;
+    mat.opacity = 0.6;
+    mesh.scale.set(1, 1, 1);
     mesh.position.set(
       pos.x + (Math.random() - 0.5) * 0.4,
       0.1,
       pos.z + (Math.random() - 0.5) * 0.4
     );
-    this.scene.add(mesh);
 
+    this.scene.add(mesh);
     this.dustParticles.push({
       mesh,
+      mat,
       vx: (Math.random() - 0.5) * 1.5,
       vy: 0.8 + Math.random() * 1.2,
       vz: (Math.random() - 0.5) * 1.5,
@@ -149,24 +188,23 @@ export class FXManager {
       }
     }
 
-    // Damage numbers
-    for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
-      const dn = this.damageNumbers[i];
-      dn.life -= delta;
-      dn.sprite.position.y += dn.vy * delta;
+    // Pooled damage numbers
+    for (const p of this.damageSpritePool) {
+      if (!p.active) continue;
 
-      const progress = dn.life / dn.maxLife;
-      dn.sprite.material.opacity = Math.min(1, progress * 1.5);
+      p.life -= delta;
+      p.sprite.position.y += p.vy * delta;
 
-      if (dn.life <= 0) {
-        this.scene.remove(dn.sprite);
-        dn.sprite.material.map?.dispose();
-        dn.sprite.material.dispose();
-        this.damageNumbers.splice(i, 1);
+      const progress = p.life / p.maxLife;
+      p.sprite.material.opacity = Math.min(1, progress * 1.5);
+
+      if (p.life <= 0) {
+        p.active = false;
+        this.scene.remove(p.sprite);
       }
     }
 
-    // Dust particles
+    // Pooled dust particles
     for (let i = this.dustParticles.length - 1; i >= 0; i--) {
       const dp = this.dustParticles[i];
       dp.life -= delta;
@@ -175,13 +213,11 @@ export class FXManager {
       dp.mesh.position.z += dp.vz * delta;
       dp.mesh.scale.multiplyScalar(0.96);
 
-      const mat = dp.mesh.material as THREE.MeshBasicMaterial;
-      mat.opacity = Math.max(0, dp.life / 0.4);
+      dp.mat.opacity = Math.max(0, (dp.life / 0.4) * 0.6);
 
       if (dp.life <= 0) {
         this.scene.remove(dp.mesh);
-        dp.mesh.geometry.dispose();
-        mat.dispose();
+        this.dustPool.push({ mesh: dp.mesh, mat: dp.mat });
         this.dustParticles.splice(i, 1);
       }
     }
@@ -190,6 +226,18 @@ export class FXManager {
   public dispose(): void {
     if (this.hitmarkerEl && this.hitmarkerEl.parentNode) {
       this.hitmarkerEl.parentNode.removeChild(this.hitmarkerEl);
+    }
+    for (const p of this.damageSpritePool) {
+      this.scene.remove(p.sprite);
+      p.texture.dispose();
+      p.sprite.material.dispose();
+    }
+    for (const d of this.dustParticles) {
+      this.scene.remove(d.mesh);
+      d.mat.dispose();
+    }
+    for (const item of this.dustPool) {
+      item.mat.dispose();
     }
   }
 }

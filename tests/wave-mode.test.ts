@@ -162,10 +162,14 @@ async function runWaveTest() {
 
   // Step 5: Test Player Weapon Hit on Bot
   const hitPromise = new Promise<HitNotificationPayload>((resolve) => {
-    client.on('player_hit', (data: HitNotificationPayload) => {
-      console.log(`✓ Player hit event on bot: damage=${data.damage}, botRemainingHp=${data.targetRemainingHp}`);
-      resolve(data);
-    });
+    const handler = (data: HitNotificationPayload) => {
+      if (data.targetId === firstBotId) {
+        client.off('player_hit', handler);
+        console.log(`✓ Player hit event on bot: damage=${data.damage}, botRemainingHp=${data.targetRemainingHp}`);
+        resolve(data);
+      }
+    };
+    client.on('player_hit', handler);
   });
 
   // Client fires rifle at bot

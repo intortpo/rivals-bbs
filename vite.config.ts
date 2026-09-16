@@ -16,6 +16,14 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist/client',
-    target: 'esnext'
+    target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+          vendor: ['socket.io-client', 'qrcode', 'html5-qrcode']
+        }
+      }
+    }
   }
 });

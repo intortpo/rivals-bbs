@@ -280,6 +280,46 @@ export class WaveManager {
           bot.z += (bot.z / fDist) * 3.0 * dt;
         }
 
+        // Resolve solid building and cover collisions for bots with tangential sliding
+        const botRadius = 0.6;
+        for (let oIdx = 0; oIdx < this.mapObstacles.length; oIdx++) {
+          const obs = this.mapObstacles[oIdx];
+          // Quick broadphase: check if bot is in horizontal vicinity
+          if (
+            bot.x + botRadius > obs.min[0] &&
+            bot.x - botRadius < obs.max[0] &&
+            bot.z + botRadius > obs.min[2] &&
+            bot.z - botRadius < obs.max[2]
+          ) {
+            // Check vertical overlap (bot height ~2m)
+            const botFeet = bot.y;
+            const botHead = bot.y + 1.8;
+            if (botFeet >= obs.max[1] - 0.2 || botHead <= obs.min[1] + 0.1) {
+              continue;
+            }
+
+            const dx1 = Math.abs(bot.x + botRadius - obs.min[0]);
+            const dx2 = Math.abs(obs.max[0] - (bot.x - botRadius));
+            const dz1 = Math.abs(bot.z + botRadius - obs.min[2]);
+            const dz2 = Math.abs(obs.max[2] - (bot.z - botRadius));
+
+            const min = Math.min(dx1, dx2, dz1, dz2);
+            if (min === dx1) {
+              bot.x = obs.min[0] - botRadius;
+              if (bot.vx > 0) bot.vx = 0;
+            } else if (min === dx2) {
+              bot.x = obs.max[0] + botRadius;
+              if (bot.vx < 0) bot.vx = 0;
+            } else if (min === dz1) {
+              bot.z = obs.min[2] - botRadius;
+              if (bot.vz > 0) bot.vz = 0;
+            } else if (min === dz2) {
+              bot.z = obs.max[2] + botRadius;
+              if (bot.vz < 0) bot.vz = 0;
+            }
+          }
+        }
+
         // Clamp to map boundaries
         bot.x = Math.max(-boundX, Math.min(boundX, bot.x));
         bot.z = Math.max(-boundZ, Math.min(boundZ, bot.z));

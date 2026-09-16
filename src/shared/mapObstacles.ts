@@ -76,8 +76,25 @@ export function hasLineOfSight(
   to: [number, number, number],
   obstacles: BoundingBox[]
 ): boolean {
+  const rMinX = from[0] < to[0] ? from[0] : to[0];
+  const rMaxX = from[0] > to[0] ? from[0] : to[0];
+  const rMinY = from[1] < to[1] ? from[1] : to[1];
+  const rMaxY = from[1] > to[1] ? from[1] : to[1];
+  const rMinZ = from[2] < to[2] ? from[2] : to[2];
+  const rMaxZ = from[2] > to[2] ? from[2] : to[2];
+
   for (let i = 0; i < obstacles.length; i++) {
-    if (lineIntersectsBox(from, to, obstacles[i])) {
+    const box = obstacles[i];
+    // Fast broadphase AABB rejection: if ray segment bounds do not overlap obstacle, skip slab test
+    if (
+      box.min[0] > rMaxX || box.max[0] < rMinX ||
+      box.min[1] > rMaxY || box.max[1] < rMinY ||
+      box.min[2] > rMaxZ || box.max[2] < rMinZ
+    ) {
+      continue;
+    }
+
+    if (lineIntersectsBox(from, to, box)) {
       return false;
     }
   }

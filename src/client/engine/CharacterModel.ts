@@ -276,6 +276,14 @@ export class CharacterModel {
   private static loadWaiters: Array<(gltf: THREE.Group) => void> = [];
   private static debrisList: BrickDebris[] = [];
   private static sceneRef: THREE.Scene | null = null;
+  private static readonly debrisGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+  private static readonly debrisMaterials = [
+    new THREE.MeshStandardMaterial({ color: '#00d2ff', roughness: 0.3 }),
+    new THREE.MeshStandardMaterial({ color: '#ffbb00', roughness: 0.3 }),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.3 }),
+    new THREE.MeshStandardMaterial({ color: '#ff2a55', roughness: 0.3 }),
+    new THREE.MeshStandardMaterial({ color: '#222233', roughness: 0.3 })
+  ];
 
   constructor(
     scene: THREE.Scene,
@@ -667,15 +675,10 @@ export class CharacterModel {
       this.nameplateGroup.visible = false;
     }
 
-    // Spawn celebratory brick debris
-    const colors = [this.playerColor, '#00d2ff', '#ffbb00', '#ffffff', '#222233'];
+    // Spawn celebratory brick debris using shared geometry and materials
     for (let i = 0; i < 12; i++) {
-      const mat = new THREE.MeshStandardMaterial({
-        color: colors[i % colors.length],
-        roughness: 0.3
-      });
-      const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-      const brick = new THREE.Mesh(geo, mat);
+      const mat = CharacterModel.debrisMaterials[i % CharacterModel.debrisMaterials.length];
+      const brick = new THREE.Mesh(CharacterModel.debrisGeometry, mat);
 
       brick.position.copy(this.root.position);
       brick.position.y += 0.5 + Math.random() * 0.8;
@@ -740,8 +743,6 @@ export class CharacterModel {
       d.life -= delta;
       if (d.life <= 0) {
         CharacterModel.sceneRef?.remove(d.mesh);
-        d.mesh.geometry.dispose();
-        (d.mesh.material as THREE.Material).dispose();
         CharacterModel.debrisList.splice(i, 1);
       }
     }
