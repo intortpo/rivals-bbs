@@ -836,11 +836,15 @@ class GameApp {
       ) {
         this.triggerReloadFlow();
       } else {
-        const targetMeshes = [
-          ...this.networkClient.getTargetableMeshes(),
-          this.mapBuilder.group
-        ];
-        const fireRes = this.weaponManager.fire(this.renderer.camera, targetMeshes, this.input.isFiring());
+        const targetMeshes = this.networkClient.getTargetableMeshes();
+        const solidMeshes = this.mapBuilder.getSolidMeshes();
+        const fireRes = this.weaponManager.fire(
+          this.renderer.camera,
+          targetMeshes,
+          solidMeshes,
+          this.input.isFiring(),
+          isAiming
+        );
 
         if (fireRes.fired) {
           this.audio.playShoot(this.weaponManager.currentWeaponType);

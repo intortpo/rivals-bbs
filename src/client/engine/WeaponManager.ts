@@ -354,6 +354,9 @@ export class WeaponManager {
   }
 
   private loadGLBWeapons(): void {
+    if (typeof window === 'undefined') {
+      return; // Headless / test environment guard
+    }
     const loader = new GLTFLoader();
 
     const configs: {
@@ -505,7 +508,9 @@ export class WeaponManager {
   public fire(
     camera: THREE.Camera,
     targetableMeshes: THREE.Object3D[],
-    _isFiringInput: boolean = true
+    solidMeshes: THREE.Object3D[] = [],
+    _isFiringInput: boolean = true,
+    isAiming: boolean = false
   ): {
     fired: boolean;
     hitPlayerId?: string;
@@ -557,13 +562,16 @@ export class WeaponManager {
       : stats.type === 'shotgun' ? 0.20 : 0.12;
 
     const raycaster = new THREE.Raycaster();
+    raycaster.params.Line.threshold = 0; // Prevent Three.js 1m threshold line interception
     const camDir = new THREE.Vector3();
     camera.getWorldDirection(camDir);
 
-    // Apply spread
-    if (stats.spread > 0) {
-      const spreadX = (Math.random() - 0.5) * stats.spread;
-      const spreadY = (Math.random() - 0.5) * stats.spread;
+    // Apply spread (75-80% reduction during ADS aim)
+    const spreadFactor = isAiming ? 0.20 : 1.0;
+    const effectiveSpread = stats.spread * spreadFactor;
+    if (effectiveSpread > 0) {
+      const spreadX = (Math.random() - 0.5) * effectiveSpread;
+      const spreadY = (Math.random() - 0.5) * effectiveSpread;
       camDir.x += spreadX;
       camDir.y += spreadY;
       camDir.normalize();
@@ -577,6 +585,33 @@ export class WeaponManager {
     let hitPlayerId: string | undefined;
     let isHeadshot = false;
     let hitPointVec: THREE.Vector3 = camPos.clone().add(camDir.clone().multiplyScalar(stats.range));
+
+    // Helper to extract closest player hit in front of solid obstacles
+    const resolveTargetHit = (hits: THREE.Intersection[], maxDist: number) => {
+      for (const hit of hits) {
+        if (hit.distance > maxDist + 0.05) break;
+        let obj: THREE.Object3D | null = hit.object;
+        while (obj && !obj.userData?.playerId) {
+          obj = obj.parent;
+        }
+        if (obj && obj.userData?.playerId) {
+          const playerId = obj.userData.playerId;
+          const headshot = hits.some((h) => {
+            let p: THREE.Object3D | null = h.object;
+            while (p && !p.userData?.playerId) p = p.parent;
+            return (
+              p?.userData?.playerId === playerId &&
+              Boolean(h.object.userData?.isHead || h.object.userData?.isHeadshot)
+            );
+          });
+          return { hitPlayerId: playerId, isHeadshot: headshot, hitPoint: hit.point };
+        } else if (solidMeshes.length === 0) {
+          // Fallback for legacy single-array callers where obstacles and players were mixed
+          return { hitPlayerId: undefined, isHeadshot: false, hitPoint: hit.point };
+        }
+      }
+      return null;
+    };
 
     // Archetype 1: Arc Disruptor (Tesla Cone auto-targeting within 16m)
     if (stats.type === 'arc_disruptor') {
@@ -612,7 +647,8 @@ export class WeaponManager {
         // Raycast straight forward to check for wall
         raycaster.set(camPos, camDir);
         raycaster.far = 16;
-        const hits = raycaster.intersectObjects(targetableMeshes, true);
+        const obstacleSources = solidMeshes.length > 0 ? solidMeshes : targetableMeshes;
+        const hits = raycaster.intersectObjects(obstacleSources, true);
         if (hits.length > 0) {
           hitPointVec = hits[0].point;
         }
@@ -638,35 +674,38 @@ export class WeaponManager {
       while (bouncesLeft >= 0) {
         raycaster.set(curOrigin, curDir);
         raycaster.far = stats.range;
-        const hits = raycaster.intersectObjects(targetableMeshes, true);
-        if (hits.length === 0) {
-          hitPointVec = curOrigin.clone().add(curDir.clone().multiplyScalar(stats.range));
+
+        const wallHits = solidMeshes.length > 0 ? raycaster.intersectObjects(solidMeshes, true) : [];
+        const wallDist = wallHits.length > 0 ? wallHits[0].distance : Infinity;
+
+        const targetHits = raycaster.intersectObjects(targetableMeshes, true);
+        const playerHit = resolveTargetHit(targetHits, wallDist);
+
+        if (playerHit && playerHit.hitPlayerId) {
+          hitPlayerId = playerHit.hitPlayerId;
+          isHeadshot = playerHit.isHeadshot;
+          hitPointVec = playerHit.hitPoint;
           bouncePoints.push(hitPointVec.clone());
-          break;
-        }
-
-        const hit = hits[0];
-        hitPointVec = hit.point;
-        bouncePoints.push(hitPointVec.clone());
-
-        let obj: THREE.Object3D | null = hit.object;
-        while (obj && !obj.userData?.playerId) {
-          obj = obj.parent;
-        }
-
-        if (obj && obj.userData?.playerId) {
-          hitPlayerId = obj.userData.playerId;
-          isHeadshot = Boolean(hit.object.userData?.isHead || hit.object.userData?.isHeadshot);
           break; // Hit enemy!
         }
 
-        if (hit.face && bouncesLeft > 0) {
-          const normal = hit.face.normal.clone().applyQuaternion(hit.object.quaternion).normalize();
-          this.fx?.spawnNeedleRicochet(hit.point, normal);
-          curDir = curDir.clone().sub(normal.clone().multiplyScalar(2 * curDir.dot(normal))).normalize();
-          curOrigin = hit.point.clone().add(curDir.clone().multiplyScalar(0.08));
-          bouncesLeft--;
+        if (wallHits.length > 0) {
+          const hit = wallHits[0];
+          hitPointVec = hit.point;
+          bouncePoints.push(hitPointVec.clone());
+
+          if (hit.face && bouncesLeft > 0) {
+            const normal = hit.face.normal.clone().applyQuaternion(hit.object.quaternion).normalize();
+            this.fx?.spawnNeedleRicochet(hit.point, normal);
+            curDir = curDir.clone().sub(normal.clone().multiplyScalar(2 * curDir.dot(normal))).normalize();
+            curOrigin = hit.point.clone().add(curDir.clone().multiplyScalar(0.08));
+            bouncesLeft--;
+          } else {
+            break;
+          }
         } else {
+          hitPointVec = curOrigin.clone().add(curDir.clone().multiplyScalar(stats.range));
+          bouncePoints.push(hitPointVec.clone());
           break;
         }
       }
@@ -688,17 +727,19 @@ export class WeaponManager {
     if (stats.type === 'plasma_launcher') {
       raycaster.set(camPos, camDir);
       raycaster.far = stats.range;
-      const hits = raycaster.intersectObjects(targetableMeshes, true);
-      if (hits.length > 0) {
-        hitPointVec = hits[0].point;
-        let obj: THREE.Object3D | null = hits[0].object;
-        while (obj && !obj.userData?.playerId) {
-          obj = obj.parent;
-        }
-        if (obj && obj.userData?.playerId) {
-          hitPlayerId = obj.userData.playerId;
-          isHeadshot = Boolean(hits[0].object.userData?.isHead || hits[0].object.userData?.isHeadshot);
-        }
+
+      const wallHits = solidMeshes.length > 0 ? raycaster.intersectObjects(solidMeshes, true) : [];
+      const wallDist = wallHits.length > 0 ? wallHits[0].distance : Infinity;
+      if (wallHits.length > 0) {
+        hitPointVec = wallHits[0].point;
+      }
+
+      const targetHits = raycaster.intersectObjects(targetableMeshes, true);
+      const playerHit = resolveTargetHit(targetHits, wallDist);
+      if (playerHit && playerHit.hitPlayerId) {
+        hitPlayerId = playerHit.hitPlayerId;
+        isHeadshot = playerHit.isHeadshot;
+        hitPointVec = playerHit.hitPoint;
       }
 
       // Spawn traveling plasma orb entity
@@ -741,23 +782,19 @@ export class WeaponManager {
     if (stats.type === 'railgun') {
       raycaster.set(camPos, camDir);
       raycaster.far = stats.range;
-      const hits = raycaster.intersectObjects(targetableMeshes, true);
 
-      for (const hit of hits) {
-        let obj: THREE.Object3D | null = hit.object;
-        while (obj && !obj.userData?.playerId) {
-          obj = obj.parent;
-        }
-        if (obj && obj.userData?.playerId) {
-          if (!hitPlayerId) {
-            hitPlayerId = obj.userData.playerId;
-            isHeadshot = Boolean(hit.object.userData?.isHead || hit.object.userData?.isHeadshot);
-          }
-        } else {
-          // Solid map geometry stops the line
-          hitPointVec = hit.point;
-          break;
-        }
+      const wallHits = solidMeshes.length > 0 ? raycaster.intersectObjects(solidMeshes, true) : [];
+      const wallDist = wallHits.length > 0 ? wallHits[0].distance : Infinity;
+      if (wallHits.length > 0) {
+        hitPointVec = wallHits[0].point;
+      }
+
+      const targetHits = raycaster.intersectObjects(targetableMeshes, true);
+      const playerHit = resolveTargetHit(targetHits, wallDist);
+      if (playerHit && playerHit.hitPlayerId) {
+        hitPlayerId = playerHit.hitPlayerId;
+        isHeadshot = playerHit.isHeadshot;
+        hitPointVec = playerHit.hitPoint;
       }
 
       this.fx?.spawnRailgunTracer(muzzlePos, hitPointVec);
@@ -774,22 +811,19 @@ export class WeaponManager {
     // Default: Conventional Weapons (rifle, shotgun, sniper, katana)
     raycaster.set(camPos, camDir);
     raycaster.far = stats.range;
-    const intersects = raycaster.intersectObjects(targetableMeshes, true);
 
-    for (const hit of intersects) {
-      let obj: THREE.Object3D | null = hit.object;
-      while (obj && !obj.userData?.playerId) {
-        obj = obj.parent;
-      }
-      if (obj && obj.userData?.playerId) {
-        hitPlayerId = obj.userData.playerId;
-        isHeadshot = Boolean(hit.object.userData?.isHead || hit.object.userData?.isHeadshot);
-        hitPointVec = hit.point;
-        break;
-      } else {
-        hitPointVec = hit.point;
-        break;
-      }
+    const wallHits = solidMeshes.length > 0 ? raycaster.intersectObjects(solidMeshes, true) : [];
+    const wallDist = wallHits.length > 0 ? wallHits[0].distance : Infinity;
+    if (wallHits.length > 0) {
+      hitPointVec = wallHits[0].point;
+    }
+
+    const targetHits = raycaster.intersectObjects(targetableMeshes, true);
+    const playerHit = resolveTargetHit(targetHits, wallDist);
+    if (playerHit && playerHit.hitPlayerId) {
+      hitPlayerId = playerHit.hitPlayerId;
+      isHeadshot = playerHit.isHeadshot;
+      hitPointVec = playerHit.hitPoint;
     }
 
     this.spawnTracer(muzzlePos, hitPointVec);

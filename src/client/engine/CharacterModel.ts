@@ -260,11 +260,15 @@ export class CharacterModel {
   private initialBoneRotations: Map<string, THREE.Quaternion> = new Map();
 
   // Hitbox meshes for precise raycasting
+  public hitboxContainer!: THREE.Group;
   public headCollider!: THREE.Mesh;
   public bodyCollider!: THREE.Mesh;
   public pelvisCollider!: THREE.Mesh;
+  public leftArmCollider!: THREE.Mesh;
+  public rightArmCollider!: THREE.Mesh;
   public leftLegCollider!: THREE.Mesh;
   public rightLegCollider!: THREE.Mesh;
+  public fullBodyCollider!: THREE.Mesh;
 
   public get torsoMesh(): THREE.Mesh {
     return this.bodyCollider;
@@ -278,8 +282,11 @@ export class CharacterModel {
       this.headCollider,
       this.bodyCollider,
       this.pelvisCollider,
+      this.leftArmCollider,
+      this.rightArmCollider,
       this.leftLegCollider,
-      this.rightLegCollider
+      this.rightLegCollider,
+      this.fullBodyCollider
     ].filter(Boolean);
   }
 
@@ -359,40 +366,64 @@ export class CharacterModel {
       depthWrite: false
     });
 
-    // 1. Head Sphere: Radius 0.18m, elevated at y = 1.10m
-    const headGeo = new THREE.SphereGeometry(0.18, 12, 12);
-    this.headCollider = new THREE.Mesh(headGeo, hitMat);
-    this.headCollider.position.set(0, 1.10, 0);
-    this.headCollider.userData = { playerId: this.playerId, isHead: true, isHeadshot: true, part: 'head' };
-    this.root.add(this.headCollider);
+    this.hitboxContainer = new THREE.Group();
+    this.root.add(this.hitboxContainer);
 
-    // 2. Upper Chest & Torso: Width 0.46m, Height 0.40m, Depth 0.28m, centered at y = 0.80m
-    const chestGeo = new THREE.BoxGeometry(0.46, 0.40, 0.28);
+    // 1. Head Sphere: Radius 0.21m, centered at y = 1.12m (covers head, helmet, face, and neck)
+    const headGeo = new THREE.SphereGeometry(0.21, 12, 12);
+    this.headCollider = new THREE.Mesh(headGeo, hitMat);
+    this.headCollider.position.set(0, 1.12, 0);
+    this.headCollider.userData = { playerId: this.playerId, isHead: true, isHeadshot: true, part: 'head' };
+    this.hitboxContainer.add(this.headCollider);
+
+    // 2. Upper Chest & Torso: Width 0.50m, Height 0.42m, Depth 0.32m, centered at y = 0.80m
+    const chestGeo = new THREE.BoxGeometry(0.50, 0.42, 0.32);
     this.bodyCollider = new THREE.Mesh(chestGeo, hitMat);
     this.bodyCollider.position.set(0, 0.80, 0);
     this.bodyCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'chest' };
-    this.root.add(this.bodyCollider);
+    this.hitboxContainer.add(this.bodyCollider);
 
-    // 3. Pelvis / Lower Abdomen: Width 0.42m, Height 0.30m, Depth 0.26m, centered at y = 0.50m
-    const pelvisGeo = new THREE.BoxGeometry(0.42, 0.30, 0.26);
+    // 3. Left Shoulder & Arm: Width 0.22m, Height 0.44m, Depth 0.24m, centered at x = -0.28m, y = 0.78m
+    const leftArmGeo = new THREE.BoxGeometry(0.22, 0.44, 0.24);
+    this.leftArmCollider = new THREE.Mesh(leftArmGeo, hitMat);
+    this.leftArmCollider.position.set(-0.28, 0.78, 0);
+    this.leftArmCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'leftArm' };
+    this.hitboxContainer.add(this.leftArmCollider);
+
+    // 4. Right Shoulder & Arm: Width 0.22m, Height 0.44m, Depth 0.24m, centered at x = 0.28m, y = 0.78m
+    const rightArmGeo = new THREE.BoxGeometry(0.22, 0.44, 0.24);
+    this.rightArmCollider = new THREE.Mesh(rightArmGeo, hitMat);
+    this.rightArmCollider.position.set(0.28, 0.78, 0);
+    this.rightArmCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'rightArm' };
+    this.hitboxContainer.add(this.rightArmCollider);
+
+    // 5. Pelvis / Lower Abdomen: Width 0.46m, Height 0.32m, Depth 0.30m, centered at y = 0.50m
+    const pelvisGeo = new THREE.BoxGeometry(0.46, 0.32, 0.30);
     this.pelvisCollider = new THREE.Mesh(pelvisGeo, hitMat);
     this.pelvisCollider.position.set(0, 0.50, 0);
     this.pelvisCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'pelvis' };
-    this.root.add(this.pelvisCollider);
+    this.hitboxContainer.add(this.pelvisCollider);
 
-    // 4. Left Leg: Width 0.20m, Height 0.48m, Depth 0.22m, centered at x = -0.11m, y = 0.24m
-    const leftLegGeo = new THREE.BoxGeometry(0.20, 0.48, 0.22);
+    // 6. Left Leg: Width 0.24m, Height 0.50m, Depth 0.28m, centered at x = -0.12m, y = 0.25m
+    const leftLegGeo = new THREE.BoxGeometry(0.24, 0.50, 0.28);
     this.leftLegCollider = new THREE.Mesh(leftLegGeo, hitMat);
-    this.leftLegCollider.position.set(-0.11, 0.24, 0);
+    this.leftLegCollider.position.set(-0.12, 0.25, 0);
     this.leftLegCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'leftLeg' };
-    this.root.add(this.leftLegCollider);
+    this.hitboxContainer.add(this.leftLegCollider);
 
-    // 5. Right Leg: Width 0.20m, Height 0.48m, Depth 0.22m, centered at x = 0.11m, y = 0.24m
-    const rightLegGeo = new THREE.BoxGeometry(0.20, 0.48, 0.22);
+    // 7. Right Leg: Width 0.24m, Height 0.50m, Depth 0.28m, centered at x = 0.12m, y = 0.25m
+    const rightLegGeo = new THREE.BoxGeometry(0.24, 0.50, 0.28);
     this.rightLegCollider = new THREE.Mesh(rightLegGeo, hitMat);
-    this.rightLegCollider.position.set(0.11, 0.24, 0);
+    this.rightLegCollider.position.set(0.12, 0.25, 0);
     this.rightLegCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'rightLeg' };
-    this.root.add(this.rightLegCollider);
+    this.hitboxContainer.add(this.rightLegCollider);
+
+    // 8. Full-Body Silhouette Capsule: Radius 0.32m, Height 1.28m, centered at y = 0.64m
+    const fullBodyGeo = new THREE.CylinderGeometry(0.32, 0.32, 1.28, 12);
+    this.fullBodyCollider = new THREE.Mesh(fullBodyGeo, hitMat);
+    this.fullBodyCollider.position.set(0, 0.64, 0);
+    this.fullBodyCollider.userData = { playerId: this.playerId, isHead: false, isHeadshot: false, part: 'capsule' };
+    this.hitboxContainer.add(this.fullBodyCollider);
   }
 
   private loadCharacterMesh(): void {
@@ -890,6 +921,27 @@ export class CharacterModel {
       CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, clampedPitch * 0.75);
       this.headBone.quaternion.multiplyQuaternions(qHeadInit, CharacterModel._deltaQ);
     }
+
+    // 6. Dynamic Hitbox Posture & Bone Synchronization
+    if (this.hitboxContainer) {
+      if (isSliding) {
+        this.hitboxContainer.position.y = -0.35;
+      } else {
+        this.hitboxContainer.position.y = 0;
+      }
+
+      // Upper-body colliders tilt with aim pitch
+      if (this.headCollider && this.bodyCollider) {
+        this.headCollider.position.z = -Math.sin(clampedPitch * 0.45) * 0.18;
+        this.headCollider.position.y = 1.12 + (Math.cos(clampedPitch * 0.45) - 1.0) * 0.10;
+        this.bodyCollider.rotation.x = clampedPitch * 0.45;
+        if (this.leftArmCollider) this.leftArmCollider.rotation.x = clampedPitch * 0.45;
+        if (this.rightArmCollider) this.rightArmCollider.rotation.x = clampedPitch * 0.45;
+      }
+    }
+
+    // Immediately synchronize world transforms so raycasts evaluate current frame's true posture
+    this.root.updateMatrixWorld(true);
   }
 
   public shatterIntoBricks(): void {

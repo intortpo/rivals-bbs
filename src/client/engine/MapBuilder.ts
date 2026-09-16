@@ -52,6 +52,7 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
 };
 
 export class MapBuilder {
+  public solidMeshes: THREE.Mesh[] = [];
   public collisionBoxes: THREE.Box3[] = [];
   public rooftopBoxes: THREE.Box3[] = [];
   public ladderBoxes: THREE.Box3[] = [];
@@ -161,6 +162,7 @@ export class MapBuilder {
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
     floor.position.y = -0.05;
+    this.solidMeshes.push(floor);
     this.group.add(floor);
 
     // 2. Load 3D Cartoon City GLB
@@ -223,6 +225,7 @@ export class MapBuilder {
               }
 
               if (height > 0.45 && widthX > 0.3 && depthZ > 0.3) {
+                this.solidMeshes.push(mesh);
                 if (isVehicle) {
                   // Inset vehicle horizontal bounds slightly (0.12m) to hug visible chassis
                   box.min.x += 0.12;
@@ -353,6 +356,7 @@ export class MapBuilder {
     });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
+    this.solidMeshes.push(floor);
     this.group.add(floor);
 
     // Floor grid lines
@@ -383,6 +387,7 @@ export class MapBuilder {
       mesh.position.set(w.x, w.y, w.z);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      this.solidMeshes.push(mesh);
       this.group.add(mesh);
       this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
     });
@@ -444,6 +449,7 @@ export class MapBuilder {
     const floorMat = new THREE.MeshStandardMaterial({ color: '#161922', roughness: 0.7 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
+    this.solidMeshes.push(floor);
     this.group.add(floor);
 
     const grid = new THREE.GridHelper(110, 55, '#ffaa00', '#252936');
@@ -467,6 +473,7 @@ export class MapBuilder {
       const geo = new THREE.BoxGeometry(w.w, w.h, w.d);
       const mesh = new THREE.Mesh(geo, wallMat);
       mesh.position.set(w.x, w.y, w.z);
+      this.solidMeshes.push(mesh);
       this.group.add(mesh);
       this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
     });
@@ -599,6 +606,7 @@ export class MapBuilder {
     const floorMat = new THREE.MeshStandardMaterial({ color: '#131722', roughness: 0.6, metalness: 0.2 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
+    this.solidMeshes.push(floor);
     this.group.add(floor);
 
     const grid = new THREE.GridHelper(110, 55, '#a855f7', '#1f273d');
@@ -619,6 +627,7 @@ export class MapBuilder {
       const geo = new THREE.BoxGeometry(w.w, w.h, w.d);
       const mesh = new THREE.Mesh(geo, wallMat);
       mesh.position.set(w.x, w.y, w.z);
+      this.solidMeshes.push(mesh);
       this.group.add(mesh);
       this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
     });
@@ -683,6 +692,7 @@ export class MapBuilder {
     });
     const lava = new THREE.Mesh(lavaGeo, lavaMat);
     lava.position.y = -0.8;
+    this.solidMeshes.push(lava);
     this.group.add(lava);
 
     // 2. Perimeter foundry containment rock walls (112m x 112m)
@@ -699,6 +709,7 @@ export class MapBuilder {
       const geo = new THREE.BoxGeometry(w.w, w.h, w.d);
       const mesh = new THREE.Mesh(geo, wallMat);
       mesh.position.set(w.x, w.y, w.z);
+      this.solidMeshes.push(mesh);
       this.group.add(mesh);
       this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
     });
@@ -765,6 +776,7 @@ export class MapBuilder {
     const floorMat = new THREE.MeshStandardMaterial({ color: '#dce8f5', roughness: 0.35, metalness: 0.1 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
+    this.solidMeshes.push(floor);
     this.group.add(floor);
 
     const grid = new THREE.GridHelper(115, 50, '#00ffee', '#a4b8cc');
@@ -785,6 +797,7 @@ export class MapBuilder {
       const geo = new THREE.BoxGeometry(w.w, w.h, w.d);
       const mesh = new THREE.Mesh(geo, wallMat);
       mesh.position.set(w.x, w.y, w.z);
+      this.solidMeshes.push(mesh);
       this.group.add(mesh);
       this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
     });
@@ -913,6 +926,7 @@ export class MapBuilder {
 
     const box = new THREE.Box3().setFromObject(mesh);
     this.collisionBoxes.push(box);
+    this.solidMeshes.push(mesh);
     if (walkableTop) {
       this.rooftopBoxes.push(box);
     }
@@ -942,6 +956,7 @@ export class MapBuilder {
 
     const box = new THREE.Box3().setFromObject(mesh);
     this.collisionBoxes.push(box);
+    this.solidMeshes.push(mesh);
     return mesh;
   }
 
@@ -1211,7 +1226,12 @@ export class MapBuilder {
     return highestGround;
   }
 
+  public getSolidMeshes(): THREE.Mesh[] {
+    return this.solidMeshes;
+  }
+
   public dispose(): void {
+    this.solidMeshes = [];
     this.collisionBoxes = [];
     this.rooftopBoxes = [];
     this.ladderBoxes = [];
