@@ -288,7 +288,7 @@ export class CharacterModel {
   private isDead: boolean = false;
   private equippedWeaponMeshes: Map<WeaponType, THREE.Group> = new Map();
 
-  private static cachedCharacterGLTF: THREE.Group | null = null;
+  public static cachedCharacterGLTF: THREE.Group | null = null;
   private static isLoadingGLTF: boolean = false;
   private static loadWaiters: Array<(gltf: THREE.Group) => void> = [];
   private static debrisList: BrickDebris[] = [];
@@ -653,6 +653,16 @@ export class CharacterModel {
 
   public triggerRecoil(): void {
     this.recoilImpulse = 0.25;
+  }
+
+  public getMuzzlePosition(out: THREE.Vector3 = new THREE.Vector3()): THREE.Vector3 {
+    if (this.weaponSocket && this.weaponSocket.parent) {
+      this.weaponSocket.getWorldPosition(out);
+      return out;
+    }
+    this.root.getWorldPosition(out);
+    out.y += 0.85;
+    return out;
   }
 
   public update(

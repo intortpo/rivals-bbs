@@ -125,12 +125,14 @@ export class NetworkClient {
         remote.model.triggerRecoil();
         this.audio.playShoot(data.weaponType);
 
-        // Spawn remote bullet tracer
-        const from = new THREE.Vector3(...data.origin);
-        const to = data.hitPoint
-          ? new THREE.Vector3(...data.hitPoint)
-          : from.clone().add(new THREE.Vector3(...data.direction).multiplyScalar(60));
-        this.weaponManager.spawnTracer(from, to);
+        // Spawn remote bullet tracer from weapon muzzle
+        if (data.weaponType !== 'katana') {
+          const from = remote.model.getMuzzlePosition();
+          const to = data.hitPoint
+            ? new THREE.Vector3(...data.hitPoint)
+            : from.clone().add(new THREE.Vector3(...data.direction).multiplyScalar(60));
+          this.weaponManager.spawnTracer(from, to, data.weaponType);
+        }
       }
     });
 

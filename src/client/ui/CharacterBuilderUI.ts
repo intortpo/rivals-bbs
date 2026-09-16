@@ -6,7 +6,8 @@ import {
   DEFAULT_CUSTOMIZATION,
   MODULAR_CATALOG,
   customizationToMeshNames,
-  ModularItemOption
+  ModularItemOption,
+  CharacterModel
 } from '../engine/CharacterModel.js';
 
 export class CharacterBuilderUI {
@@ -497,10 +498,9 @@ export class CharacterBuilderUI {
     ring.position.y = 0.005;
     this.scene.add(ring);
 
-    // Load Character Model for Turntable
-    const loader = new GLTFLoader();
-    loader.load('/models/characters/creative_character.glb', (gltf) => {
-      const clone = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+    // Load Character Model for Turntable (reuse preloaded GLTF if available)
+    const setupModel = (gltfScene: THREE.Group) => {
+      const clone = SkeletonUtils.clone(gltfScene) as THREE.Group;
       clone.scale.set(0.60, 0.60, 0.60);
       clone.position.set(0, 0, 0);
 
@@ -530,7 +530,16 @@ export class CharacterBuilderUI {
       this.previewMesh = clone;
       this.scene.add(clone);
       this.updatePreviewOutfit();
-    });
+    };
+
+    if (CharacterModel.cachedCharacterGLTF) {
+      setupModel(CharacterModel.cachedCharacterGLTF);
+    } else {
+      const loader = new GLTFLoader();
+      loader.load('/models/characters/creative_character.glb', (gltf) => {
+        setupModel(gltf.scene);
+      });
+    }
 
     this.startTurntableLoop();
   }

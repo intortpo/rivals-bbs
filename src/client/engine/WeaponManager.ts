@@ -810,11 +810,13 @@ export class WeaponManager {
     this.flashDuration = 0.05;
   }
 
-  public spawnTracer(from: THREE.Vector3, to: THREE.Vector3): void {
+  public spawnTracer(from: THREE.Vector3, to: THREE.Vector3, weaponType?: WeaponType): void {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const dz = to.z - from.z;
     const dist = Math.hypot(dx, dy, dz) || 1;
+
+    const wType = weaponType || this.currentWeaponType;
 
     let tr = this.tracerPool.pop();
     if (!tr) {
@@ -845,9 +847,11 @@ export class WeaponManager {
     }
 
     (tr.line.material as THREE.LineBasicMaterial).color.set(
-      this.currentWeaponType === 'needle_carbine' ? '#ff00aa'
-      : this.currentWeaponType === 'sniper' ? '#ff3366'
-      : this.currentWeaponType === 'plasma_launcher' ? '#b537f2'
+      wType === 'needle_carbine' ? '#ff00aa'
+      : wType === 'sniper' ? '#ff3366'
+      : wType === 'plasma_launcher' ? '#b537f2'
+      : wType === 'railgun' ? '#00e5ff'
+      : wType === 'arc_disruptor' ? '#00ffff'
       : '#ffee55'
     );
 
