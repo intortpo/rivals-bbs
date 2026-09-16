@@ -1,6 +1,6 @@
-# Context & Domain Model: Rivals BBS
+# Context & Domain Model: Airsoft BBS
 
-This document defines the ubiquitous language, architectural boundaries, and core design principles for the Rivals BBS multiplayer game.
+This document defines the ubiquitous language, architectural boundaries, and core design principles for the Airsoft BBS multiplayer game.
 
 ## Ubiquitous Language
 

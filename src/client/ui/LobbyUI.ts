@@ -48,7 +48,7 @@ export class LobbyUI {
   }
 
   private buildLobbyDOM(): void {
-    const savedName = localStorage.getItem('rivals_player_name') || `Rival_${Math.floor(100 + Math.random() * 900)}`;
+    const savedName = localStorage.getItem('rivals_player_name') || `Airsoft_${Math.floor(100 + Math.random() * 900)}`;
 
     const screen = document.createElement('div');
     screen.id = 'lobby-screen';
@@ -84,10 +84,10 @@ export class LobbyUI {
       <div id="section-main-menu" style="width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; text-align: center;">
         <div style="margin-bottom: 2px;">
           <h1 style="font-size: 34px; font-weight: 900; margin: 0; background: linear-gradient(135deg, #00d2ff, #ff2a55); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px;">
-            ⚡ RIVALS BBS
+            🎯 AIRSOFT BBS
           </h1>
           <p style="font-size: 12px; color: #8da2c0; margin: 2px 0 0 0; letter-spacing: 1px;">
-            1v1 & 4v4 3D MULTIPLAYER ARENA
+            TACTICAL 3D MULTIPLAYER & WAVE SURVIVAL
           </p>
         </div>
 

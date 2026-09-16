@@ -172,9 +172,9 @@ app.get('*', (_req, res) => {
       res.send(`
         <!DOCTYPE html>
         <html>
-          <head><title>Rivals BBS Server</title></head>
+          <head><title>Airsoft BBS Server</title></head>
           <body style="font-family: sans-serif; background: #111; color: #fff; text-align: center; padding: 50px;">
-            <h1>⚡ Rivals BBS Backend Server Running</h1>
+            <h1>🎯 Airsoft BBS Backend Server Running</h1>
             <p>API & Socket.IO active on port ${PORT}</p>
             <p>For development with Vite, open <a href="http://${localIp}:5173" style="color: #00d2ff;">http://${localIp}:5173</a></p>
           </body>
@@ -298,7 +298,7 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n==============================================`);
-  console.log(`🎮 Rivals BBS Server running on:`);
+  console.log(`🎯 Airsoft BBS Server running on:`);
   console.log(`   Local:   http://localhost:${PORT}`);
   console.log(`   Network: http://${localIp}:${PORT}`);
   console.log(`==============================================\n`);

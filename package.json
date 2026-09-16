@@ -1,7 +1,7 @@
 {
   "name": "rivals-bbs",
   "version": "1.0.0",
-  "description": "Multiplayer Roblox Rivals clone with touch-first mobile controls and QR code room joining",
+  "description": "Multiplayer Airsoft BBS arena with touch-first mobile controls, wave survival, and QR code room joining",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server/server.ts",

@@ -134,7 +134,7 @@ export class AuthUI {
       <div class="modal-card" style="width: 100%; max-width: 380px; background: #151b2e; border: 1px solid #00d2ff; border-radius: 16px; padding: 24px; box-shadow: 0 10px 35px rgba(0, 210, 255, 0.25); text-align: center; color: white;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="font-size: 22px; font-weight: 900; margin: 0; color: #00d2ff; letter-spacing: 1px;">
-            ⚡ RIVALS PILOT ID
+            🎯 AIRSOFT PILOT ID
           </h2>
           <button id="btn-close-auth" style="background: transparent; border: none; color: #8da2c0; font-size: 22px; cursor: pointer;">✕</button>
         </div>
