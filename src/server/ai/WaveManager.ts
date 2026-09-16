@@ -1,8 +1,12 @@
 import { Server } from 'socket.io';
 import {
+  BossStatePayload,
+  BotProjectilePayload,
   EliminationPayload,
   HitNotificationPayload,
   PlayerNetworkState,
+  ProjectileImpactPayload,
+  ProjectilePattern,
   RoomNetworkState,
   TeamColor,
   WeaponType
@@ -12,6 +16,7 @@ import {
   BotArchetype,
   getMapSpawns,
   getWaveConfig,
+  MOVEMENT,
   WAVE_INTERMISSION_SECONDS,
   WaveDefinition,
   WEAPONS
@@ -22,7 +27,17 @@ import {
   hasLineOfSight
 } from '../../shared/mapObstacles.js';
 
-export type BotAIState = 'patrol' | 'hunt' | 'take_cover' | 'telegraph' | 'attack';
+export type BotAIState =
+  | 'patrol'
+  | 'hunt'
+  | 'take_cover'
+  | 'telegraph'
+  | 'attack'
+  | 'flank'
+  | 'rush_charge'
+  | 'fortify'
+  | 'sniper_perch'
+  | 'boss_phase';
 
 export interface ActiveBot {
   bot: PlayerNetworkState;
@@ -35,6 +50,30 @@ export interface ActiveBot {
   patrolNode: [number, number, number];
   telegraphUntil: number;
   coverPosition: [number, number, number] | null;
+  // Attack cadence and burst state trackers
+  burstQueue: number;
+  burstTimer: number;
+  bossPhase: number;
+  bossAttackPattern: 'ring' | 'spiral' | 'tri_beam';
+  bossSpiralAngle: number;
+  bossSpiralShotsRemaining: number;
+}
+
+export interface ServerProjectile {
+  id: string;
+  botId: string;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  radius: number;
+  damage: number;
+  color: string;
+  pattern: ProjectilePattern;
+  spawnTime: number;
+  maxLifeTime: number;
 }
 
 export class WaveManager {
@@ -47,6 +86,10 @@ export class WaveManager {
   private intermissionRemaining: number = 0;
   private intermissionTimer: NodeJS.Timeout | null = null;
   private activeBots: Map<string, ActiveBot> = new Map();
+  private activeProjectiles: Map<string, ServerProjectile> = new Map();
+  private projCounter: number = 0;
+  private lastBossBroadcastTime: number = 0;
+  private lastKnownBossHp: number = -1;
   private onEndGame: (winner: PlayerNetworkState, winningTeam?: TeamColor) => void;
   private onStateChange?: () => void;
   private mapObstacles: BoundingBox[] = [];
@@ -111,6 +154,8 @@ export class WaveManager {
       }
     }
     this.activeBots.clear();
+    this.activeProjectiles.clear();
+    this.lastKnownBossHp = -1;
 
     const config: WaveDefinition = getWaveConfig(waveNum);
     const spawns = getMapSpawns(this.mapName);
@@ -130,13 +175,26 @@ export class WaveManager {
 
         // Early wave grace period: Wave 1 gives 3.5s-5.0s, Wave 2 gives 3.0s-4.5s, Wave 3+ gives 2.5s-4.0s
         const spawnGraceBase = waveNum === 1 ? 3500 : waveNum === 2 ? 3000 : 2500;
-        const botHp = (arch.role === 'boss' && waveNum < 10) ? 150 : arch.maxHp;
-        const botShield = (arch.role === 'boss' && waveNum < 10) ? 25 : arch.shieldHp;
-
+        let botHp = arch.maxHp;
+        let botShield = arch.shieldHp;
         let botWeapon: WeaponType = arch.weapon;
         let botNamePrefix = arch.namePrefix;
 
-        if (waveNum >= 5 && arch.role === 'sniper' && i % 2 === 1) {
+        if (arch.role === 'boss') {
+          if (waveNum === 3) {
+            botNamePrefix = '💠 PRISM CONSTRUCT';
+            botHp = 260;
+            botShield = 60;
+          } else if (waveNum === 6) {
+            botNamePrefix = '⭐ OCTAHEDRON OVERLORD';
+            botHp = 360;
+            botShield = 100;
+          } else if (waveNum >= 10) {
+            botNamePrefix = '🔮 APEX ICOSAHEDRON';
+            botHp = 480;
+            botShield = 150;
+          }
+        } else if (waveNum >= 5 && arch.role === 'sniper' && i % 2 === 1) {
           botWeapon = 'railgun';
           botNamePrefix = '⚡ Railgun Sniper';
         } else if (waveNum >= 6 && arch.role === 'rusher' && i % 2 === 1) {
@@ -152,7 +210,7 @@ export class WaveManager {
 
         const botPlayer: PlayerNetworkState = {
           id: botId,
-          name: `${botNamePrefix} #${i + 1}`,
+          name: arch.role === 'boss' ? botNamePrefix : `${botNamePrefix} #${i + 1}`,
           color: arch.color,
           team: 'red',
           isHost: false,
@@ -187,12 +245,18 @@ export class WaveManager {
           archetype: arch,
           lastFireTime: Date.now() + spawnGraceBase + Math.random() * 1500,
           seed: Math.random() * 100,
-          aiState: 'attack',
+          aiState: arch.role === 'boss' ? 'boss_phase' : 'attack',
           stateTimer: 0,
           lastSeenTargetPos: null,
           patrolNode: [spawnPoint.x, spawnPoint.y, spawnPoint.z],
           telegraphUntil: 0,
-          coverPosition: null
+          coverPosition: null,
+          burstQueue: 0,
+          burstTimer: 0,
+          bossPhase: 1,
+          bossAttackPattern: 'ring',
+          bossSpiralAngle: 0,
+          bossSpiralShotsRemaining: 0
         });
       }
     }
@@ -314,8 +378,14 @@ export class WaveManager {
         continue;
       }
 
-      // Ground clamping to floor / platforms
-      bot.y = this.getTerrainHeight(bot.x, bot.z);
+      // Ground clamping or boss hover levitation
+      if (archetype.role === 'boss') {
+        const groundY = this.getTerrainHeight(bot.x, bot.z);
+        const hoverOffset = 1.6 + Math.sin((now / 1000) * 2.0 + seed) * 0.35;
+        bot.y = groundY + hoverOffset;
+      } else {
+        bot.y = this.getTerrainHeight(bot.x, bot.z);
+      }
 
       // 1. Target selection: nearest living human player
       let target: PlayerNetworkState | null = null;
@@ -348,7 +418,7 @@ export class WaveManager {
       let yawDiff = targetYaw - bot.yaw;
       while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
       while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
-      const maxTurn = 10.0 * dt;
+      const maxTurn = (archetype.role === 'boss' ? 6.0 : 10.0) * dt;
       bot.yaw += Math.max(-maxTurn, Math.min(maxTurn, yawDiff));
       bot.pitch = targetPitch;
 
@@ -360,13 +430,13 @@ export class WaveManager {
       const fwdX = -Math.sin(bot.yaw);
       const fwdZ = -Math.cos(bot.yaw);
       const dot = (fwdX * dx + fwdZ * dz) / dist;
-      const inVisionCone = dot > 0.25 || dist < 14;
+      const inVisionCone = dot > 0.20 || dist < 14;
       const canSeeTarget = hasLOS && inVisionCone;
 
       // 3. State-Driven Goal Machine Transitions
       if (canSeeTarget) {
         active.lastSeenTargetPos = [target.x, target.y, target.z];
-        if (bot.health < bot.maxHealth * 0.35 && active.aiState !== 'take_cover' && active.coverPosition === null) {
+        if (bot.health < bot.maxHealth * 0.35 && active.aiState !== 'take_cover' && active.coverPosition === null && archetype.role !== 'boss') {
           const cover = this.findNearestCover(bot, target);
           if (cover) {
             active.aiState = 'take_cover';
@@ -374,10 +444,10 @@ export class WaveManager {
             active.stateTimer = 3.0;
           }
         } else if (active.aiState === 'patrol' || active.aiState === 'hunt') {
-          active.aiState = 'attack';
+          active.aiState = archetype.role === 'boss' ? 'boss_phase' : 'attack';
         }
       } else {
-        if (active.aiState === 'attack') {
+        if (active.aiState === 'attack' || active.aiState === 'boss_phase') {
           if (active.lastSeenTargetPos) {
             active.aiState = 'hunt';
             active.stateTimer = 4.0;
@@ -393,7 +463,7 @@ export class WaveManager {
         }
       }
 
-      // 4. Navigation & Steering
+      // 4. Navigation & Steering by Archetype Variant
       if (active.aiState === 'take_cover' && active.coverPosition) {
         active.stateTimer -= dt;
         const cdx = active.coverPosition[0] - bot.x;
@@ -426,40 +496,116 @@ export class WaveManager {
         bot.vz = 0;
         bot.yaw = targetYaw;
         bot.pitch = targetPitch;
-      } else {
-        // Default attack / patrol navigation towards target
-        if (dist > 0.1) {
-          let dirX = dx / dist;
-          let dirZ = dz / dist;
+      } else if (dist > 0.1) {
+        const dirX = dx / dist;
+        const dirZ = dz / dist;
+        const prefRange = archetype.preferredRange;
 
+        if (archetype.role === 'rusher') {
+          // Rusher: Relentless zig-zag sprint closing in
+          const zigFreq = 7.0;
+          const zigZag = Math.sin((now / 1000) * zigFreq + seed) * 0.55;
+          const perpX = -dirZ;
+          const perpZ = dirX;
+          const moveX = dirX + perpX * zigZag;
+          const moveZ = dirZ + perpZ * zigZag;
+          const mag = Math.hypot(moveX, moveZ) || 1;
+          bot.vx = (moveX / mag) * archetype.speed;
+          bot.vz = (moveZ / mag) * archetype.speed;
+          bot.x += bot.vx * dt;
+          bot.z += bot.vz * dt;
+        } else if (archetype.role === 'sniper') {
+          // Sniper: Retreats if too close to maintain sniper range (> 18m)
+          if (dist < 16) {
+            bot.vx = -dirX * archetype.speed;
+            bot.vz = -dirZ * archetype.speed;
+            bot.x += bot.vx * dt;
+            bot.z += bot.vz * dt;
+          } else if (dist > prefRange + 4) {
+            bot.vx = dirX * archetype.speed * 0.7;
+            bot.vz = dirZ * archetype.speed * 0.7;
+            bot.x += bot.vx * dt;
+            bot.z += bot.vz * dt;
+          } else {
+            bot.vx = 0;
+            bot.vz = 0;
+          }
+        } else if (archetype.role === 'boss') {
+          // Boss: Orbiting hover drift
+          const orbitAngle = (now / 1000) * 0.4 + seed;
+          const orbitX = Math.cos(orbitAngle) * 0.6;
+          const orbitZ = Math.sin(orbitAngle) * 0.6;
+          if (dist > prefRange + 2) {
+            bot.vx = (dirX + orbitX) * archetype.speed * 0.8;
+            bot.vz = (dirZ + orbitZ) * archetype.speed * 0.8;
+          } else if (dist < prefRange - 3) {
+            bot.vx = (-dirX + orbitX) * archetype.speed * 0.6;
+            bot.vz = (-dirZ + orbitZ) * archetype.speed * 0.6;
+          } else {
+            bot.vx = orbitX * archetype.speed;
+            bot.vz = orbitZ * archetype.speed;
+          }
+          bot.x += bot.vx * dt;
+          bot.z += bot.vz * dt;
+        } else {
+          // Scout & Heavy: Standard strafing advance / spacing
           const strafeTime = (now / 1000) + seed;
           const strafeX = -dirZ * Math.sin(strafeTime * 2.5) * 0.4;
           const strafeZ = dirX * Math.sin(strafeTime * 2.5) * 0.4;
-
           let moveX = dirX + strafeX;
           let moveZ = dirZ + strafeZ;
           const moveMag = Math.hypot(moveX, moveZ) || 1;
           moveX /= moveMag;
           moveZ /= moveMag;
 
-          const prefRange = archetype.preferredRange;
-
           if (dist > prefRange) {
-            bot.x += moveX * archetype.speed * dt;
-            bot.z += moveZ * archetype.speed * dt;
             bot.vx = moveX * archetype.speed;
             bot.vz = moveZ * archetype.speed;
-          } else if (dist < prefRange - 2 && archetype.role !== 'rusher') {
-            bot.x -= dirX * archetype.speed * 0.4 * dt;
-            bot.z -= dirZ * archetype.speed * 0.4 * dt;
-            bot.vx = -dirX * archetype.speed * 0.4;
-            bot.vz = -dirZ * archetype.speed * 0.4;
+          } else if (dist < prefRange - 2) {
+            bot.vx = -dirX * archetype.speed * 0.5;
+            bot.vz = -dirZ * archetype.speed * 0.5;
           } else {
-            bot.x += strafeX * archetype.speed * dt;
-            bot.z += strafeZ * archetype.speed * dt;
             bot.vx = strafeX * archetype.speed;
             bot.vz = strafeZ * archetype.speed;
           }
+          bot.x += bot.vx * dt;
+          bot.z += bot.vz * dt;
+        }
+      }
+
+      // Process queued burst shots
+      if (active.burstQueue > 0) {
+        active.burstTimer -= dt;
+        if (active.burstTimer <= 0) {
+          active.burstQueue--;
+          active.burstTimer = 0.12;
+          const bDir: [number, number, number] = [dx / dist3D, dy / dist3D, dz / dist3D];
+          this.spawnProjectile(
+            bot,
+            [bot.x, bot.y + 1.1, bot.z],
+            bDir,
+            archetype.projectileSpeed || 22,
+            archetype.projectileRadius || 0.20,
+            archetype.projectileDamage || 16,
+            archetype.projectileColor || '#00ffcc',
+            'plasma'
+          );
+        }
+      }
+
+      // Process boss twin spiral barrage
+      if (active.bossSpiralShotsRemaining > 0) {
+        active.burstTimer -= dt;
+        if (active.burstTimer <= 0) {
+          active.bossSpiralShotsRemaining--;
+          active.burstTimer = 0.08;
+          const a1 = active.bossSpiralAngle;
+          const a2 = active.bossSpiralAngle + Math.PI;
+          active.bossSpiralAngle += 0.44; // ~25 deg rotation
+          const spd = archetype.projectileSpeed || 18;
+          const dmg = archetype.projectileDamage || 20;
+          this.spawnProjectile(bot, [bot.x, bot.y + 1.1, bot.z], [Math.cos(a1), 0.04, Math.sin(a1)], spd, 0.24, dmg, '#ec4899', 'spiral', 5.0);
+          this.spawnProjectile(bot, [bot.x, bot.y + 1.1, bot.z], [Math.cos(a2), 0.04, Math.sin(a2)], spd, 0.24, dmg, '#ec4899', 'spiral', 5.0);
         }
       }
 
@@ -512,33 +658,30 @@ export class WaveManager {
       bot.x = Math.max(-boundX, Math.min(boundX, bot.x));
       bot.z = Math.max(-boundZ, Math.min(boundZ, bot.z));
 
-      // 5. Combat & Firing
-      let waveAccuracyMult = 1.0;
+      // 5. Combat & Projectile Weapon Discharge
       let waveCooldownMult = 1.0;
       if (this.currentWave === 1) {
-        waveAccuracyMult = 0.65;
         waveCooldownMult = 1.3;
       } else if (this.currentWave === 2) {
-        waveAccuracyMult = 0.75;
         waveCooldownMult = 1.2;
       } else if (this.currentWave === 3) {
-        waveAccuracyMult = 0.85;
         waveCooldownMult = 1.1;
       }
 
       const weaponStats = WEAPONS[archetype.weapon];
-      const inRange = dist <= (weaponStats ? weaponStats.range : 30);
+      const inRange = dist <= (weaponStats ? weaponStats.range : 32);
       const effectiveCooldown = archetype.fireCooldown * waveCooldownMult;
 
-      if (inRange && (archetype.weapon !== 'katana' || dist <= 2.6)) {
+      if (inRange && (archetype.weapon !== 'katana' || dist <= 3.2)) {
         if (hasLOS && active.aiState !== 'telegraph' && now - active.lastFireTime >= effectiveCooldown * 1000) {
           active.aiState = 'telegraph';
-          active.telegraphUntil = now + (this.currentWave === 1 ? 280 : 200);
+          const telegraphDuration = archetype.role === 'sniper' ? 700 : archetype.role === 'heavy' ? 400 : (this.currentWave === 1 ? 280 : 200);
+          active.telegraphUntil = now + telegraphDuration;
         }
       }
 
       if (active.aiState === 'telegraph' && now >= active.telegraphUntil) {
-        active.aiState = 'attack';
+        active.aiState = archetype.role === 'boss' ? 'boss_phase' : 'attack';
         bot.yaw = targetYaw;
         bot.pitch = targetPitch;
 
@@ -550,59 +693,274 @@ export class WaveManager {
 
         active.lastFireTime = now;
 
-        // True 3D forward direction from bot to target (NEVER shooting backward!)
+        // True 3D forward direction from bot to target
         const dirX = dx / dist3D;
         const dirY = dy / dist3D;
         const dirZ = dz / dist3D;
 
-        // Hit registration roll
-        const distFalloff = Math.max(0.35, 1 - (dist / 35));
-        const effectiveAccuracy = archetype.accuracy * waveAccuracyMult * distFalloff;
-        const hitRoll = Math.random();
-        const isHit = hitRoll < effectiveAccuracy;
-        const isHeadshot = isHit && Math.random() < 0.05;
+        this.fireBotProjectiles(active, target, [dirX, dirY, dirZ]);
+      }
+    }
 
-        let hitPoint: [number, number, number];
-        if (isHit) {
-          hitPoint = [target.x, target.y + (isHeadshot ? 1.4 : 1.0), target.z];
-        } else {
-          // Whiz-by tracer passing forward near player
-          const missOffX = (Math.random() - 0.5) * 1.6;
-          const missOffY = (Math.random() - 0.5) * 1.2;
-          const missOffZ = (Math.random() - 0.5) * 1.6;
-          hitPoint = [target.x + missOffX, target.y + 1.1 + missOffY, target.z + missOffZ];
+    // Update and collide active server projectiles
+    this.tickProjectiles(dt, livingHumans);
+
+    // Sync boss state to HUD
+    this.updateBossState(now);
+  }
+
+  private fireBotProjectiles(
+    active: ActiveBot,
+    target: PlayerNetworkState,
+    direction: [number, number, number]
+  ): void {
+    const { bot, archetype } = active;
+    const origin: [number, number, number] = [bot.x, bot.y + 1.1, bot.z];
+
+    // Emit fire visual / audio cue
+    this.io.to(this.roomState.roomId).emit('player_fired', {
+      shooterId: bot.id,
+      weaponType: bot.currentWeapon,
+      origin,
+      direction,
+      hitPoint: [target.x, target.y + 1.0, target.z]
+    });
+
+    const speed = archetype.projectileSpeed || 22;
+    const radius = archetype.projectileRadius || 0.22;
+    const damage = archetype.projectileDamage || 18;
+    const color = archetype.projectileColor || '#ffaa00';
+
+    if (archetype.role === 'scout') {
+      // 2-round burst
+      this.spawnProjectile(bot, origin, direction, speed, radius, damage, color, 'plasma');
+      active.burstQueue = 1;
+      active.burstTimer = 0.12;
+    } else if (archetype.role === 'rusher') {
+      // 3-shard fan spread (center, -11°, +11°)
+      const yaw = bot.yaw;
+      const spreadAngles = [-0.19, 0, 0.19];
+      for (const offset of spreadAngles) {
+        const angle = yaw + offset;
+        const sDir: [number, number, number] = [-Math.sin(angle), direction[1], -Math.cos(angle)];
+        const mag = Math.hypot(sDir[0], sDir[1], sDir[2]) || 1;
+        this.spawnProjectile(bot, origin, [sDir[0] / mag, sDir[1] / mag, sDir[2] / mag], speed, radius, damage, color, 'shard', 3.0);
+      }
+    } else if (archetype.role === 'heavy') {
+      // 5-way shotgun scatter
+      const yaw = bot.yaw;
+      const offsets = [-0.28, -0.14, 0, 0.14, 0.28];
+      for (let i = 0; i < offsets.length; i++) {
+        const angle = yaw + offsets[i];
+        const pitchJitter = (Math.random() - 0.5) * 0.08;
+        const sDir: [number, number, number] = [-Math.sin(angle), direction[1] + pitchJitter, -Math.cos(angle)];
+        const mag = Math.hypot(sDir[0], sDir[1], sDir[2]) || 1;
+        this.spawnProjectile(bot, origin, [sDir[0] / mag, sDir[1] / mag, sDir[2] / mag], speed, radius, damage, color, 'plasma', 3.5);
+      }
+    } else if (archetype.role === 'sniper') {
+      // Supersonic piercing beam
+      this.spawnProjectile(bot, origin, direction, speed, radius, damage, color, 'beam', 5.0);
+    } else if (archetype.role === 'boss') {
+      // Inter-level Geometric Boss: Cycle through 3 bullet-hell patterns
+      const currentPattern = active.bossPhase;
+      active.bossPhase = (active.bossPhase % 3) + 1;
+
+      if (currentPattern === 1) {
+        // Pattern 1: 360-degree Nova Ring (16 projectiles in circle)
+        const count = 16;
+        for (let i = 0; i < count; i++) {
+          const theta = (i / count) * Math.PI * 2;
+          const ringDir: [number, number, number] = [Math.cos(theta), 0.02, Math.sin(theta)];
+          this.spawnProjectile(bot, origin, ringDir, 14, 0.28, 22, '#f43f5e', 'ring', 5.0);
         }
-
-        // Emit visual fire event
-        this.io.to(this.roomState.roomId).emit('player_fired', {
-          shooterId: bot.id,
-          weaponType: bot.currentWeapon,
-          origin: [bot.x, bot.y + 1.1, bot.z],
-          direction: [dirX, dirY, dirZ],
-          hitPoint
-        });
-
-        if (isHit) {
-          let damage: number;
-          if (bot.currentWeapon === 'railgun') damage = 45;
-          else if (bot.currentWeapon === 'plasma_launcher') damage = 35;
-          else if (bot.currentWeapon === 'arc_disruptor') damage = 16;
-          else if (bot.currentWeapon === 'needle_carbine') damage = 18;
-          else {
-            switch (archetype.role) {
-              case 'rusher': damage = 30; break;
-              case 'sniper': damage = 40; break;
-              case 'heavy': damage = 22; break;
-              case 'boss': damage = 24; break;
-              case 'scout':
-              default: damage = 18; break;
-            }
-          }
-
-          if (isHeadshot) damage = Math.round(damage * 1.35);
-          this.applyDamageToPlayer(target, bot, damage, isHeadshot, bot.currentWeapon);
+      } else if (currentPattern === 2) {
+        // Pattern 2: Twin Spiral Stream (12 shots over ~1 second)
+        active.bossSpiralShotsRemaining = 12;
+        active.burstTimer = 0.08;
+        active.bossSpiralAngle = Math.atan2(-direction[0], -direction[2]);
+      } else {
+        // Pattern 3: Tri-Beam Heavy Aim Burst
+        const yaw = bot.yaw;
+        const offsets = [-0.12, 0, 0.12];
+        for (const off of offsets) {
+          const angle = yaw + off;
+          const bDir: [number, number, number] = [-Math.sin(angle), direction[1], -Math.cos(angle)];
+          const mag = Math.hypot(bDir[0], bDir[1], bDir[2]) || 1;
+          this.spawnProjectile(bot, origin, [bDir[0] / mag, bDir[1] / mag, bDir[2] / mag], 22, 0.30, 26, '#f43f5e', 'plasma', 4.0);
         }
       }
+    } else {
+      this.spawnProjectile(bot, origin, direction, speed, radius, damage, color, 'plasma');
+    }
+  }
+
+  private spawnProjectile(
+    bot: PlayerNetworkState,
+    origin: [number, number, number],
+    direction: [number, number, number],
+    speed: number,
+    radius: number,
+    damage: number,
+    color: string,
+    pattern: ProjectilePattern = 'plasma',
+    maxLifeTime: number = 4.0
+  ): void {
+    const id = `bproj_${bot.id}_${++this.projCounter}_${Date.now()}`;
+    const vx = direction[0] * speed;
+    const vy = direction[1] * speed;
+    const vz = direction[2] * speed;
+
+    const proj: ServerProjectile = {
+      id,
+      botId: bot.id,
+      x: origin[0],
+      y: origin[1],
+      z: origin[2],
+      vx,
+      vy,
+      vz,
+      radius,
+      damage,
+      color,
+      pattern,
+      spawnTime: Date.now(),
+      maxLifeTime
+    };
+
+    this.activeProjectiles.set(id, proj);
+
+    const payload: BotProjectilePayload = {
+      id,
+      botId: bot.id,
+      x: origin[0],
+      y: origin[1],
+      z: origin[2],
+      vx,
+      vy,
+      vz,
+      radius,
+      color,
+      damage,
+      pattern
+    };
+
+    this.io.to(this.roomState.roomId).emit('bot_projectile_spawn', payload);
+  }
+
+  private tickProjectiles(dt: number, livingHumans: PlayerNetworkState[]): void {
+    const now = Date.now();
+    for (const [id, proj] of this.activeProjectiles.entries()) {
+      if (now - proj.spawnTime > proj.maxLifeTime * 1000) {
+        this.activeProjectiles.delete(id);
+        continue;
+      }
+
+      proj.x += proj.vx * dt;
+      proj.y += proj.vy * dt;
+      proj.z += proj.vz * dt;
+
+      // Floor / ceiling check
+      if (proj.y <= 0.05 || proj.y > 60) {
+        const payload: ProjectileImpactPayload = {
+          id: proj.id,
+          hitPoint: [proj.x, Math.max(0, proj.y), proj.z]
+        };
+        this.io.to(this.roomState.roomId).emit('bot_projectile_impact', payload);
+        this.activeProjectiles.delete(id);
+        continue;
+      }
+
+      // Check map obstacle collision
+      let hitObstacle = false;
+      for (let i = 0; i < this.mapObstacles.length; i++) {
+        const obs = this.mapObstacles[i];
+        if (
+          proj.x >= obs.min[0] &&
+          proj.x <= obs.max[0] &&
+          proj.y >= obs.min[1] &&
+          proj.y <= obs.max[1] &&
+          proj.z >= obs.min[2] &&
+          proj.z <= obs.max[2]
+        ) {
+          hitObstacle = true;
+          break;
+        }
+      }
+
+      if (hitObstacle) {
+        const payload: ProjectileImpactPayload = {
+          id: proj.id,
+          hitPoint: [proj.x, proj.y, proj.z]
+        };
+        this.io.to(this.roomState.roomId).emit('bot_projectile_impact', payload);
+        this.activeProjectiles.delete(id);
+        continue;
+      }
+
+      // Check collision against living human players
+      let hitPlayer: PlayerNetworkState | null = null;
+      for (const human of livingHumans) {
+        const horizDist = Math.hypot(proj.x - human.x, proj.z - human.z);
+        const playerRadius = MOVEMENT.PLAYER_RADIUS; // 0.38
+        if (horizDist <= playerRadius + proj.radius) {
+          const playerHeight = human.isSliding ? MOVEMENT.PLAYER_SLIDE_HEIGHT : MOVEMENT.PLAYER_HEIGHT;
+          if (proj.y >= human.y - 0.1 && proj.y <= human.y + playerHeight + proj.radius) {
+            hitPlayer = human;
+            break;
+          }
+        }
+      }
+
+      if (hitPlayer) {
+        const shooterActive = this.activeBots.get(proj.botId);
+        const shooterBot = shooterActive ? shooterActive.bot : null;
+        if (shooterBot && !shooterBot.isDead) {
+          this.applyDamageToPlayer(hitPlayer, shooterBot, proj.damage, false, shooterBot.currentWeapon);
+        }
+        const payload: ProjectileImpactPayload = {
+          id: proj.id,
+          hitPoint: [proj.x, proj.y, proj.z],
+          hitPlayerId: hitPlayer.id
+        };
+        this.io.to(this.roomState.roomId).emit('bot_projectile_impact', payload);
+        this.activeProjectiles.delete(id);
+        continue;
+      }
+    }
+  }
+
+  private updateBossState(now: number): void {
+    const bossActive = Array.from(this.activeBots.values()).find(
+      (a) => a.archetype.role === 'boss' && !a.bot.isDead
+    );
+
+    if (bossActive) {
+      const b = bossActive.bot;
+      const totalHp = b.health + b.shieldHp;
+      if (now - this.lastBossBroadcastTime > 300 || this.lastKnownBossHp !== totalHp) {
+        this.lastBossBroadcastTime = now;
+        this.lastKnownBossHp = totalHp;
+        const payload: BossStatePayload = {
+          bossId: b.id,
+          name: b.name,
+          health: b.health,
+          maxHealth: b.maxHealth,
+          shield: b.shieldHp,
+          phase: bossActive.bossPhase || 1
+        };
+        this.io.to(this.roomState.roomId).emit('boss_state', payload);
+      }
+    } else if (this.lastKnownBossHp > 0) {
+      // Boss was just eliminated
+      this.lastKnownBossHp = 0;
+      this.io.to(this.roomState.roomId).emit('boss_state', {
+        bossId: '',
+        name: '',
+        health: 0,
+        maxHealth: 100,
+        shield: 0,
+        phase: 0
+      });
     }
   }
 
@@ -756,5 +1114,6 @@ export class WaveManager {
       this.intermissionTimer = null;
     }
     this.activeBots.clear();
+    this.activeProjectiles.clear();
   }
 }

@@ -1,4 +1,4 @@
-import { GameOverPayload, PowerupType, WeaponStats, WeaponType } from '../../shared/types.js';
+import { BossStatePayload, GameOverPayload, PowerupType, WeaponStats, WeaponType } from '../../shared/types.js';
 import { POWERUPS, WEAPONS } from '../../shared/constants.js';
 
 export class TouchHUD {
@@ -27,6 +27,11 @@ export class TouchHUD {
   private btnSettingsEl!: HTMLElement;
   private waveBannerEl!: HTMLElement;
   private waveBannerTextEl!: HTMLElement;
+  private bossBannerEl!: HTMLElement;
+  private bossNameEl!: HTMLElement;
+  private bossPhaseEl!: HTMLElement;
+  private bossHpFillEl!: HTMLElement;
+  private bossShieldFillEl!: HTMLElement;
   private modeEl: HTMLElement | null = null;
   private scoreEl: HTMLElement | null = null;
   private fragEl: HTMLElement | null = null;
@@ -89,6 +94,18 @@ export class TouchHUD {
       <!-- Wave Intermission / Cleared Banner -->
       <div id="hud-wave-banner" style="position: absolute; top: 68px; left: 50%; transform: translateX(-50%); background: linear-gradient(90deg, rgba(255, 170, 0, 0.92), rgba(0, 210, 255, 0.92)); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 14px; padding: 8px 24px; display: none; align-items: center; gap: 10px; box-shadow: 0 0 24px rgba(0, 210, 255, 0.6); backdrop-filter: blur(8px); pointer-events: none; z-index: 40;">
         <span id="hud-wave-banner-text" style="font-size: 16px; font-weight: 900; color: white; letter-spacing: 1px; text-shadow: 0 2px 6px rgba(0,0,0,0.8);">🎉 WAVE 1 CLEARED! NEXT WAVE IN 5s</span>
+      </div>
+
+      <!-- Inter-Level Boss Health Banner -->
+      <div id="hud-boss-banner" style="position: absolute; top: 66px; left: 50%; transform: translateX(-50%); width: 340px; max-width: 90vw; background: rgba(10, 14, 24, 0.92); border: 2px solid #f43f5e; border-radius: 12px; padding: 6px 14px; display: none; flex-direction: column; gap: 4px; box-shadow: 0 0 22px rgba(244, 63, 94, 0.5); backdrop-filter: blur(8px); z-index: 50; pointer-events: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 900; color: #ff6b8b; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">
+          <span id="hud-boss-name">👑 GEOMETRIC NEXUS</span>
+          <span id="hud-boss-phase" style="font-size: 11px; color: #f59e0b; background: rgba(245, 158, 11, 0.2); padding: 2px 6px; border-radius: 4px;">PHASE 1</span>
+        </div>
+        <div style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 5px; overflow: hidden; position: relative;">
+          <div id="hud-boss-hp-fill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #f43f5e, #ff8da1); transition: width 0.1s linear;"></div>
+          <div id="hud-boss-shield-fill" style="position: absolute; top: 0; left: 0; width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); opacity: 0.85; transition: width 0.1s linear;"></div>
+        </div>
       </div>
 
       <!-- Top Right Quick Buttons: Dashboard & Settings -->
@@ -208,6 +225,11 @@ export class TouchHUD {
     this.btnSettingsEl = hud.querySelector('#btn-hud-settings') as HTMLElement;
     this.waveBannerEl = hud.querySelector('#hud-wave-banner') as HTMLElement;
     this.waveBannerTextEl = hud.querySelector('#hud-wave-banner-text') as HTMLElement;
+    this.bossBannerEl = hud.querySelector('#hud-boss-banner') as HTMLElement;
+    this.bossNameEl = hud.querySelector('#hud-boss-name') as HTMLElement;
+    this.bossPhaseEl = hud.querySelector('#hud-boss-phase') as HTMLElement;
+    this.bossHpFillEl = hud.querySelector('#hud-boss-hp-fill') as HTMLElement;
+    this.bossShieldFillEl = hud.querySelector('#hud-boss-shield-fill') as HTMLElement;
     this.modeEl = hud.querySelector('#hud-match-mode');
     this.scoreEl = hud.querySelector('#hud-match-score');
     this.fragEl = hud.querySelector('#hud-frag-limit');
@@ -230,6 +252,29 @@ export class TouchHUD {
     }
     if (this.btnSettingsEl) {
       bindAction(this.btnSettingsEl, () => this.onOpenSettings?.());
+    }
+  }
+
+  public updateBossState(payload: BossStatePayload): void {
+    if (!this.bossBannerEl) return;
+    if (!payload || payload.health <= 0 || !payload.bossId) {
+      this.bossBannerEl.style.display = 'none';
+      return;
+    }
+
+    this.bossBannerEl.style.display = 'flex';
+    if (this.bossNameEl) this.bossNameEl.textContent = payload.name;
+    if (this.bossPhaseEl) this.bossPhaseEl.textContent = `PHASE ${payload.phase}`;
+
+    const maxHp = payload.maxHealth || 100;
+    const hpPct = Math.max(0, Math.min(100, (payload.health / maxHp) * 100));
+    if (this.bossHpFillEl) this.bossHpFillEl.style.width = `${hpPct}%`;
+
+    if (payload.shield > 0 && this.bossShieldFillEl) {
+      this.bossShieldFillEl.style.display = 'block';
+      this.bossShieldFillEl.style.width = `${Math.min(100, (payload.shield / 100) * 100)}%`;
+    } else if (this.bossShieldFillEl) {
+      this.bossShieldFillEl.style.display = 'none';
     }
   }
 

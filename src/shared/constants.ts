@@ -150,6 +150,9 @@ export const MOVEMENT = {
   JUMP_VELOCITY: 11.5,
   SLIDE_JUMP_BOOST: 1.2,
   GRAVITY: 28.0,
+  AIR_ACCEL: 24.0,
+  AIR_MAX_SPEED: 12.0,
+  AIR_DRAG: 0.985,
   PLAYER_HEIGHT: 1.28,
   PLAYER_SLIDE_HEIGHT: 0.70,
   PLAYER_RADIUS: 0.38,
@@ -394,6 +397,10 @@ export interface BotArchetype {
   fireCooldown: number;
   burstCount: number;
   accuracy: number;
+  projectileSpeed: number;
+  projectileRadius: number;
+  projectileColor: string;
+  projectileDamage: number;
   outfitIndex: number;
   color: string;
 }
@@ -406,10 +413,14 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     maxHp: 60,
     shieldHp: 0,
     speed: 4.0,
-    preferredRange: 14,
-    fireCooldown: 2.0,
+    preferredRange: 13,
+    fireCooldown: 1.6,
     burstCount: 2,
-    accuracy: 0.22,
+    accuracy: 0.25,
+    projectileSpeed: 22,
+    projectileRadius: 0.20,
+    projectileColor: '#00ffcc',
+    projectileDamage: 16,
     outfitIndex: 0,
     color: '#ff4466'
   },
@@ -419,11 +430,15 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     weapon: 'katana',
     maxHp: 65,
     shieldHp: 0,
-    speed: 4.5,
-    preferredRange: 2.0,
-    fireCooldown: 1.8,
-    burstCount: 1,
-    accuracy: 0.5,
+    speed: 4.8,
+    preferredRange: 3.0,
+    fireCooldown: 1.4,
+    burstCount: 3,
+    accuracy: 0.45,
+    projectileSpeed: 28,
+    projectileRadius: 0.18,
+    projectileColor: '#ffaa00',
+    projectileDamage: 18,
     outfitIndex: 2,
     color: '#ffaa00'
   },
@@ -432,12 +447,16 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     namePrefix: '🛡️ Enforcer Heavy',
     weapon: 'shotgun',
     maxHp: 85,
-    shieldHp: 20,
-    speed: 2.8,
-    preferredRange: 6.0,
-    fireCooldown: 2.5,
-    burstCount: 1,
+    shieldHp: 25,
+    speed: 2.6,
+    preferredRange: 7.0,
+    fireCooldown: 2.0,
+    burstCount: 5,
     accuracy: 0.3,
+    projectileSpeed: 16,
+    projectileRadius: 0.26,
+    projectileColor: '#a855f7',
+    projectileDamage: 22,
     outfitIndex: 1,
     color: '#a855f7'
   },
@@ -448,26 +467,34 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     maxHp: 50,
     shieldHp: 0,
     speed: 3.0,
-    preferredRange: 24,
-    fireCooldown: 3.8,
+    preferredRange: 26,
+    fireCooldown: 3.2,
     burstCount: 1,
-    accuracy: 0.35,
+    accuracy: 0.4,
+    projectileSpeed: 55,
+    projectileRadius: 0.15,
+    projectileColor: '#00e5ff',
+    projectileDamage: 40,
     outfitIndex: 3,
     color: '#00ffff'
   },
   boss: {
     role: 'boss',
-    namePrefix: '💀 TITAN BOSS',
-    weapon: 'rifle',
-    maxHp: 200,
-    shieldHp: 50,
-    speed: 3.8,
-    preferredRange: 11,
-    fireCooldown: 2.0,
-    burstCount: 3,
-    accuracy: 0.35,
+    namePrefix: '👑 GEOMETRIC NEXUS',
+    weapon: 'plasma_launcher',
+    maxHp: 320,
+    shieldHp: 120,
+    speed: 3.2,
+    preferredRange: 14,
+    fireCooldown: 1.2,
+    burstCount: 16,
+    accuracy: 0.5,
+    projectileSpeed: 15,
+    projectileRadius: 0.28,
+    projectileColor: '#f43f5e',
+    projectileDamage: 24,
     outfitIndex: 1,
-    color: '#ff0033'
+    color: '#f43f5e'
   }
 };
 
@@ -487,19 +514,22 @@ export function getWaveConfig(waveNum: number): WaveDefinition {
     };
   }
   if (waveNum === 2) {
-    // Target practice: 3 scouts
+    // Target practice: 2 scouts + 1 rusher
     return {
       waveNumber: 2,
-      bots: [{ role: 'scout', count: 3 }]
-    };
-  }
-  if (waveNum === 3) {
-    // Introduce melee threat: 2 scouts + 1 blade rusher
-    return {
-      waveNumber: 3,
       bots: [
         { role: 'scout', count: 2 },
         { role: 'rusher', count: 1 }
+      ]
+    };
+  }
+  if (waveNum === 3) {
+    // Inter-Level Boss 1: Geometric Prism Construct
+    return {
+      waveNumber: 3,
+      bots: [
+        { role: 'boss', count: 1 },
+        { role: 'scout', count: 1 }
       ]
     };
   }
@@ -526,13 +556,13 @@ export function getWaveConfig(waveNum: number): WaveDefinition {
     };
   }
   if (waveNum === 6) {
-    // Mid-game Mini-Boss encounter!
+    // Inter-Level Boss 2: Octahedron Overlord
     return {
       waveNumber: 6,
       bots: [
         { role: 'boss', count: 1 },
-        { role: 'scout', count: 2 },
-        { role: 'rusher', count: 1 }
+        { role: 'rusher', count: 1 },
+        { role: 'heavy', count: 1 }
       ]
     };
   }

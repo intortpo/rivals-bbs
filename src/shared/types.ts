@@ -199,6 +199,38 @@ export interface RemoteFirePayload {
   hitPoint?: [number, number, number];
 }
 
+export type ProjectilePattern = 'bullet' | 'plasma' | 'shard' | 'ring' | 'spiral' | 'beam';
+
+export interface BotProjectilePayload {
+  id: string;
+  botId: string;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  radius: number;
+  color: string;
+  damage: number;
+  pattern: ProjectilePattern;
+}
+
+export interface ProjectileImpactPayload {
+  id: string;
+  hitPoint: [number, number, number];
+  hitPlayerId?: string;
+}
+
+export interface BossStatePayload {
+  bossId: string;
+  name: string;
+  health: number;
+  maxHealth: number;
+  shield: number;
+  phase: number;
+}
+
 export interface HitNotificationPayload {
   attackerId: string;
   targetId: string;

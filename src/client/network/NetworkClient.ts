@@ -1,6 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import * as THREE from 'three';
 import {
+  BossStatePayload,
+  BotProjectilePayload,
   CharacterCustomization,
   EliminationPayload,
   FireWeaponPayload,
@@ -11,17 +13,19 @@ import {
   PlayerInputPayload,
   PowerupActivatedPayload,
   PowerupType,
+  ProjectileImpactPayload,
   RemoteFirePayload,
   RoomNetworkState,
   WorldSnapshot
 } from '../../shared/types.js';
 import { CharacterModel } from '../engine/CharacterModel.js';
+import { GeometricBossModel } from '../engine/GeometricBossModel.js';
 import { AudioManager } from '../engine/AudioManager.js';
 import { FXManager } from '../engine/FXManager.js';
 import { WeaponManager } from '../engine/WeaponManager.js';
 
 interface RemotePlayerEntry {
-  model: CharacterModel;
+  model: CharacterModel | GeometricBossModel;
   targetPos: THREE.Vector3;
   prevPos: THREE.Vector3;
   targetYaw: number;
@@ -58,6 +62,9 @@ export class NetworkClient {
   public onWaveCleared?: (payload: { waveNumber: number; nextWaveInSec: number; totalWaves: number }) => void;
   public onWaveStart?: (payload: { waveNumber: number; totalBots: number }) => void;
   public onRoomDeleted?: (payload: { roomId: string; reason?: string }) => void;
+  public onBotProjectileSpawn?: (payload: BotProjectilePayload) => void;
+  public onBotProjectileImpact?: (payload: ProjectileImpactPayload) => void;
+  public onBossState?: (payload: BossStatePayload) => void;
 
   constructor(
     scene: THREE.Scene,
@@ -184,6 +191,18 @@ export class NetworkClient {
 
     this.socket.on('wave_start', (payload: any) => {
       this.onWaveStart?.(payload);
+    });
+
+    this.socket.on('bot_projectile_spawn', (payload: BotProjectilePayload) => {
+      this.onBotProjectileSpawn?.(payload);
+    });
+
+    this.socket.on('bot_projectile_impact', (payload: ProjectileImpactPayload) => {
+      this.onBotProjectileImpact?.(payload);
+    });
+
+    this.socket.on('boss_state', (payload: BossStatePayload) => {
+      this.onBossState?.(payload);
     });
 
     this.socket.on('game_over', (payload: GameOverPayload) => {
@@ -362,21 +381,28 @@ export class NetworkClient {
     for (const [id, pState] of Object.entries(state.players)) {
       if (id === this.myId) continue; // Skip local player model
       if (!this.remotePlayers.has(id)) {
-        let outfitIndex = 0;
-        if (pState.isBot && pState.botRole) {
-          outfitIndex = pState.botRole === 'heavy' || pState.botRole === 'boss' ? 1 : pState.botRole === 'rusher' ? 2 : pState.botRole === 'sniper' ? 3 : 0;
-        }
-        const model = new CharacterModel(
-          this.scene,
-          id,
-          pState.name,
-          pState.color,
-          false,
-          pState.outfitIndex ?? outfitIndex,
-          pState.customization
-        );
-        if (pState.botRole === 'boss') {
-          model.root.scale.setScalar(1.22);
+        let model: CharacterModel | GeometricBossModel;
+        if (pState.isBot && pState.botRole === 'boss') {
+          model = new GeometricBossModel(
+            this.scene,
+            id,
+            pState.name,
+            pState.color || '#f43f5e'
+          );
+        } else {
+          let outfitIndex = 0;
+          if (pState.isBot && pState.botRole) {
+            outfitIndex = pState.botRole === 'heavy' ? 1 : pState.botRole === 'rusher' ? 2 : pState.botRole === 'sniper' ? 3 : 0;
+          }
+          model = new CharacterModel(
+            this.scene,
+            id,
+            pState.name,
+            pState.color,
+            false,
+            pState.outfitIndex ?? outfitIndex,
+            pState.customization
+          );
         }
         model.root.position.set(pState.x, pState.y, pState.z);
         model.root.rotation.y = pState.yaw;
@@ -403,14 +429,19 @@ export class NetworkClient {
       let remote = this.remotePlayers.get(id);
       if (!remote) {
         // Fallback: spawn remote model if snapshot references new entity
-        const model = new CharacterModel(
-          this.scene,
-          id,
-          data.isBot ? 'Hostile Unit' : 'Pilot',
-          '#ff2a55',
-          false,
-          0
-        );
+        let model: CharacterModel | GeometricBossModel;
+        if (data.isBot && (data as any).botRole === 'boss') {
+          model = new GeometricBossModel(this.scene, id, 'Boss', '#f43f5e');
+        } else {
+          model = new CharacterModel(
+            this.scene,
+            id,
+            data.isBot ? 'Hostile Unit' : 'Pilot',
+            '#ff2a55',
+            false,
+            0
+          );
+        }
         model.root.position.set(data.x, data.y, data.z);
         model.root.rotation.y = data.yaw;
         remote = {

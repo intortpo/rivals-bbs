@@ -17,6 +17,7 @@ import { DashboardUI } from './ui/DashboardUI.js';
 import { CharacterBuilderUI } from './ui/CharacterBuilderUI.js';
 import { LoadingScreenUI } from './ui/LoadingScreenUI.js';
 import { NetworkClient } from './network/NetworkClient.js';
+import { ProjectileManager } from './engine/ProjectileManager.js';
 import { MOVEMENT, NETWORK, WEAPON_ORDER } from '../shared/constants.js';
 import { TeamColor } from '../shared/types.js';
 
@@ -25,6 +26,7 @@ class GameApp {
   private renderer!: Renderer;
   private audio!: AudioManager;
   private fx!: FXManager;
+  private projectileManager!: ProjectileManager;
   private powerupManager!: PowerupManager;
   private weaponManager!: WeaponManager;
   private input!: InputManager;
@@ -94,6 +96,7 @@ class GameApp {
     this.renderer = new Renderer(this.appContainer);
     this.audio = new AudioManager();
     this.fx = new FXManager(this.renderer.scene);
+    this.projectileManager = new ProjectileManager(this.renderer.scene, this.fx);
     this.powerupManager = new PowerupManager(this.renderer.scene, this.audio);
     this.weaponManager = new WeaponManager(this.renderer.scene, this.renderer.camera, this.fx, this.audio);
     this.input = new InputManager(this.appContainer);
@@ -348,6 +351,7 @@ class GameApp {
 
     this.networkClient.onRoomDeleted = (payload) => {
       this.isDead = false;
+      this.projectileManager.clear();
       this.hud.setVisible(false);
       this.hud.hideWaveBanner();
       this.lobbyUI.showMainMenu();
@@ -359,6 +363,7 @@ class GameApp {
 
     this.networkClient.onWaveCleared = (payload) => {
       this.audio.playWaveClear();
+      this.projectileManager.clear();
       this.hud.showWaveCleared(payload.waveNumber, payload.nextWaveInSec);
 
       // Free ammo bonus
@@ -377,10 +382,23 @@ class GameApp {
 
     this.networkClient.onWaveStart = (_payload) => {
       this.audio.playWaveStart();
+      this.projectileManager.clear();
       this.hud.hideWaveBanner();
       if (this.networkClient.currentRoomState) {
         this.updateHUDMatchStats(this.networkClient.currentRoomState);
       }
+    };
+
+    this.networkClient.onBotProjectileSpawn = (payload) => {
+      this.projectileManager.onProjectileSpawn(payload);
+    };
+
+    this.networkClient.onBotProjectileImpact = (payload) => {
+      this.projectileManager.onProjectileImpact(payload);
+    };
+
+    this.networkClient.onBossState = (payload) => {
+      this.hud.updateBossState(payload);
     };
 
     this.networkClient.onPlayerEliminated = (payload) => {
@@ -411,6 +429,7 @@ class GameApp {
     };
 
     this.networkClient.onGameOver = async (payload) => {
+      this.projectileManager.clear();
       const mode = this.networkClient.currentRoomState?.mode;
       const currentWave = this.networkClient.currentRoomState?.waveState?.currentWave;
       const roomId = this.networkClient.currentRoomState?.roomId;
@@ -524,6 +543,7 @@ class GameApp {
       this.powerupManager.remainingActiveSec
     );
     this.networkClient.update(delta);
+    this.projectileManager.update(delta);
     this.weaponManager.update(delta, this.input.isFiring());
     this.fx.update(delta);
     CharacterModel.updateDebris(delta);
@@ -621,13 +641,49 @@ class GameApp {
         this.hasJumpedThisAirtime = true;
         this.audio.playJump();
       }
-    } else if (canJump) {
-      // Coyote time jump after stepping off ledge
-      this.playerVel.y = MOVEMENT.JUMP_VELOCITY;
-      this.coyoteTimer = 0;
-      this.jumpBufferTimer = 0;
-      this.hasJumpedThisAirtime = true;
-      this.audio.playJump();
+    } else {
+      // Mid-Air Control & Momentum Steering
+      if (canJump) {
+        // Coyote time jump after stepping off ledge
+        this.playerVel.y = MOVEMENT.JUMP_VELOCITY;
+        this.coyoteTimer = 0;
+        this.jumpBufferTimer = 0;
+        this.hasJumpedThisAirtime = true;
+        this.audio.playJump();
+      }
+
+      if (isMovingInput) {
+        const speedMult = this.powerupManager.getSpeedMultiplier();
+        const targetSpeed = MOVEMENT.AIR_MAX_SPEED * speedMult;
+        this._scratchMoveDir.copy(this._scratchForward).multiplyScalar(move.forward)
+          .addScaledVector(this._scratchRight, move.right).normalize();
+        const desiredX = this._scratchMoveDir.x * targetSpeed;
+        const desiredZ = this._scratchMoveDir.z * targetSpeed;
+
+        const currentHorizSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
+
+        if (currentHorizSpeed <= targetSpeed) {
+          // Accelerate smoothly towards desired input vector
+          const steerRate = MOVEMENT.AIR_ACCEL * delta;
+          this.playerVel.x = THREE.MathUtils.damp(this.playerVel.x, desiredX, steerRate, delta);
+          this.playerVel.z = THREE.MathUtils.damp(this.playerVel.z, desiredZ, steerRate, delta);
+        } else {
+          // High-speed momentum (from jump pad or slide-jump):
+          // Steer velocity vector direction towards input without abruptly clamping magnitude!
+          const steerAngle = Math.atan2(desiredZ, desiredX);
+          const currentAngle = Math.atan2(this.playerVel.z, this.playerVel.x);
+          let angleDiff = steerAngle - currentAngle;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+          const maxAngleChange = 4.5 * delta;
+          const newAngle = currentAngle + Math.max(-maxAngleChange, Math.min(maxAngleChange, angleDiff));
+          // Apply gentle air drag
+          const retainedSpeed = currentHorizSpeed * MOVEMENT.AIR_DRAG;
+          this.playerVel.x = Math.cos(newAngle) * retainedSpeed;
+          this.playerVel.z = Math.sin(newAngle) * retainedSpeed;
+        }
+      }
     }
 
     // 3.5 Ladder Climbing Physics
