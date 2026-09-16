@@ -316,7 +316,7 @@ export class GrammarReloadUI {
     const q = this.currentQuestions[this.currentQuestionIndex];
     if (!q) return;
 
-    const evalResult = evaluateAnswer(q.id, selectedIndex);
+    const evalResult = evaluateAnswer(q, selectedIndex);
     const feedbackEl = document.getElementById('grammar-feedback');
 
     if (evalResult.isCorrect) {

@@ -19,8 +19,8 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-aux-1',
     prompt: 'I ___ (reload) my assault rifle right now!',
-    options: ['am reloading', 'is reloading', 'are reloading', 'reloading'],
-    correctIndex: 0,
+    options: ['is reloading', 'are reloading', 'am reloading', 'reloading'],
+    correctIndex: 2,
     explanation: 'With subject "I", use "am" + verb-ing ("am reloading").',
     category: 'auxiliary'
   },
@@ -35,40 +35,40 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-aux-3',
     prompt: 'They ___ (run) toward the central fountain plaza.',
-    options: ['are running', 'is running', 'runs', 'am running'],
-    correctIndex: 0,
+    options: ['is running', 'runs', 'am running', 'are running'],
+    correctIndex: 3,
     explanation: 'With subject "They", use "are" + verb-ing ("are running").',
     category: 'auxiliary'
   },
   {
     id: 'pc-aux-4',
     prompt: 'We ___ (take) cover behind the yellow bus.',
-    options: ['are taking', 'is taking', 'am taking', 'taking'],
-    correctIndex: 0,
+    options: ['is taking', 'are taking', 'am taking', 'taking'],
+    correctIndex: 1,
     explanation: 'With plural subject "We", use "are" + verb-ing ("are taking").',
     category: 'auxiliary'
   },
   {
     id: 'pc-aux-5',
     prompt: 'Listen! The alarm ___ (ring) across the city.',
-    options: ['is ringing', 'are ringing', 'am ringing', 'rings'],
-    correctIndex: 0,
+    options: ['are ringing', 'am ringing', 'is ringing', 'rings'],
+    correctIndex: 2,
     explanation: 'Singular subject "The alarm" requires "is" + verb-ing.',
     category: 'auxiliary'
   },
   {
     id: 'pc-aux-6',
     prompt: 'You ___ (stand) right in the line of fire!',
-    options: ['are standing', 'is standing', 'am standing', 'standing'],
-    correctIndex: 0,
+    options: ['is standing', 'am standing', 'standing', 'are standing'],
+    correctIndex: 3,
     explanation: 'Subject "You" always pairs with "are" in present continuous.',
     category: 'auxiliary'
   },
   {
     id: 'pc-aux-7',
     prompt: 'The helicopter ___ (hover) above the tall building.',
-    options: ['is hovering', 'are hovering', 'hovering', 'am hovering'],
-    correctIndex: 0,
+    options: ['are hovering', 'is hovering', 'hovering', 'am hovering'],
+    correctIndex: 1,
     explanation: 'Singular noun "The helicopter" takes "is" + verb-ing.',
     category: 'auxiliary'
   },
@@ -85,24 +85,24 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-spell-1',
     prompt: 'The champion is ___ (slide) under the barrier.',
-    options: ['sliding', 'slideing', 'slidding', 'slides'],
-    correctIndex: 0,
+    options: ['slideing', 'slidding', 'slides', 'sliding'],
+    correctIndex: 3,
     explanation: 'Verbs ending in silent "-e" drop the "e" before adding "-ing" (slide -> sliding).',
     category: 'spelling'
   },
   {
     id: 'pc-spell-2',
     prompt: 'The scout is ___ (run) as fast as possible.',
-    options: ['running', 'runing', 'runned', 'runs'],
-    correctIndex: 0,
+    options: ['runing', 'running', 'runned', 'runs'],
+    correctIndex: 1,
     explanation: 'One-syllable verbs with consonant-vowel-consonant double the last letter (run -> running).',
     category: 'spelling'
   },
   {
     id: 'pc-spell-3',
     prompt: 'She is ___ (make) a new tactical plan.',
-    options: ['making', 'makeing', 'makking', 'makes'],
-    correctIndex: 0,
+    options: ['makeing', 'makking', 'making', 'makes'],
+    correctIndex: 2,
     explanation: 'Drop the final silent "-e": make -> making.',
     category: 'spelling'
   },
@@ -117,24 +117,24 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-spell-5',
     prompt: 'The cat is ___ (lie) down in the shade.',
-    options: ['lying', 'lieing', 'laying', 'liing'],
-    correctIndex: 0,
+    options: ['lieing', 'lying', 'laying', 'liing'],
+    correctIndex: 1,
     explanation: 'Verbs ending in "-ie" change "-ie" to "-y" + "-ing" (lie -> lying).',
     category: 'spelling'
   },
   {
     id: 'pc-spell-6',
     prompt: 'They are ___ (begin) the final round.',
-    options: ['beginning', 'begining', 'beging', 'begins'],
-    correctIndex: 0,
+    options: ['begining', 'beging', 'begins', 'beginning'],
+    correctIndex: 3,
     explanation: 'Two-syllable verb with stress on the second syllable doubles the final consonant (begin -> beginning).',
     category: 'spelling'
   },
   {
     id: 'pc-spell-7',
     prompt: 'I am ___ (write) instructions in team chat.',
-    options: ['writing', 'writeing', 'writting', 'writes'],
-    correctIndex: 0,
+    options: ['writeing', 'writting', 'writing', 'writes'],
+    correctIndex: 2,
     explanation: 'Drop the silent "-e" before adding "-ing" (write -> writing).',
     category: 'spelling'
   },
@@ -151,24 +151,24 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-neg-2',
     prompt: 'We ___ (not retreat) from this match!',
-    options: ['are not retreating', 'is not retreating', 'not retreating', 'am not retreating'],
-    correctIndex: 0,
+    options: ['is not retreating', 'are not retreating', 'not retreating', 'am not retreating'],
+    correctIndex: 1,
     explanation: 'Negative form with "We" is "are not" + verb-ing.',
     category: 'negative'
   },
   {
     id: 'pc-neg-3',
     prompt: 'I ___ (not waste) any shotgun shells.',
-    options: ['am not wasting', 'is not wasting', 'are not wasting', 'not wasting'],
-    correctIndex: 0,
+    options: ['is not wasting', 'are not wasting', 'not wasting', 'am not wasting'],
+    correctIndex: 3,
     explanation: 'Negative form with "I" is "am not" + verb-ing.',
     category: 'negative'
   },
   {
     id: 'pc-neg-4',
     prompt: 'The drones ___ (not patrol) Sector B right now.',
-    options: ['are not patrolling', 'is not patrolling', 'do not patrolling', 'not patrolling'],
-    correctIndex: 0,
+    options: ['is not patrolling', 'do not patrolling', 'are not patrolling', 'not patrolling'],
+    correctIndex: 2,
     explanation: 'Plural subject "The drones" takes "are not" + verb-ing.',
     category: 'negative'
   },
@@ -177,8 +177,8 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-q-1',
     prompt: '___ you ___ (watch) the north street?',
-    options: ['Are / watching', 'Is / watching', 'Do / watching', 'Are / watch'],
-    correctIndex: 0,
+    options: ['Is / watching', 'Are / watching', 'Do / watching', 'Are / watch'],
+    correctIndex: 1,
     explanation: 'Question form with "you": "Are" + subject + verb-ing.',
     category: 'question'
   },
@@ -193,16 +193,16 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-q-3',
     prompt: 'Where ___ they ___ (hide) right now?',
-    options: ['are / hiding', 'is / hiding', 'do / hiding', 'are / hide'],
-    correctIndex: 0,
+    options: ['is / hiding', 'do / hiding', 'are / hiding', 'are / hide'],
+    correctIndex: 2,
     explanation: 'Plural subject "they" takes "are" + subject + verb-ing ("are they hiding").',
     category: 'question'
   },
   {
     id: 'pc-q-4',
     prompt: '___ your jump pad ___ (charge) up?',
-    options: ['Is / charging', 'Are / charging', 'Does / charging', 'Is / chargeing'],
-    correctIndex: 0,
+    options: ['Are / charging', 'Does / charging', 'Is / chargeing', 'Is / charging'],
+    correctIndex: 3,
     explanation: 'Singular noun "your jump pad" requires "Is" + verb-ing ("charging").',
     category: 'question'
   },
@@ -219,16 +219,16 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
   {
     id: 'pc-ctx-2',
     prompt: 'Look outside! It ___ (rain) heavily on the cartoon city.',
-    options: ['is raining', 'are raining', 'raining', 'rains'],
-    correctIndex: 0,
+    options: ['are raining', 'is raining', 'raining', 'rains'],
+    correctIndex: 1,
     explanation: 'With impersonal "It", use "is raining".',
     category: 'context'
   },
   {
     id: 'pc-ctx-3',
     prompt: 'The students ___ (study) English grammar while playing.',
-    options: ['are studying', 'is studying', 'studying', 'studies'],
-    correctIndex: 0,
+    options: ['is studying', 'studying', 'are studying', 'studies'],
+    correctIndex: 2,
     explanation: 'Plural subject "The students" takes "are studying".',
     category: 'context'
   },
@@ -243,26 +243,60 @@ export const PRESENT_CONTINUOUS_BANK: GrammarQuestion[] = [
 ];
 
 /**
- * Returns a randomized set of N unique Present Continuous grammar questions.
+ * Shuffles the options of a grammar question using Fisher-Yates and updates correctIndex.
+ */
+export function shuffleQuestionOptions(q: GrammarQuestion): GrammarQuestion {
+  const correctOptionText = q.options[q.correctIndex];
+  const shuffledOptions = [...q.options];
+
+  for (let i = shuffledOptions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = shuffledOptions[i];
+    shuffledOptions[i] = shuffledOptions[j];
+    shuffledOptions[j] = temp;
+  }
+
+  const newCorrectIndex = shuffledOptions.indexOf(correctOptionText);
+
+  return {
+    ...q,
+    options: shuffledOptions,
+    correctIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0
+  };
+}
+
+/**
+ * Returns a randomized set of N unique Present Continuous grammar questions
+ * with unpredictably shuffled multiple-choice options.
  */
 export function getRandomGrammarQuestions(count: number = 2): GrammarQuestion[] {
   const shuffled = [...PRESENT_CONTINUOUS_BANK].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(count, shuffled.length));
+  return shuffled
+    .slice(0, Math.min(count, shuffled.length))
+    .map((q) => shuffleQuestionOptions(q));
 }
 
 /**
  * Validates player answer and returns result with explanatory feedback.
+ * Accepts either a question ID (string) or an active GrammarQuestion instance.
  */
 export function evaluateAnswer(
-  questionId: string,
+  questionOrId: string | GrammarQuestion,
   selectedIndex: number
 ): {
   isCorrect: boolean;
   correctIndex: number;
   explanation: string;
 } {
-  const q = PRESENT_CONTINUOUS_BANK.find((item) => item.id === questionId);
-  if (!q) {
+  let targetQ: GrammarQuestion | undefined;
+
+  if (typeof questionOrId === 'object' && questionOrId !== null) {
+    targetQ = questionOrId;
+  } else if (typeof questionOrId === 'string') {
+    targetQ = PRESENT_CONTINUOUS_BANK.find((item) => item.id === questionOrId);
+  }
+
+  if (!targetQ) {
     return {
       isCorrect: false,
       correctIndex: 0,
@@ -270,10 +304,10 @@ export function evaluateAnswer(
     };
   }
 
-  const isCorrect = selectedIndex === q.correctIndex;
+  const isCorrect = selectedIndex === targetQ.correctIndex;
   return {
     isCorrect,
-    correctIndex: q.correctIndex,
-    explanation: q.explanation
+    correctIndex: targetQ.correctIndex,
+    explanation: targetQ.explanation
   };
 }
