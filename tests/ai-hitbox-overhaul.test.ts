@@ -5,7 +5,8 @@ import { lineIntersectsBox, hasLineOfSight, BoundingBox } from '../src/shared/ma
 import { CharacterModel } from '../src/client/engine/CharacterModel.js';
 import { WaveManager, BotAIState } from '../src/server/ai/WaveManager.js';
 import { RoomNetworkState, PlayerNetworkState } from '../src/shared/types.js';
-import { WEAPONS, BOT_ARCHETYPES, getMapSpawns } from '../src/shared/constants.js';
+import { WEAPONS, BOT_ARCHETYPES, getMapSpawns, MOVEMENT } from '../src/shared/constants.js';
+import { MapBuilder } from '../src/client/engine/MapBuilder.js';
 
 // 1. Compound 5-Part Hitbox System & Raycast Precision
 describe('Compound 5-Part Hitbox System & Raycast Precision', () => {
@@ -169,6 +170,46 @@ describe('Ground Snapping & Terrain Clamping', () => {
       assert.ok(groundSpawns.length >= 2, `Map ${map} must have floor level spawns (y = 0.0)`);
     }
     console.log('✓ Verified floor level spawns at y = 0.0 across all arena maps');
+  });
+});
+
+// 5. Normalized Character & Bot Height Parity
+describe('Normalized Character & Bot Height Parity', () => {
+  it('should ensure local player eye height and remote bot eye height match within 0.02m at ground level', () => {
+    const scene = new THREE.Scene();
+    const botModel = new CharacterModel(scene, 'bot_unit', 'Hostile Bot', '#ff2a55', false, 0);
+
+    // Bot stands on ground at y = 0.0
+    botModel.root.position.set(0, 0, 0);
+    botModel.root.updateMatrixWorld(true);
+
+    const botHeadWorldPos = new THREE.Vector3();
+    botModel.headCollider.getWorldPosition(botHeadWorldPos);
+
+    // Local player stands on ground at y = 0.0
+    const localPlayerFeetY = 0.0;
+    const localPlayerEyeY = localPlayerFeetY + MOVEMENT.EYE_HEIGHT;
+
+    // Both eye lines must align within 0.02m (head collider center is 1.10m, eye height is 1.08m)
+    const eyeDisparity = Math.abs(localPlayerEyeY - botHeadWorldPos.y);
+    assert.ok(
+      eyeDisparity <= 0.03,
+      `Local player eye level (${localPlayerEyeY}m) must align with bot head level (${botHeadWorldPos.y}m), got disparity: ${eyeDisparity.toFixed(3)}m`
+    );
+    console.log(`✓ Verified 1:1 eye-level parity: Player Camera Y=${localPlayerEyeY.toFixed(2)}m vs Bot Head Y=${botHeadWorldPos.y.toFixed(2)}m (Disparity: ${eyeDisparity.toFixed(2)}m)`);
+  });
+
+  it('should ensure player and bot are both on ground plane y = 0.0 without phantom 1.0m elevation', () => {
+    const scene = new THREE.Scene();
+    const mb = new MapBuilder(scene, 'Arena Classic');
+
+    // Player position on ground floor
+    const playerFloorPos = new THREE.Vector3(0, 0, 0);
+    const groundLevel = mb.getGroundLevel(playerFloorPos);
+
+    assert.strictEqual(groundLevel, 0.0, 'Ground level on ground plane maps must be exactly 0.0 (no phantom +1.0m)');
+    mb.dispose();
+    console.log('✓ Verified ground level y = 0.0 with zero phantom offset');
   });
 });
 

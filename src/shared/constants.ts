@@ -150,11 +150,11 @@ export const MOVEMENT = {
   JUMP_VELOCITY: 11.5,
   SLIDE_JUMP_BOOST: 1.2,
   GRAVITY: 28.0,
-  PLAYER_HEIGHT: 1.45,
-  PLAYER_SLIDE_HEIGHT: 0.80,
-  PLAYER_RADIUS: 0.40,
-  EYE_HEIGHT: 1.25,
-  SLIDE_EYE_HEIGHT: 0.65
+  PLAYER_HEIGHT: 1.28,
+  PLAYER_SLIDE_HEIGHT: 0.70,
+  PLAYER_RADIUS: 0.38,
+  EYE_HEIGHT: 1.08,
+  SLIDE_EYE_HEIGHT: 0.55
 };
 
 export const NETWORK = {
@@ -187,11 +187,11 @@ export const CITY_SPAWNS = [
 export const CYBER_SPIRE_SPAWNS = [
   { x: 0, y: 0.0, z: -4, yaw: 0 },
   { x: 0, y: 0.0, z: 4, yaw: Math.PI },
-  { x: 0, y: 4.0, z: -22, yaw: 0 }, // North Tower
-  { x: 0, y: 4.0, z: 22, yaw: Math.PI }, // South Tower
-  { x: -22, y: 3.0, z: 0, yaw: Math.PI / 2 }, // West Helipad
-  { x: 22, y: 3.0, z: 0, yaw: -Math.PI / 2 }, // East Deck
-  { x: 0, y: 11.0, z: 0, yaw: 0 } // High Spire
+  { x: 0, y: 3.0, z: -22, yaw: 0 }, // North Tower
+  { x: 0, y: 3.0, z: 22, yaw: Math.PI }, // South Tower
+  { x: -22, y: 2.0, z: 0, yaw: Math.PI / 2 }, // West Helipad
+  { x: 22, y: 2.0, z: 0, yaw: -Math.PI / 2 }, // East Deck
+  { x: 0, y: 10.0, z: 0, yaw: 0 } // High Spire
 ];
 
 export const QUANTUM_LAB_SPAWNS = [
@@ -199,7 +199,7 @@ export const QUANTUM_LAB_SPAWNS = [
   { x: 22, y: 0.0, z: 0, yaw: -Math.PI / 2 }, // East Lab Bay
   { x: 0, y: 0.0, z: -22, yaw: 0 }, // North Access
   { x: 0, y: 0.0, z: 22, yaw: Math.PI }, // South Access
-  { x: 0, y: 4.5, z: 0, yaw: 0 }, // Observation Deck
+  { x: 0, y: 3.5, z: 0, yaw: 0 }, // Observation Deck
   { x: -14, y: 0.0, z: 12, yaw: -Math.PI / 4 },
   { x: 14, y: 0.0, z: -12, yaw: 3 * Math.PI / 4 }
 ];
@@ -210,7 +210,7 @@ export const MAGMA_FOUNDRY_SPAWNS = [
   { x: -22, y: 0.0, z: 0, yaw: Math.PI / 2 }, // West Slag Pour
   { x: 22, y: 0.0, z: 0, yaw: -Math.PI / 2 }, // East Tank
   { x: 0, y: 0.0, z: 0, yaw: 0 }, // Central Crucible
-  { x: 0, y: 5.5, z: 6, yaw: Math.PI } // High Crane Gantry
+  { x: 0, y: 4.5, z: 6, yaw: Math.PI } // High Crane Gantry
 ];
 
 export const SUBZERO_STATION_SPAWNS = [

@@ -36,9 +36,9 @@ describe('5 New Arena Maps Architecture & Geometry', () => {
     assert.strictEqual(mb.teleportPorts.length, 2, 'Should have 1 paired teleporter (2 ports)');
 
     // Test platform height check
-    const centerTerracePos = new THREE.Vector3(0, 4.0, 0); // On Tier 2 terrace (max.y = 4.0 -> ground level = 5.0)
+    const centerTerracePos = new THREE.Vector3(0, 4.0, 0); // On Tier 2 terrace (max.y = 4.0 -> ground level = 4.0)
     const gLevel = mb.getGroundLevel(centerTerracePos);
-    assert.strictEqual(gLevel, 5.0, 'Standing on Tier 2 terrace should provide ground level 5.0');
+    assert.strictEqual(gLevel, 4.0, 'Standing on Tier 2 terrace should provide ground level 4.0');
 
     // Test stepping off into void
     const voidPos = new THREE.Vector3(-18, 0, -18);
@@ -58,7 +58,7 @@ describe('5 New Arena Maps Architecture & Geometry', () => {
     // Verify observation deck height
     const obsDeckPos = new THREE.Vector3(0, 3.5, 0);
     const obsGLevel = mb.getGroundLevel(obsDeckPos);
-    assert.strictEqual(obsGLevel, 4.5, 'Observation deck should provide elevated ground level 4.5');
+    assert.strictEqual(obsGLevel, 3.5, 'Observation deck should provide elevated ground level 3.5');
 
     mb.dispose();
   });
@@ -73,7 +73,7 @@ describe('5 New Arena Maps Architecture & Geometry', () => {
     // Test central crucible ground
     const cruciblePos = new THREE.Vector3(0, 0, 0);
     const ground = mb.getGroundLevel(cruciblePos);
-    assert.strictEqual(ground, 1.0, 'Central crucible surface provides ground level 1.0');
+    assert.strictEqual(ground, 0.0, 'Central crucible surface provides ground level 0.0');
 
     // Test lava void drop
     const lavaPos = new THREE.Vector3(15, 0, 15);
@@ -93,7 +93,7 @@ describe('5 New Arena Maps Architecture & Geometry', () => {
     // Test command center roof height
     const bunkerRoofPos = new THREE.Vector3(0, 4.0, 0);
     const gLevel = mb.getGroundLevel(bunkerRoofPos);
-    assert.strictEqual(gLevel, 5.0, 'Bunker roof provides ground level 5.0');
+    assert.strictEqual(gLevel, 4.0, 'Bunker roof provides ground level 4.0');
 
     mb.dispose();
   });
@@ -107,7 +107,7 @@ describe('5 New Arena Maps Architecture & Geometry', () => {
 
     // Test island ground
     const shrinePos = new THREE.Vector3(0, 0, 0);
-    assert.strictEqual(mb.getGroundLevel(shrinePos), 1.0, 'Shrine island surface provides ground level 1.0');
+    assert.strictEqual(mb.getGroundLevel(shrinePos), 0.0, 'Shrine island surface provides ground level 0.0');
 
     // Test open sky chasm
     const chasmPos = new THREE.Vector3(-15, 0, -15);

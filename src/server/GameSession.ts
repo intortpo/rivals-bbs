@@ -441,7 +441,7 @@ export class GameSession {
 
   private resolveRailgunShot(shooter: PlayerNetworkState, payload: FireWeaponPayload): void {
     const stats = WEAPONS.railgun;
-    const origin: [number, number, number] = payload.origin || [shooter.x, shooter.y + 1.2, shooter.z];
+    const origin: [number, number, number] = payload.origin || [shooter.x, shooter.y + 1.08, shooter.z];
     const dir = payload.direction || [0, 0, -1];
     const dirLen = Math.hypot(dir[0], dir[1], dir[2]) || 1;
     const ndx = dir[0] / dirLen;
@@ -456,7 +456,7 @@ export class GameSession {
       }
 
       const vx = target.x - origin[0];
-      const vy = (target.y + 0.9) - origin[1];
+      const vy = (target.y + 0.8) - origin[1];
       const vz = target.z - origin[2];
 
       const t = vx * ndx + vy * ndy + vz * ndz;
@@ -466,12 +466,12 @@ export class GameSession {
       const py = origin[1] + ndy * t;
       const pz = origin[2] + ndz * t;
 
-      const distSq = (target.x - px) ** 2 + (target.y + 0.9 - py) ** 2 + (target.z - pz) ** 2;
+      const distSq = (target.x - px) ** 2 + (target.y + 0.8 - py) ** 2 + (target.z - pz) ** 2;
       const hitboxRadius = 1.0;
 
       if (distSq <= hitboxRadius * hitboxRadius) {
-        if (hasLineOfSight(origin, [target.x, target.y + 0.9, target.z], this.mapObstacles)) {
-          const isHeadshot = Math.abs((target.y + 1.25) - py) < 0.35;
+        if (hasLineOfSight(origin, [target.x, target.y + 0.8, target.z], this.mapObstacles)) {
+          const isHeadshot = Math.abs((target.y + 1.10) - py) < 0.22;
           const damage = isHeadshot ? Math.round(stats.damage * stats.headshotMultiplier) : stats.damage;
           this.applyDirectDamage(shooter, target, damage, 'railgun', isHeadshot);
         }
@@ -489,8 +489,8 @@ export class GameSession {
     }
 
     // Line-of-sight check: shots cannot penetrate solid buildings or vehicles
-    const origin: [number, number, number] = payload.origin || [shooter.x, shooter.y + 1.2, shooter.z];
-    const targetPoint: [number, number, number] = payload.hitPoint || [target.x, target.y + 1.0, target.z];
+    const origin: [number, number, number] = payload.origin || [shooter.x, shooter.y + 1.08, shooter.z];
+    const targetPoint: [number, number, number] = payload.hitPoint || [target.x, target.y + 0.8, target.z];
     if (!hasLineOfSight(origin, targetPoint, this.mapObstacles)) {
       return; // Shot blocked by building!
     }

@@ -353,8 +353,8 @@ export class WaveManager {
       bot.pitch = targetPitch;
 
       // 2. Line of Sight & Sensory Perception
-      const botEye: [number, number, number] = [bot.x, bot.y + 1.2, bot.z];
-      const targetBody: [number, number, number] = [target.x, target.y + 1.0, target.z];
+      const botEye: [number, number, number] = [bot.x, bot.y + 1.08, bot.z];
+      const targetBody: [number, number, number] = [target.x, target.y + 0.8, target.z];
       const hasLOS = hasLineOfSight(botEye, targetBody, this.mapObstacles);
 
       const fwdX = -Math.sin(bot.yaw);
@@ -479,7 +479,7 @@ export class WaveManager {
           bot.z - botRadius < obs.max[2]
         ) {
           const botFeet = bot.y;
-          const botHead = bot.y + 1.8;
+          const botHead = bot.y + 1.28;
           if (botFeet >= obs.max[1] - 0.2 || botHead <= obs.min[1] + 0.1) {
             continue;
           }

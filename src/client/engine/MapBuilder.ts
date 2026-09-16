@@ -958,7 +958,7 @@ export class MapBuilder {
   }
 
   public getGroundLevel(playerPos: THREE.Vector3): number {
-    let highestGround = this.hasGroundPlane ? 1.0 : -100;
+    let highestGround = this.hasGroundPlane ? 0.0 : -100;
     for (const roof of this.rooftopBoxes) {
       if (
         playerPos.x >= roof.min.x - 0.25 &&
@@ -966,9 +966,9 @@ export class MapBuilder {
         playerPos.z >= roof.min.z - 0.25 &&
         playerPos.z <= roof.max.z + 0.25 &&
         playerPos.y >= roof.max.y - 0.7 &&
-        playerPos.y <= roof.max.y + 3.5
+        playerPos.y <= roof.max.y + 2.5
       ) {
-        const candidate = roof.max.y + 1.0;
+        const candidate = roof.max.y;
         if (candidate > highestGround) {
           highestGround = candidate;
         }

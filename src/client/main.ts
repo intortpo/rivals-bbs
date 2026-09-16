@@ -41,7 +41,7 @@ class GameApp {
   private mapBuilder!: MapBuilder;
 
   // Local player physics state
-  private playerPos = new THREE.Vector3(0, 1.5, 0);
+  private playerPos = new THREE.Vector3(0, 0, 0);
   private playerVel = new THREE.Vector3(0, 0, 0);
   private playerYaw: number = 0;
   private playerPitch: number = 0;
