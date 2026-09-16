@@ -622,7 +622,7 @@ class GameApp {
     // Check box obstacles with vertical clearance and tangential sliding
     const playerRadius = MOVEMENT.PLAYER_RADIUS;
     const playerFeet = this.playerPos.y;
-    const playerHead = this.playerPos.y + (this.isSliding ? 1.0 : 1.8);
+    const playerHead = this.playerPos.y + (this.isSliding ? MOVEMENT.PLAYER_SLIDE_HEIGHT : MOVEMENT.PLAYER_HEIGHT);
 
     for (const box of this.mapBuilder.collisionBoxes) {
       // If player's feet are above the obstacle surface, they are standing or landing on top

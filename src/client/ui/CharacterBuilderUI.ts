@@ -452,7 +452,7 @@ export class CharacterBuilderUI {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 50);
-    this.camera.position.set(0, 0.95, this.zoomDistance);
+    this.camera.position.set(0, 0.68, this.zoomDistance * 0.75);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(width, height);
@@ -475,18 +475,18 @@ export class CharacterBuilderUI {
     this.scene.add(rimLight);
 
     // Glowing Pedestal
-    const pedGeo = new THREE.CylinderGeometry(0.85, 0.95, 0.08, 32);
+    const pedGeo = new THREE.CylinderGeometry(0.60, 0.68, 0.06, 32);
     const pedMat = new THREE.MeshStandardMaterial({
       color: '#151c2e',
       roughness: 0.3,
       metalness: 0.2
     });
     const pedestal = new THREE.Mesh(pedGeo, pedMat);
-    pedestal.position.y = -0.04;
+    pedestal.position.y = -0.03;
     pedestal.receiveShadow = true;
     this.scene.add(pedestal);
 
-    const ringGeo = new THREE.RingGeometry(0.82, 0.85, 32);
+    const ringGeo = new THREE.RingGeometry(0.58, 0.61, 32);
     ringGeo.rotateX(-Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({ color: '#00d2ff', side: THREE.DoubleSide });
     const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -497,7 +497,7 @@ export class CharacterBuilderUI {
     const loader = new GLTFLoader();
     loader.load('/models/characters/creative_character.glb', (gltf) => {
       const clone = SkeletonUtils.clone(gltf.scene) as THREE.Group;
-      clone.scale.set(0.85, 0.85, 0.85);
+      clone.scale.set(0.60, 0.60, 0.60);
       clone.position.set(0, 0, 0);
 
       // Relax arms into tactical combat stance

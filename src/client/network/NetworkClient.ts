@@ -289,7 +289,7 @@ export class NetworkClient {
           pState.customization
         );
         if (pState.botRole === 'boss') {
-          model.root.scale.setScalar(1.35);
+          model.root.scale.setScalar(1.22);
         }
         model.root.position.set(pState.x, pState.y, pState.z);
         model.root.rotation.y = pState.yaw;

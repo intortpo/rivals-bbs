@@ -327,17 +327,17 @@ export class CharacterModel {
       depthWrite: false
     });
 
-    // Body / Torso Box: Height 1.0m, Width 0.55m, Depth 0.4m
-    const bodyGeo = new THREE.BoxGeometry(0.55, 1.0, 0.4);
+    // Body / Torso Box: Height 0.70m, Width 0.40m, Depth 0.30m (proportional to 0.60 avatar scale)
+    const bodyGeo = new THREE.BoxGeometry(0.40, 0.70, 0.30);
     this.bodyCollider = new THREE.Mesh(bodyGeo, hitMat);
-    this.bodyCollider.position.set(0, 0.85, 0);
+    this.bodyCollider.position.set(0, 0.58, 0);
     this.bodyCollider.userData = { playerId: this.playerId, isHeadshot: false };
     this.root.add(this.bodyCollider);
 
-    // Head Sphere: Radius 0.22m, elevated at y = 1.55m
-    const headGeo = new THREE.SphereGeometry(0.22, 12, 12);
+    // Head Sphere: Radius 0.16m, elevated at y = 1.10m
+    const headGeo = new THREE.SphereGeometry(0.16, 12, 12);
     this.headCollider = new THREE.Mesh(headGeo, hitMat);
-    this.headCollider.position.set(0, 1.55, 0);
+    this.headCollider.position.set(0, 1.10, 0);
     this.headCollider.userData = { playerId: this.playerId, isHeadshot: true };
     this.root.add(this.headCollider);
   }
@@ -400,8 +400,8 @@ export class CharacterModel {
   private attachClonedModel(source: THREE.Group): void {
     const clone = SkeletonUtils.clone(source) as THREE.Group;
 
-    // Scale to natural human proportion: 1.78m height (2.10 * 0.85 = 1.785m)
-    clone.scale.set(0.85, 0.85, 0.85);
+    // Scale to compact, proportional tactical avatar: ~1.26m height (2.10 * 0.60 = 1.26m)
+    clone.scale.set(0.60, 0.60, 0.60);
     clone.position.set(0, 0, 0);
 
     // Locate bones
@@ -511,7 +511,7 @@ export class CharacterModel {
 
   private buildNameplate(): void {
     this.nameplateGroup = new THREE.Group();
-    this.nameplateGroup.position.y = 2.05; // Placed right above character head
+    this.nameplateGroup.position.y = 1.45; // Placed right above compact character head
 
     const canvas = document.createElement('canvas');
     canvas.width = 256;
