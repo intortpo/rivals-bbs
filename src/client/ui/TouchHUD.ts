@@ -137,14 +137,14 @@ export class TouchHUD {
       <div id="hud-countdown" style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 96px; font-weight: 900; color: #00d2ff; text-shadow: 0 0 30px #00d2ff; display: none;">3</div>
 
       <!-- Game Over Modal -->
-      <div id="hud-game-over" class="modal-backdrop" style="display: none;">
-        <div class="modal-card">
+      <div id="hud-game-over" class="modal-backdrop" style="display: none; pointer-events: auto !important; cursor: default;">
+        <div class="modal-card" style="pointer-events: auto !important; cursor: default;">
           <h1 id="hud-winner-title" style="font-size: 32px; color: #ffbb00; margin: 0 0 10px 0;">VICTORY!</h1>
           <p id="hud-winner-desc" style="font-size: 16px; color: #8da2c0; margin-bottom: 20px;">Match Finished</p>
 
           <div id="hud-scoreboard-table" style="width: 100%; margin-bottom: 24px;"></div>
 
-          <button id="btn-return-lobby" class="btn btn-primary" style="width: 100%;">Return to Lobby</button>
+          <button id="btn-return-lobby" class="btn btn-primary" style="width: 100%; pointer-events: auto !important; cursor: pointer;">Return to Lobby</button>
         </div>
       </div>
     `;
@@ -486,6 +486,10 @@ export class TouchHUD {
         this.gameOverModalEl.style.display = 'none';
         onReturnToLobby();
       };
+    }
+
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
     }
 
     this.gameOverModalEl.style.display = 'flex';

@@ -46,7 +46,7 @@ export class MapBuilder {
   public bounds = { minX: -28, maxX: 28, minZ: -28, maxZ: 28 };
   public mapName: string;
   public skyTheme: string;
-  private group: THREE.Group;
+  public group: THREE.Group;
   private sceneRef: THREE.Scene;
   private skyMesh: THREE.Mesh | null = null;
 

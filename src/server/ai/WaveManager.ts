@@ -16,6 +16,11 @@ import {
   WaveDefinition,
   WEAPONS
 } from '../../shared/constants.js';
+import {
+  BoundingBox,
+  getMapObstacles,
+  hasLineOfSight
+} from '../../shared/mapObstacles.js';
 
 interface ActiveBot {
   bot: PlayerNetworkState;
@@ -36,6 +41,7 @@ export class WaveManager {
   private activeBots: Map<string, ActiveBot> = new Map();
   private onEndGame: (winner: PlayerNetworkState, winningTeam?: TeamColor) => void;
   private onStateChange?: () => void;
+  private mapObstacles: BoundingBox[] = [];
 
   constructor(
     io: Server,
@@ -49,6 +55,7 @@ export class WaveManager {
     this.mapName = mapName;
     this.onEndGame = onEndGame;
     this.onStateChange = onStateChange;
+    this.mapObstacles = getMapObstacles(mapName);
 
     // Default maxWaves from fragLimit (if fragLimit is 5 or 10 or 0 for endless)
     this.maxWaves = roomState.fragLimit > 0 ? roomState.fragLimit : 10;
@@ -113,6 +120,11 @@ export class WaveManager {
         const offsetX = (Math.random() - 0.5) * 4;
         const offsetZ = (Math.random() - 0.5) * 4;
 
+        // Early wave grace period: Wave 1 gives 3.5s-5.0s, Wave 2 gives 3.0s-4.5s, Wave 3+ gives 2.5s-4.0s
+        const spawnGraceBase = waveNum === 1 ? 3500 : waveNum === 2 ? 3000 : 2500;
+        const botHp = (arch.role === 'boss' && waveNum < 10) ? 150 : arch.maxHp;
+        const botShield = (arch.role === 'boss' && waveNum < 10) ? 25 : arch.shieldHp;
+
         const botPlayer: PlayerNetworkState = {
           id: botId,
           name: `${arch.namePrefix} #${i + 1}`,
@@ -129,9 +141,9 @@ export class WaveManager {
           vz: 0,
           yaw: spawnPoint.yaw,
           pitch: 0,
-          health: arch.maxHp,
-          maxHealth: arch.maxHp,
-          shieldHp: arch.shieldHp,
+          health: botHp,
+          maxHealth: botHp,
+          shieldHp: botShield,
           activePowerup: null,
           powerupExpiresAt: 0,
           currentWeapon: arch.weapon,
@@ -148,8 +160,7 @@ export class WaveManager {
         this.activeBots.set(botId, {
           bot: botPlayer,
           archetype: arch,
-          // Give human players a 2.5-4.0s grace period when a wave spawns before bots open fire
-          lastFireTime: Date.now() + 2500 + Math.random() * 1500,
+          lastFireTime: Date.now() + spawnGraceBase + Math.random() * 1500,
           seed: Math.random() * 100
         });
       }
@@ -274,17 +285,39 @@ export class WaveManager {
         bot.z = Math.max(-boundZ, Math.min(boundZ, bot.z));
       }
 
+      // Early wave scaling: gentler aim and longer cooldowns during introductory waves
+      let waveAccuracyMult = 1.0;
+      let waveCooldownMult = 1.0;
+      if (this.currentWave === 1) {
+        waveAccuracyMult = 0.65;
+        waveCooldownMult = 1.3;
+      } else if (this.currentWave === 2) {
+        waveAccuracyMult = 0.75;
+        waveCooldownMult = 1.2;
+      } else if (this.currentWave === 3) {
+        waveAccuracyMult = 0.85;
+        waveCooldownMult = 1.1;
+      }
+
       // 3. Combat & Firing
       const weaponStats = WEAPONS[archetype.weapon];
       const inRange = dist <= (weaponStats ? weaponStats.range : 30);
+      const effectiveCooldown = archetype.fireCooldown * waveCooldownMult;
 
-      if (inRange && now - active.lastFireTime >= archetype.fireCooldown * 1000) {
-        active.lastFireTime = now;
-
+      if (inRange && now - active.lastFireTime >= effectiveCooldown * 1000) {
         // Melee check: Blade Rusher must be in close range to swing katana
         if (archetype.weapon === 'katana' && dist > 2.6) {
           continue;
         }
+
+        // Line-of-Sight check: verify solid buildings or vehicles do not block line to target
+        const botEye: [number, number, number] = [bot.x, bot.y + 1.2, bot.z];
+        const targetBody: [number, number, number] = [target.x, target.y + 1.0, target.z];
+        if (!hasLineOfSight(botEye, targetBody, this.mapObstacles)) {
+          continue; // View blocked by building! Bot continues navigating towards target.
+        }
+
+        active.lastFireTime = now;
 
         // Emit visual fire event to room
         this.io.to(this.roomState.roomId).emit('player_fired', {
@@ -295,9 +328,9 @@ export class WaveManager {
           hitPoint: [target.x, target.y + 1.2, target.z]
         });
 
-        // Determine hit registration based on accuracy with distance falloff
+        // Determine hit registration based on accuracy with distance falloff and wave scaling
         const distFalloff = Math.max(0.35, 1 - (dist / 35));
-        const effectiveAccuracy = archetype.accuracy * distFalloff;
+        const effectiveAccuracy = archetype.accuracy * waveAccuracyMult * distFalloff;
         const hitRoll = Math.random();
 
         if (hitRoll < effectiveAccuracy) {

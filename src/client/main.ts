@@ -633,7 +633,10 @@ class GameApp {
       ) {
         this.triggerReloadFlow();
       } else {
-        const targetMeshes = this.networkClient.getTargetableMeshes();
+        const targetMeshes = [
+          ...this.networkClient.getTargetableMeshes(),
+          this.mapBuilder.group
+        ];
         const fireRes = this.weaponManager.fire(this.renderer.camera, targetMeshes);
 
         if (fireRes.fired) {

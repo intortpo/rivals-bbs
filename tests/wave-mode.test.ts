@@ -96,7 +96,7 @@ async function runWaveTest() {
   client.emit('start_countdown');
   const waveStartData = await waveStartPromise;
 
-  if (waveStartData.waveNumber !== 1 || waveStartData.totalBots < 4) {
+  if (waveStartData.waveNumber !== 1 || waveStartData.totalBots !== 2) {
     throw new Error(`Invalid wave 1 configuration: ${JSON.stringify(waveStartData)}`);
   }
 
@@ -104,8 +104,8 @@ async function runWaveTest() {
   if (!session.waveManager) throw new Error('WaveManager was not initialized');
   const botIds = Object.keys(session.roomState.players).filter(id => session.roomState.players[id].isBot);
   console.log(`✓ Server spawned ${botIds.length} bot entities in room: ${botIds.join(', ')}`);
-  if (botIds.length !== 4) {
-    throw new Error(`Expected 4 bots in Wave 1, got ${botIds.length}`);
+  if (botIds.length !== 2) {
+    throw new Error(`Expected 2 bots in Wave 1, got ${botIds.length}`);
   }
 
   const firstBotId = botIds[0];
@@ -115,7 +115,37 @@ async function runWaveTest() {
   }
   console.log(`✓ Bot entity verified: ${firstBot.name} [Role: ${firstBot.botRole}, Team: ${firstBot.team}, HP: ${firstBot.health}]`);
 
-  // Step 4: Verify Bot AI Tick Steers Towards Player
+  // Step 3.5: Test Building Line-of-Sight Protection
+  console.log('🧱 Testing Building Line-of-Sight (LOS) Obstruction...');
+  const { hasLineOfSight, getMapObstacles } = await import('../src/shared/mapObstacles.js');
+  const cityObstacles = getMapObstacles('Cartoon City');
+
+  // Player at origin (0, 1.2, 0), enemy behind massive Eco_Building_Slope004 (-25, 1.2, 52)
+  const losClear = hasLineOfSight([0, 1.2, 5], [0, 1.2, 25], cityObstacles);
+  const losBlocked = hasLineOfSight([0, 1.2, 0], [-25, 1.2, 52], cityObstacles);
+
+  if (!losClear) throw new Error('Expected clear LOS down open street');
+  if (losBlocked) throw new Error('Expected obstructed LOS through solid skyscraper');
+  console.log('✓ Line-of-sight math confirmed: Open street is clear (true), Skyscraper blocks ray (false)');
+
+  // Test that a bot positioned behind a building cannot shoot the player
+  const playerInitialHp = playerState.health;
+  firstBot.x = -25;
+  firstBot.y = 1.0;
+  firstBot.z = 52;
+  // Fast forward bot fire timer to now
+  const activeBot = (session.waveManager as any).activeBots.get(firstBotId);
+  if (activeBot) activeBot.lastFireTime = 0;
+
+  session.waveManager.tick(1.0);
+  if (playerState.health !== playerInitialHp) {
+    throw new Error('Bot was able to shoot and damage player through a building!');
+  }
+  console.log(`✓ Building cover verified: Bot behind skyscraper did not hit player (Player HP maintained at ${playerState.health})`);
+
+  // Step 4: Verify Bot AI Navigation Steers Towards Player
+  firstBot.x = 20;
+  firstBot.z = 20;
   const initialBotX = firstBot.x;
   const initialBotZ = firstBot.z;
 

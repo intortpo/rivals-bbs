@@ -310,62 +310,118 @@ export interface WaveDefinition {
 
 export function getWaveConfig(waveNum: number): WaveDefinition {
   if (waveNum === 1) {
+    // Gentle warm-up: 2 introductory scouts
     return {
       waveNumber: 1,
-      bots: [{ role: 'scout', count: 4 }]
+      bots: [{ role: 'scout', count: 2 }]
     };
   }
   if (waveNum === 2) {
+    // Target practice: 3 scouts
     return {
       waveNumber: 2,
-      bots: [
-        { role: 'scout', count: 3 },
-        { role: 'rusher', count: 1 }
-      ]
+      bots: [{ role: 'scout', count: 3 }]
     };
   }
   if (waveNum === 3) {
+    // Introduce melee threat: 2 scouts + 1 blade rusher
     return {
       waveNumber: 3,
       bots: [
         { role: 'scout', count: 2 },
-        { role: 'rusher', count: 1 },
-        { role: 'heavy', count: 1 }
+        { role: 'rusher', count: 1 }
       ]
     };
   }
   if (waveNum === 4) {
+    // Introduce shotgun heavy: 2 scouts, 1 rusher, 1 heavy
     return {
       waveNumber: 4,
       bots: [
         { role: 'scout', count: 2 },
         { role: 'rusher', count: 1 },
+        { role: 'heavy', count: 1 }
+      ]
+    };
+  }
+  if (waveNum === 5) {
+    // Introduce long-range sniper: 2 scouts, 1 rusher, 1 sniper
+    return {
+      waveNumber: 5,
+      bots: [
+        { role: 'scout', count: 2 },
+        { role: 'rusher', count: 1 },
+        { role: 'sniper', count: 1 }
+      ]
+    };
+  }
+  if (waveNum === 6) {
+    // Mid-game Mini-Boss encounter!
+    return {
+      waveNumber: 6,
+      bots: [
+        { role: 'boss', count: 1 },
+        { role: 'scout', count: 2 },
+        { role: 'rusher', count: 1 }
+      ]
+    };
+  }
+  if (waveNum === 7) {
+    return {
+      waveNumber: 7,
+      bots: [
+        { role: 'scout', count: 3 },
+        { role: 'rusher', count: 2 },
+        { role: 'heavy', count: 1 }
+      ]
+    };
+  }
+  if (waveNum === 8) {
+    return {
+      waveNumber: 8,
+      bots: [
+        { role: 'scout', count: 3 },
+        { role: 'rusher', count: 2 },
         { role: 'heavy', count: 1 },
         { role: 'sniper', count: 1 }
       ]
     };
   }
-  if (waveNum === 5) {
+  if (waveNum === 9) {
     return {
-      waveNumber: 5,
+      waveNumber: 9,
       bots: [
-        { role: 'boss', count: 1 },
-        { role: 'scout', count: 2 },
-        { role: 'heavy', count: 1 }
+        { role: 'scout', count: 4 },
+        { role: 'rusher', count: 2 },
+        { role: 'heavy', count: 2 },
+        { role: 'sniper', count: 1 }
       ]
     };
   }
-  // Wave 6+: smoothly scaled
-  const baseCount = 5 + (waveNum - 5);
+  if (waveNum === 10) {
+    // Grand Finale Boss Battle!
+    return {
+      waveNumber: 10,
+      bots: [
+        { role: 'boss', count: 1 },
+        { role: 'scout', count: 2 },
+        { role: 'rusher', count: 2 },
+        { role: 'heavy', count: 1 },
+        { role: 'sniper', count: 1 }
+      ]
+    };
+  }
+  // Wave 11+: smoothly scaled endless mode
+  const baseCount = 6 + (waveNum - 10);
   const isBossWave = waveNum % 5 === 0;
   return {
     waveNumber: waveNum,
     bots: [
       ...(isBossWave ? [{ role: 'boss' as const, count: 1 }] : []),
-      { role: 'scout' as const, count: Math.max(2, Math.floor(baseCount * 0.4)) },
-      { role: 'rusher' as const, count: Math.max(1, Math.floor(baseCount * 0.2)) },
+      { role: 'scout' as const, count: Math.max(2, Math.floor(baseCount * 0.35)) },
+      { role: 'rusher' as const, count: Math.max(1, Math.floor(baseCount * 0.25)) },
       { role: 'heavy' as const, count: Math.max(1, Math.floor(baseCount * 0.2)) },
-      { role: 'sniper' as const, count: Math.max(1, Math.floor(baseCount * 0.15)) }
+      { role: 'sniper' as const, count: Math.max(1, Math.floor(baseCount * 0.2)) }
     ]
   };
 }

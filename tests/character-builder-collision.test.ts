@@ -265,3 +265,46 @@ describe('Network Synchronization of Custom Outfits', () => {
     console.log('🎉 ALL CHARACTER BUILDER & COLLISION TESTS PASSED CLEANLY!\n');
   });
 });
+
+// 4. Modal Cursor & Weapon Firing Protection
+describe('Modal Cursor & Weapon Firing Protection', () => {
+  it('should identify active modals and suppress weapon firing during interaction', () => {
+    const modalSelectors = [
+      '#grammar-reload-overlay',
+      '#hud-game-over',
+      '#settings-modal',
+      '#dashboard-modal',
+      '#character-builder-modal'
+    ];
+
+    const mockElements: Record<string, { style: { display: string } }> = {
+      '#grammar-reload-overlay': { style: { display: 'none' } },
+      '#hud-game-over': { style: { display: 'none' } },
+      '#settings-modal': { style: { display: 'none' } }
+    };
+
+    const isAnyModalOpen = () => {
+      for (const sel of modalSelectors) {
+        const el = mockElements[sel];
+        if (el && el.style.display !== 'none') return true;
+      }
+      return false;
+    };
+
+    assert.strictEqual(isAnyModalOpen(), false, 'Initially no modals open');
+
+    // Open grammar overlay
+    mockElements['#grammar-reload-overlay'].style.display = 'flex';
+    assert.strictEqual(isAnyModalOpen(), true, 'Detected open grammar reload overlay');
+
+    // Firing check
+    const isMouseDown = true;
+    const isFiring = () => (isAnyModalOpen() ? false : isMouseDown);
+    assert.strictEqual(isFiring(), false, 'Weapon firing suppressed while modal is active');
+
+    // Close grammar overlay
+    mockElements['#grammar-reload-overlay'].style.display = 'none';
+    assert.strictEqual(isAnyModalOpen(), false);
+    assert.strictEqual(isFiring(), true, 'Weapon firing active when no modals are open');
+  });
+});

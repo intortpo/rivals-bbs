@@ -40,6 +40,14 @@ export class InputManager {
 
     // Pointer lock for desktop mouse aiming
     window.addEventListener('mousedown', (e) => {
+      // If any modal is open, ensure mouse cursor is free and never fire weapons
+      if (this.isAnyModalOpen()) {
+        this.isMouseDown = false;
+        this.isRightMouseDown = false;
+        this.unlockCursor();
+        return;
+      }
+
       // Don't lock if clicking UI modals, controls, or HUD buttons
       const target = e.target as HTMLElement;
       if (
@@ -48,7 +56,9 @@ export class InputManager {
         target.closest('#lobby-screen') ||
         target.closest('#settings-modal') ||
         target.closest('#dashboard-modal') ||
-        target.closest('#grammar-modal') ||
+        target.closest('#grammar-reload-overlay') ||
+        target.closest('#hud-game-over') ||
+        target.closest('#character-builder-modal') ||
         target.closest('.touch-btn') ||
         target.closest('.icon-btn') ||
         target.closest('button') ||
@@ -83,12 +93,47 @@ export class InputManager {
     });
 
     window.addEventListener('mousemove', (e) => {
+      if (this.isAnyModalOpen()) {
+        this.mouseDeltaX = 0;
+        this.mouseDeltaY = 0;
+        return;
+      }
       if (this.isPointerLocked) {
         const sensitivity = 0.0022 * this.touch.sensitivity;
         this.mouseDeltaX += e.movementX * sensitivity;
         this.mouseDeltaY += e.movementY * sensitivity;
       }
     });
+  }
+
+  public isAnyModalOpen(): boolean {
+    const modalSelectors = [
+      '#grammar-reload-overlay',
+      '#hud-game-over',
+      '#settings-modal',
+      '#dashboard-modal',
+      '#character-builder-modal',
+      '#qr-modal',
+      '#scanner-modal',
+      '#auth-modal',
+      '.modal-backdrop',
+      '.modal'
+    ];
+
+    for (const sel of modalSelectors) {
+      const elements = document.querySelectorAll(sel);
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i] as HTMLElement;
+        if (
+          el &&
+          el.style.display !== 'none' &&
+          window.getComputedStyle(el).display !== 'none'
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   public getMoveVector(): { forward: number; right: number } {
@@ -126,10 +171,12 @@ export class InputManager {
   }
 
   public isFiring(): boolean {
+    if (this.isAnyModalOpen()) return false;
     return this.touch.state.isFiring || this.isMouseDown;
   }
 
   public isAiming(): boolean {
+    if (this.isAnyModalOpen()) return false;
     return this.touch.state.isAiming || this.isRightMouseDown;
   }
 

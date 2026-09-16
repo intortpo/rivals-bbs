@@ -59,6 +59,9 @@ export class CharacterBuilderUI {
     if (custom) {
       this.currentCustomization = { ...custom };
     }
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
+    }
     this.modalEl.style.display = 'flex';
     this.initTurntable();
     this.renderCategoryOptions();
@@ -76,6 +79,7 @@ export class CharacterBuilderUI {
   private buildUI(): void {
     this.modalEl = document.createElement('div');
     this.modalEl.id = 'character-builder-modal';
+    this.modalEl.className = 'modal-backdrop';
     this.modalEl.style.cssText = `
       display: none;
       position: fixed;
@@ -90,6 +94,8 @@ export class CharacterBuilderUI {
       align-items: center;
       padding: 16px;
       box-sizing: border-box;
+      pointer-events: auto !important;
+      cursor: default;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
     `;
 

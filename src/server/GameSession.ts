@@ -21,6 +21,11 @@ import {
   getMapSpawns,
   getTeamSpawn
 } from '../shared/constants.js';
+import {
+  BoundingBox,
+  getMapObstacles,
+  hasLineOfSight
+} from '../shared/mapObstacles.js';
 import { WaveManager } from './ai/WaveManager.js';
 
 export class GameSession {
@@ -31,11 +36,13 @@ export class GameSession {
   private lastFireTimes: Map<string, number> = new Map();
   private onStateChange?: () => void;
   public waveManager: WaveManager | null = null;
+  private mapObstacles: BoundingBox[] = [];
 
   constructor(io: Server, roomState: RoomNetworkState, onStateChange?: () => void) {
     this.io = io;
     this.roomState = roomState;
     this.onStateChange = onStateChange;
+    this.mapObstacles = getMapObstacles(roomState.mapName);
   }
 
   public get roomId(): string {
@@ -340,6 +347,13 @@ export class GameSession {
     // Friendly fire check in 4v4 and wave mode
     if ((this.roomState.mode === '4v4' || this.roomState.mode === 'wave') && shooter.team !== 'none' && shooter.team === target.team) {
       return;
+    }
+
+    // Line-of-sight check: shots cannot penetrate solid buildings or vehicles
+    const origin: [number, number, number] = payload.origin || [shooter.x, shooter.y + 1.2, shooter.z];
+    const targetPoint: [number, number, number] = payload.hitPoint || [target.x, target.y + 1.0, target.z];
+    if (!hasLineOfSight(origin, targetPoint, this.mapObstacles)) {
+      return; // Shot blocked by building!
     }
 
     const stats = WEAPONS[payload.weaponType];

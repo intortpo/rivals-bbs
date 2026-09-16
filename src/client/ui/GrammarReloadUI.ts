@@ -31,6 +31,10 @@ export class GrammarReloadUI {
     this.currentQuestionIndex = 0;
     this.isBusy = false;
 
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
+    }
+
     this.overlayEl.style.display = 'flex';
     this.updateStreakBadge();
     this.renderCurrentQuestion();
@@ -44,6 +48,7 @@ export class GrammarReloadUI {
   private buildDOM(): void {
     const overlay = document.createElement('div');
     overlay.id = 'grammar-reload-overlay';
+    overlay.className = 'modal-backdrop';
     overlay.style.cssText = `
       position: absolute;
       inset: 0;
@@ -55,6 +60,8 @@ export class GrammarReloadUI {
       z-index: 600;
       padding: 16px;
       box-sizing: border-box;
+      pointer-events: auto !important;
+      cursor: default;
       user-select: none;
       -webkit-user-select: none;
     `;

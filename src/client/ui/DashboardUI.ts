@@ -35,6 +35,7 @@ export class DashboardUI {
   private buildDOM(): void {
     const modal = document.createElement('div');
     modal.id = 'dashboard-modal';
+    modal.className = 'modal-backdrop';
     modal.style.cssText = `
       position: absolute;
       inset: 0;
@@ -46,6 +47,8 @@ export class DashboardUI {
       z-index: 960;
       padding: 16px;
       box-sizing: border-box;
+      pointer-events: auto !important;
+      cursor: default;
       user-select: none;
       -webkit-user-select: none;
     `;
