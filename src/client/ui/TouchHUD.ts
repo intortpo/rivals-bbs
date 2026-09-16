@@ -1,4 +1,5 @@
-import { GameOverPayload, WeaponStats, WeaponType } from '../../shared/types.js';
+import { GameOverPayload, PowerupType, WeaponStats, WeaponType } from '../../shared/types.js';
+import { POWERUPS } from '../../shared/constants.js';
 
 export class TouchHUD {
   private container: HTMLElement;
@@ -13,6 +14,22 @@ export class TouchHUD {
   private killfeedEl!: HTMLElement;
   private countdownEl!: HTMLElement;
   private gameOverModalEl!: HTMLElement;
+
+  private powerupBtnEl!: HTMLElement;
+  private powerupIconEl!: HTMLElement;
+  private powerupLabelEl!: HTMLElement;
+  private powerupTimerBarEl!: HTMLElement;
+  private shieldContainerEl!: HTMLElement;
+  private shieldTextEl!: HTMLElement;
+  private shieldFillEl!: HTMLElement;
+  private btnDashboardEl!: HTMLElement;
+  private btnSettingsEl!: HTMLElement;
+  private waveBannerEl!: HTMLElement;
+  private waveBannerTextEl!: HTMLElement;
+
+  public onPowerupClick?: () => void;
+  public onOpenDashboard?: () => void;
+  public onOpenSettings?: () => void;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -39,6 +56,17 @@ export class TouchHUD {
         <div style="font-size: 13px; font-weight: bold; color: #ff2a55;" id="hud-frag-limit">GOAL: 5</div>
       </div>
 
+      <!-- Wave Intermission / Cleared Banner -->
+      <div id="hud-wave-banner" style="position: absolute; top: 68px; left: 50%; transform: translateX(-50%); background: linear-gradient(90deg, rgba(255, 170, 0, 0.92), rgba(0, 210, 255, 0.92)); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 14px; padding: 8px 24px; display: none; align-items: center; gap: 10px; box-shadow: 0 0 24px rgba(0, 210, 255, 0.6); backdrop-filter: blur(8px); pointer-events: none; z-index: 40;">
+        <span id="hud-wave-banner-text" style="font-size: 16px; font-weight: 900; color: white; letter-spacing: 1px; text-shadow: 0 2px 6px rgba(0,0,0,0.8);">🎉 WAVE 1 CLEARED! NEXT WAVE IN 5s</span>
+      </div>
+
+      <!-- Top Right Quick Buttons: Dashboard & Settings -->
+      <div style="position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; pointer-events: auto;">
+        <button id="btn-hud-dashboard" class="icon-btn" title="Dashboard">📊</button>
+        <button id="btn-hud-settings" class="icon-btn" title="Settings">⚙️</button>
+      </div>
+
       <!-- Killfeed (Top Left below banner) -->
       <div id="hud-killfeed" style="position: absolute; top: 70px; left: 18px; display: flex; flex-direction: column; gap: 6px; pointer-events: none;"></div>
 
@@ -60,8 +88,20 @@ export class TouchHUD {
       <!-- Damage Vignette (Flashes red when hurt) -->
       <div id="hud-damage-vignette" style="position: absolute; inset: 0; box-shadow: inset 0 0 70px rgba(255, 42, 85, 0.7); opacity: 0; transition: opacity 0.1s ease; pointer-events: none;"></div>
 
-      <!-- Health Bar (Bottom Left) -->
-      <div style="position: absolute; bottom: 22px; left: 20px; display: flex; flex-direction: column; gap: 4px; pointer-events: auto;">
+      <!-- Health & Shield Bar (Bottom Left) -->
+      <div style="position: absolute; bottom: 22px; left: 20px; display: flex; flex-direction: column; gap: 6px; pointer-events: auto;">
+        <!-- Shield Bar -->
+        <div id="hud-shield-container" style="display: none; flex-direction: column; gap: 2px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: #00d2ff; text-shadow: 0 0 4px #00d2ff;">
+            <span>⚡ SHIELD</span>
+            <span id="hud-shield-text">50</span>
+          </div>
+          <div style="width: 160px; height: 8px; background: rgba(15, 20, 32, 0.8); border: 1px solid #00d2ff; border-radius: 4px; overflow: hidden;">
+            <div id="hud-shield-fill" style="width: 100%; height: 100%; background: #00d2ff; box-shadow: 0 0 8px #00d2ff;"></div>
+          </div>
+        </div>
+
+        <!-- Health Bar -->
         <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px #000;">
           <span>HEALTH</span>
           <span id="hud-hp-text">100</span>
@@ -69,6 +109,13 @@ export class TouchHUD {
         <div style="width: 160px; height: 14px; background: rgba(15, 20, 32, 0.8); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 7px; overflow: hidden; backdrop-filter: blur(5px);">
           <div id="hud-hp-fill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #00d2ff, #00ff88); transition: width 0.15s ease, background 0.2s ease;"></div>
         </div>
+      </div>
+
+      <!-- Powerup Button (Touch & Desktop interactive) -->
+      <div id="btn-powerup" class="touch-btn" style="bottom: 95px; right: 280px; width: 68px; height: 68px; display: none; border-color: #ffbb00; box-shadow: 0 0 16px rgba(255, 187, 0, 0.4);">
+        <span id="hud-powerup-icon" style="font-size: 26px;">⚡</span>
+        <span id="hud-powerup-label" style="font-size: 9px; font-weight: 900; letter-spacing: 0.5px; color: #ffbb00;">READY</span>
+        <div id="hud-powerup-timer-bar" style="position: absolute; bottom: -4px; left: 15%; width: 70%; height: 3px; background: #00d2ff; border-radius: 2px; display: none;"></div>
       </div>
 
       <!-- Ammo & Reload Counter (Bottom Right near action cluster) -->
@@ -115,6 +162,38 @@ export class TouchHUD {
     this.killfeedEl = hud.querySelector('#hud-killfeed') as HTMLElement;
     this.countdownEl = hud.querySelector('#hud-countdown') as HTMLElement;
     this.gameOverModalEl = hud.querySelector('#hud-game-over') as HTMLElement;
+
+    this.powerupBtnEl = hud.querySelector('#btn-powerup') as HTMLElement;
+    this.powerupIconEl = hud.querySelector('#hud-powerup-icon') as HTMLElement;
+    this.powerupLabelEl = hud.querySelector('#hud-powerup-label') as HTMLElement;
+    this.powerupTimerBarEl = hud.querySelector('#hud-powerup-timer-bar') as HTMLElement;
+    this.shieldContainerEl = hud.querySelector('#hud-shield-container') as HTMLElement;
+    this.shieldTextEl = hud.querySelector('#hud-shield-text') as HTMLElement;
+    this.shieldFillEl = hud.querySelector('#hud-shield-fill') as HTMLElement;
+    this.btnDashboardEl = hud.querySelector('#btn-hud-dashboard') as HTMLElement;
+    this.btnSettingsEl = hud.querySelector('#btn-hud-settings') as HTMLElement;
+    this.waveBannerEl = hud.querySelector('#hud-wave-banner') as HTMLElement;
+    this.waveBannerTextEl = hud.querySelector('#hud-wave-banner-text') as HTMLElement;
+
+    const bindAction = (el: HTMLElement, action: () => void) => {
+      const handler = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        action();
+      };
+      el.addEventListener('click', handler);
+      el.addEventListener('touchstart', handler, { passive: false });
+    };
+
+    if (this.powerupBtnEl) {
+      bindAction(this.powerupBtnEl, () => this.onPowerupClick?.());
+    }
+    if (this.btnDashboardEl) {
+      bindAction(this.btnDashboardEl, () => this.onOpenDashboard?.());
+    }
+    if (this.btnSettingsEl) {
+      bindAction(this.btnSettingsEl, () => this.onOpenSettings?.());
+    }
   }
 
   public setVisible(visible: boolean): void {
@@ -143,7 +222,13 @@ export class TouchHUD {
     }, 200);
   }
 
-  public updateAmmo(current: number, stats: WeaponStats, isReloading: boolean, reloadProgress: number): void {
+  public updateAmmo(
+    current: number,
+    stats: WeaponStats,
+    isReloading: boolean,
+    reloadProgress: number,
+    reserve: number = 0
+  ): void {
     if (stats.type === 'katana') {
       this.ammoCurrentEl.textContent = '∞';
       this.ammoMaxEl.textContent = '∞';
@@ -152,7 +237,7 @@ export class TouchHUD {
     }
 
     this.ammoCurrentEl.textContent = `${current}`;
-    this.ammoMaxEl.textContent = `${stats.magazineSize}`;
+    this.ammoMaxEl.textContent = `${reserve}`;
 
     if (isReloading) {
       const p = Math.round(reloadProgress * 100);
@@ -222,27 +307,154 @@ export class TouchHUD {
     }, 4500);
   }
 
-  public updateMatchHeader(mode: string, scoreA: number, scoreB: number, goal: number): void {
+  public updatePowerupSlot(type: PowerupType | null, active: boolean, remainingSec: number): void {
+    if (!this.powerupBtnEl) return;
+
+    if (!type) {
+      this.powerupBtnEl.style.display = 'none';
+      return;
+    }
+
+    this.powerupBtnEl.style.display = 'flex';
+    const def = POWERUPS[type];
+    if (this.powerupIconEl && def) {
+      this.powerupIconEl.textContent = def.icon;
+    }
+
+    if (active) {
+      if (this.powerupLabelEl) {
+        this.powerupLabelEl.textContent = `${Math.ceil(remainingSec)}s`;
+        this.powerupLabelEl.style.color = '#00ff88';
+      }
+      if (this.powerupTimerBarEl && def) {
+        this.powerupTimerBarEl.style.display = 'block';
+        const pct = Math.max(0, Math.min(100, (remainingSec / def.durationSec) * 100));
+        this.powerupTimerBarEl.style.width = `${pct}%`;
+      }
+    } else {
+      if (this.powerupLabelEl) {
+        this.powerupLabelEl.textContent = 'USE [Q]';
+        this.powerupLabelEl.style.color = '#ffbb00';
+      }
+      if (this.powerupTimerBarEl) {
+        this.powerupTimerBarEl.style.display = 'none';
+      }
+    }
+  }
+
+  public updateShield(shieldHp: number, maxShield: number = 50): void {
+    if (!this.shieldContainerEl) return;
+
+    if (shieldHp <= 0) {
+      this.shieldContainerEl.style.display = 'none';
+      return;
+    }
+
+    this.shieldContainerEl.style.display = 'flex';
+    if (this.shieldTextEl) {
+      this.shieldTextEl.textContent = `${Math.round(shieldHp)}`;
+    }
+    if (this.shieldFillEl) {
+      const pct = Math.max(0, Math.min(100, (shieldHp / maxShield) * 100));
+      this.shieldFillEl.style.width = `${pct}%`;
+    }
+  }
+
+  public updateMatchHeader(
+    mode: string,
+    scoreA: number,
+    scoreB: number,
+    goal: number,
+    teamScores?: { blue: number; red: number },
+    waveState?: any
+  ): void {
     const modeEl = document.getElementById('hud-match-mode');
     const scoreEl = document.getElementById('hud-match-score');
     const fragEl = document.getElementById('hud-frag-limit');
+
+    if (mode === 'wave') {
+      if (modeEl) modeEl.textContent = '🧟 WAVE SURVIVAL';
+      if (scoreEl) scoreEl.textContent = `WAVE ${waveState?.currentWave || 1}`;
+      if (fragEl) fragEl.textContent = `🤖 BOTS: ${waveState?.aliveBotsCount ?? 0}`;
+      return;
+    }
+
     if (modeEl) modeEl.textContent = mode.toUpperCase();
-    if (scoreEl) scoreEl.textContent = `${scoreA} - ${scoreB}`;
+
+    if (mode === '4v4' && teamScores) {
+      if (scoreEl) {
+        scoreEl.innerHTML = `<span style="color: #00d2ff;">BLU ${teamScores.blue}</span> - <span style="color: #ff2a55;">RED ${teamScores.red}</span>`;
+      }
+    } else {
+      if (scoreEl) scoreEl.textContent = `${scoreA} - ${scoreB}`;
+    }
+
     if (fragEl) fragEl.textContent = `GOAL: ${goal}`;
   }
 
-  public showGameOver(payload: GameOverPayload, myId: string, onReturnToLobby: () => void): void {
-    const isWinner = payload.winnerId === myId;
+  public showWaveCleared(waveNum: number, nextInSec: number): void {
+    if (!this.waveBannerEl || !this.waveBannerTextEl) return;
+    this.waveBannerTextEl.textContent = `🎉 WAVE ${waveNum} CLEARED! NEXT IN ${nextInSec}s`;
+    this.waveBannerEl.style.display = 'flex';
+  }
+
+  public updateWaveCountdown(nextInSec: number): void {
+    if (!this.waveBannerEl || !this.waveBannerTextEl) return;
+    if (nextInSec > 0) {
+      this.waveBannerTextEl.textContent = `⏳ PREPARE! NEXT WAVE IN ${nextInSec}s`;
+      this.waveBannerEl.style.display = 'flex';
+    } else {
+      this.waveBannerEl.style.display = 'none';
+    }
+  }
+
+  public hideWaveBanner(): void {
+    if (this.waveBannerEl) {
+      this.waveBannerEl.style.display = 'none';
+    }
+  }
+
+  public showGameOver(
+    payload: GameOverPayload,
+    myId: string,
+    onReturnToLobby: () => void,
+    mode?: string,
+    currentWave?: number
+  ): void {
     const titleEl = document.getElementById('hud-winner-title');
     const descEl = document.getElementById('hud-winner-desc');
     const tableEl = document.getElementById('hud-scoreboard-table');
 
-    if (titleEl) {
-      titleEl.textContent = isWinner ? '🏆 VICTORY!' : '💀 DEFEAT';
-      titleEl.style.color = isWinner ? '#ffbb00' : '#ff2a55';
-    }
-    if (descEl) {
-      descEl.textContent = `${payload.winnerName} won the match!`;
+    this.hideWaveBanner();
+
+    if (mode === 'wave') {
+      const victory = payload.winningTeam === 'blue';
+      if (titleEl) {
+        titleEl.textContent = victory ? '🏆 SECTOR DEFENDED! VICTORY!' : '💀 SQUAD WIPED! DEFEAT';
+        titleEl.style.color = victory ? '#00ff88' : '#ff2a55';
+      }
+      if (descEl) {
+        descEl.textContent = victory
+          ? 'All enemy waves defeated! Outstanding teamwork, pilots!'
+          : `Squad fell at Wave ${currentWave || 1}. Answer grammar questions to gear up and try again!`;
+      }
+    } else if (payload.winningTeam && payload.winningTeam !== 'none') {
+      if (titleEl) {
+        titleEl.textContent = `${payload.winningTeam.toUpperCase()} TEAM VICTORIOUS!`;
+        titleEl.style.color = payload.winningTeam === 'blue' ? '#00d2ff' : '#ff2a55';
+      }
+      if (descEl) {
+        descEl.textContent = `${payload.winnerName} and team conquered the match!`;
+      }
+    } else {
+      const isWinner = payload.winnerId === myId;
+      if (titleEl) {
+        titleEl.textContent = isWinner ? '🏆 VICTORY!' : '💀 DEFEAT';
+        titleEl.style.color = isWinner ? '#ffbb00' : '#ff2a55';
+      }
+      if (descEl) {
+        descEl.textContent = `${payload.winnerName} won the match!`;
+      }
     }
 
     if (tableEl) {

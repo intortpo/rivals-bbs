@@ -1,0 +1,72 @@
+[
+  {
+    "id": "usr_6a7957dc64d0e598",
+    "username": "TestPlayer",
+    "displayName": "TestPlayer",
+    "salt": "07e17be0b8b24b64dc41693c500108ad",
+    "passwordHash": "0015d8eb7680a7180e8b8403800f92cfa57b814b22822d03ad350747991a6d6ab67d403633c68cc5548334624634aba1eb7f558dcbe466aa6be180b32e418f90",
+    "createdAt": 1789441771317,
+    "lastLoginAt": 1789441771317,
+    "stats": {
+      "grammarAnswered": 2,
+      "grammarCorrect": 2,
+      "ammoEarned": 60,
+      "gamesPlayed": 0,
+      "wins": 0,
+      "kills": 0
+    }
+  },
+  {
+    "id": "usr_c3c62c52cfc857f3",
+    "username": "forrest",
+    "displayName": "forrest",
+    "salt": "de2991a629fd91e1ff4e891d4e7ff0b9",
+    "passwordHash": "2d68749f55dc68e3b10394ae180fa55c5a9a56635b747a89528685025b09a950bee5fb8ce3c0b0317e986e91bc239c6d581e3787b819a5bde47fc64132e5a802",
+    "createdAt": 1789442036821,
+    "lastLoginAt": 1789442036821,
+    "stats": {
+      "grammarAnswered": 2,
+      "grammarCorrect": 2,
+      "ammoEarned": 60,
+      "gamesPlayed": 0,
+      "wins": 0,
+      "kills": 0
+    }
+  },
+  {
+    "id": "usr_d50193c604a88e55",
+    "email": "alex.s@bbs.ac.th",
+    "username": "Alex_BBS",
+    "displayName": "Alex_BBS",
+    "salt": "1d6bbd598f117c6312f08e8545326cd6",
+    "passwordHash": "b812ff894c1abe8d14a2e52e7236a1abc94065df0ed42db443dcecdcd66b645bba978579e535019923a27a182141f208f708c25f422bc4d73b834e4c3a1a3b17",
+    "createdAt": 1789442421162,
+    "lastLoginAt": 1789442421162,
+    "stats": {
+      "grammarAnswered": 0,
+      "grammarCorrect": 0,
+      "ammoEarned": 0,
+      "gamesPlayed": 0,
+      "wins": 0,
+      "kills": 0
+    }
+  },
+  {
+    "id": "usr_07bba2e12d8ea926",
+    "email": "forrest@bbs.ac.th",
+    "username": "_forrest",
+    "displayName": "_forrest",
+    "salt": "c4658f2e0add349350df704626dce33c",
+    "passwordHash": "dccb445541e71f6747835dfc4fb177aaa82006b2375d4d52fb3e85723b9464a5805e3598b7584d2487fd53a3e125d4fb0ef47df6b1df166ec3396a0d4037c7e8",
+    "createdAt": 1789442952885,
+    "lastLoginAt": 1789442966896,
+    "stats": {
+      "grammarAnswered": 0,
+      "grammarCorrect": 0,
+      "ammoEarned": 0,
+      "gamesPlayed": 0,
+      "wins": 0,
+      "kills": 0
+    }
+  }
+]

@@ -5,12 +5,15 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { RoomManager } from './RoomManager.js';
-import { FireWeaponPayload, PlayerInputPayload } from '../shared/types.js';
+import { UserManager } from './auth/UserManager.js';
+import { ActivatePowerupPayload, FireWeaponPayload, PlayerInputPayload } from '../shared/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.use(express.json());
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -21,6 +24,18 @@ const io = new Server(server, {
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const roomManager = new RoomManager(io);
+const userManager = new UserManager();
+
+// Helper to extract bearer token
+function getAuthToken(req: express.Request): string | null {
+  const auth = req.headers.authorization;
+  if (!auth) return null;
+  const parts = auth.split(' ');
+  if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
+    return parts[1];
+  }
+  return null;
+}
 
 // Helper to get LAN IPv4
 function getLocalIpAddress(): string {
@@ -38,6 +53,103 @@ function getLocalIpAddress(): string {
 }
 
 const localIp = getLocalIpAddress();
+
+// Auth Endpoints
+app.post('/api/auth/register', (req, res) => {
+  const { email, username, password } = req.body || {};
+  if (!email || !password) {
+    res.status(400).json({ error: 'BBS Email (@bbs.ac.th) and password are required.' });
+    return;
+  }
+  const result = userManager.register(String(email), String(username || ''), String(password));
+  if (!result.success) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json(result);
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { email, username, identifier, password } = req.body || {};
+  const id = identifier || email || username;
+  if (!id || !password) {
+    res.status(400).json({ error: 'Email/username and password are required.' });
+    return;
+  }
+  const result = userManager.login(String(id), String(password));
+  if (!result.success) {
+    res.status(401).json({ error: result.error });
+    return;
+  }
+  res.json(result);
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const token = getAuthToken(req);
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized. No token provided.' });
+    return;
+  }
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    res.status(401).json({ error: 'Invalid or expired session token.' });
+    return;
+  }
+  res.json({ user });
+});
+
+app.post('/api/stats/grammar', (req, res) => {
+  const token = getAuthToken(req);
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return;
+  }
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    res.status(401).json({ error: 'Invalid token.' });
+    return;
+  }
+
+  const { questionsAnswered = 2, correctCount = 2, ammoAwarded = 60, currentStreak = 0 } = req.body || {};
+  const updated = userManager.recordGrammarStat(
+    user.id,
+    Number(questionsAnswered),
+    Number(correctCount),
+    Number(ammoAwarded),
+    Number(currentStreak)
+  );
+  res.json({ success: true, user: updated });
+});
+
+app.post('/api/stats/match', (req, res) => {
+  const token = getAuthToken(req);
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return;
+  }
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    res.status(401).json({ error: 'Invalid token.' });
+    return;
+  }
+
+  const { won = false, kills = 0, deaths = 0, mode = '1v1', mapName = 'Cartoon City', score = 0 } = req.body || {};
+  const updated = userManager.recordDetailedMatchResult(
+    user.id,
+    Boolean(won),
+    Number(kills),
+    Number(deaths),
+    String(mode),
+    String(mapName),
+    Number(score)
+  );
+  res.json({ success: true, user: updated });
+});
+
+// Provide public open rooms list for lobby browser
+app.get('/api/rooms', (_req, res) => {
+  res.json({ rooms: roomManager.getOpenRoomsList() });
+});
 
 // Provide network info endpoint for QR code generator
 app.get('/api/network-info', (_req, res) => {
@@ -76,15 +188,24 @@ app.get('*', (_req, res) => {
 io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
+  // Send current open public rooms to newly connected client
+  socket.emit('open_rooms_update', roomManager.getOpenRoomsList());
+
+  socket.on('request_rooms', () => {
+    socket.emit('open_rooms_update', roomManager.getOpenRoomsList());
+  });
+
   socket.on('create_room', (data, callback) => {
     try {
-      const { playerName, mode, fragLimit, mapName } = data || {};
+      const { playerName, mode, fragLimit, mapName, outfitIndex, customization } = data || {};
       const { roomId, session } = roomManager.createRoom(
         socket,
         playerName,
         mode,
         fragLimit,
-        mapName
+        mapName,
+        outfitIndex,
+        customization
       );
       console.log(`[RoomManager] Room created: ${roomId} by ${playerName || 'Anonymous'}`);
       if (callback) {
@@ -104,13 +225,13 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', (data, callback) => {
     try {
-      const { roomId, playerName } = data || {};
+      const { roomId, playerName, outfitIndex, customization } = data || {};
       if (!roomId) {
         if (callback) callback({ success: false, error: 'Room ID required' });
         return;
       }
 
-      const result = roomManager.joinRoom(socket, roomId, playerName);
+      const result = roomManager.joinRoom(socket, roomId, playerName, outfitIndex, customization);
       if (result.success && result.session) {
         console.log(`[RoomManager] Player ${playerName || socket.id} joined room ${roomId}`);
         if (callback) {
@@ -156,6 +277,17 @@ io.on('connection', (socket) => {
     if (session) {
       session.handleFireWeapon(socket.id, payload);
     }
+  });
+
+  socket.on('activate_powerup', (payload: ActivatePowerupPayload) => {
+    const session = roomManager.getSessionBySocketId(socket.id);
+    if (session) {
+      session.handleActivatePowerup(socket.id, payload);
+    }
+  });
+
+  socket.on('leave_room', () => {
+    roomManager.leaveRoom(socket);
   });
 
   socket.on('disconnect', () => {

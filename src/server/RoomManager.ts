@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { GameSession } from './GameSession.js';
-import { GameMode, RoomNetworkState } from '../shared/types.js';
+import { GameMode, OpenRoomSummary, RoomNetworkState, TeamColor, CharacterCustomization } from '../shared/types.js';
 import { NETWORK, PLAYER_COLORS } from '../shared/constants.js';
 
 export class RoomManager {
@@ -26,59 +26,115 @@ export class RoomManager {
     hostSocket: Socket,
     playerName: string,
     mode: GameMode = '1v1',
-    fragLimit: number = NETWORK.DEFAULT_FRAG_LIMIT,
-    mapName: string = 'Arena Classic'
+    fragLimit?: number,
+    mapName: string = 'Cartoon City',
+    outfitIndex: number = 0,
+    customization?: CharacterCustomization
   ): { roomId: string; session: GameSession } {
     const roomId = this.generateRoomId();
     const color = PLAYER_COLORS[0];
+    const defaultFrag = mode === '4v4' ? 20 : mode === 'wave' ? (fragLimit || 10) : (fragLimit || NETWORK.DEFAULT_FRAG_LIMIT);
 
     const initialRoomState: RoomNetworkState = {
       roomId,
       hostId: hostSocket.id,
       mode,
       mapName,
-      fragLimit,
+      fragLimit: defaultFrag,
       status: 'lobby',
       countdown: NETWORK.COUNTDOWN_SECONDS,
-      players: {}
+      players: {},
+      teamScores: mode === '4v4' ? { blue: 0, red: 0 } : undefined
     };
 
-    const session = new GameSession(this.io, initialRoomState);
-    session.addPlayer(hostSocket.id, playerName || 'Host Rival', color, true);
+    const session = new GameSession(this.io, initialRoomState, () => this.broadcastOpenRooms());
+    const hostTeam: TeamColor = (mode === '4v4' || mode === 'wave') ? 'blue' : 'none';
+    session.addPlayer(hostSocket.id, playerName || 'Host Rival', color, true, hostTeam, outfitIndex, customization);
 
     this.rooms.set(roomId, session);
     this.socketToRoom.set(hostSocket.id, roomId);
     hostSocket.join(roomId);
 
+    this.broadcastOpenRooms();
     return { roomId, session };
   }
 
   public joinRoom(
     socket: Socket,
     roomId: string,
-    playerName: string
+    playerName: string,
+    outfitIndex: number = 0,
+    customization?: CharacterCustomization
   ): { success: boolean; error?: string; session?: GameSession } {
     const session = this.rooms.get(roomId.toUpperCase());
     if (!session) {
       return { success: false, error: 'Room not found. Check the code and try again.' };
     }
 
-    const currentCount = Object.keys(session.roomState.players).length;
-    const maxPlayers = session.roomState.mode === '1v1' ? 2 : 8;
+    if (session.roomState.status === 'game_over') {
+      return { success: false, error: 'This match has already ended.' };
+    }
+
+    const currentCount = Object.values(session.roomState.players).filter(p => !p.isBot).length;
+    const maxPlayers = session.roomState.mode === '1v1' ? 2 : session.roomState.mode === 'wave' ? 4 : 8;
 
     if (currentCount >= maxPlayers) {
       return { success: false, error: 'Room is full.' };
     }
 
+    let assignedTeam: TeamColor = 'none';
+    if (session.roomState.mode === '4v4') {
+      let blueCount = 0;
+      let redCount = 0;
+      for (const p of Object.values(session.roomState.players)) {
+        if (!p.isBot) {
+          if (p.team === 'blue') blueCount++;
+          else if (p.team === 'red') redCount++;
+        }
+      }
+      assignedTeam = blueCount <= redCount ? 'blue' : 'red';
+    } else if (session.roomState.mode === 'wave') {
+      assignedTeam = 'blue';
+    }
+
     const color = PLAYER_COLORS[currentCount % PLAYER_COLORS.length];
-    session.addPlayer(socket.id, playerName || `Rival #${currentCount + 1}`, color, false);
+    session.addPlayer(socket.id, playerName || `Rival #${currentCount + 1}`, color, false, assignedTeam, outfitIndex, customization);
 
     this.socketToRoom.set(socket.id, session.roomId);
     socket.join(session.roomId);
 
     session.broadcastRoomState();
+    this.broadcastOpenRooms();
+
+    // If game is already in progress, notify this joining client immediately to enter the arena
+    if (session.roomState.status === 'playing') {
+      socket.emit('game_start');
+    }
 
     return { success: true, session };
+  }
+
+  public leaveRoom(socket: Socket): void {
+    const roomId = this.socketToRoom.get(socket.id);
+    if (!roomId) return;
+
+    this.socketToRoom.delete(socket.id);
+    socket.leave(roomId);
+
+    const session = this.rooms.get(roomId);
+    if (!session) return;
+
+    session.removePlayer(socket.id);
+
+    // If no players remain or game has ended, clean up room
+    const remainingCount = Object.keys(session.roomState.players).length;
+    if (remainingCount === 0 || session.roomState.status === 'game_over') {
+      session.stop();
+      this.rooms.delete(roomId);
+      console.log(`[RoomManager] Room ${roomId} cleaned up. Active rooms: ${this.rooms.size}`);
+    }
+
+    this.broadcastOpenRooms();
   }
 
   public handleDisconnect(socket: Socket): void {
@@ -92,11 +148,54 @@ export class RoomManager {
     session.removePlayer(socket.id);
 
     // If no players remain, clean up room
-    if (Object.keys(session.roomState.players).length === 0) {
+    const remainingCount = Object.keys(session.roomState.players).length;
+    if (remainingCount === 0 || session.roomState.status === 'game_over') {
       session.stop();
       this.rooms.delete(roomId);
-      console.log(`[RoomManager] Room ${roomId} closed (empty). Active rooms: ${this.rooms.size}`);
+      console.log(`[RoomManager] Room ${roomId} closed (empty/finished). Active rooms: ${this.rooms.size}`);
     }
+
+    this.broadcastOpenRooms();
+  }
+
+  public getOpenRoomsList(): OpenRoomSummary[] {
+    const list: OpenRoomSummary[] = [];
+    for (const session of this.rooms.values()) {
+      const state = session.roomState;
+
+      // Filter out ended games immediately
+      if (state.status === 'game_over') {
+        continue;
+      }
+
+      const count = Object.values(state.players).filter(p => !p.isBot).length;
+      const max = state.mode === '1v1' ? 2 : state.mode === 'wave' ? 4 : 8;
+
+      // Filter out full games with no open slots
+      if (count >= max) {
+        continue;
+      }
+
+      const host = state.players[state.hostId]?.name || 'Host';
+
+      list.push({
+        roomId: state.roomId,
+        mode: state.mode,
+        mapName: state.mapName,
+        fragLimit: state.fragLimit,
+        playerCount: count,
+        maxPlayers: max,
+        hostName: host,
+        status: state.status
+      });
+    }
+    return list;
+  }
+
+  public broadcastOpenRooms(): void {
+    const list = this.getOpenRoomsList();
+    this.io.emit('open_rooms_update', list);
+    this.io.emit('open_rooms_list', list);
   }
 
   public getSession(roomId: string): GameSession | undefined {
@@ -108,3 +207,4 @@ export class RoomManager {
     return roomId ? this.rooms.get(roomId) : undefined;
   }
 }
+

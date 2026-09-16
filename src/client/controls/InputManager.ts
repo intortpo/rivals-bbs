@@ -2,6 +2,7 @@ import { TouchControls } from './TouchControls.js';
 
 export class InputManager {
   public touch: TouchControls;
+  public powerupRequested: boolean = false;
   private keys: Record<string, boolean> = {};
   private mouseDeltaX: number = 0;
   private mouseDeltaY: number = 0;
@@ -25,6 +26,12 @@ export class InputManager {
       if (e.code === 'KeyR') {
         this.touch.state.reloadRequested = true;
       }
+      if (['KeyQ', 'KeyE', 'Digit5'].includes(e.code)) {
+        this.powerupRequested = true;
+      }
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        this.unlockCursor();
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -33,8 +40,21 @@ export class InputManager {
 
     // Pointer lock for desktop mouse aiming
     window.addEventListener('mousedown', (e) => {
-      // Don't lock if clicking UI modals
-      if ((e.target as HTMLElement).closest('.modal') || (e.target as HTMLElement).closest('#lobby-screen')) {
+      // Don't lock if clicking UI modals, controls, or HUD buttons
+      const target = e.target as HTMLElement;
+      if (
+        target.closest('.modal') ||
+        target.closest('.modal-backdrop') ||
+        target.closest('#lobby-screen') ||
+        target.closest('#settings-modal') ||
+        target.closest('#dashboard-modal') ||
+        target.closest('#grammar-modal') ||
+        target.closest('.touch-btn') ||
+        target.closest('.icon-btn') ||
+        target.closest('button') ||
+        target.closest('input') ||
+        target.closest('select')
+      ) {
         return;
       }
 
@@ -71,27 +91,27 @@ export class InputManager {
     });
   }
 
-  public getMoveVector(): { x: number; z: number } {
+  public getMoveVector(): { forward: number; right: number } {
     // Touch joystick takes precedence if active
-    if (this.touch.state.moveX !== 0 || this.touch.state.moveZ !== 0) {
-      return { x: this.touch.state.moveX, z: this.touch.state.moveZ };
+    if (this.touch.state.forward !== 0 || this.touch.state.right !== 0) {
+      return { forward: this.touch.state.forward, right: this.touch.state.right };
     }
 
-    // Keyboard WASD / Arrow keys
-    let x = 0;
-    let z = 0;
-    if (this.keys['KeyW'] || this.keys['ArrowUp']) z -= 1;
-    if (this.keys['KeyS'] || this.keys['ArrowDown']) z += 1;
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) x -= 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) x += 1;
+    // Keyboard WASD / Arrow keys: W/Up = forward (+1), S/Down = backward (-1), D/Right = right (+1), A/Left = left (-1)
+    let forward = 0;
+    let right = 0;
+    if (this.keys['KeyW'] || this.keys['ArrowUp']) forward += 1;
+    if (this.keys['KeyS'] || this.keys['ArrowDown']) forward -= 1;
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) right += 1;
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) right -= 1;
 
-    if (x !== 0 && z !== 0) {
-      const len = Math.hypot(x, z);
-      x /= len;
-      z /= len;
+    if (forward !== 0 && right !== 0) {
+      const len = Math.hypot(forward, right);
+      forward /= len;
+      right /= len;
     }
 
-    return { x, z };
+    return { forward, right };
   }
 
   public getLookDeltas(): { yaw: number; pitch: number } {
@@ -135,5 +155,23 @@ export class InputManager {
     const r = this.touch.state.reloadRequested;
     this.touch.state.reloadRequested = false;
     return r;
+  }
+
+  public consumePowerup(): boolean {
+    const p = this.powerupRequested;
+    this.powerupRequested = false;
+    return p;
+  }
+
+  public unlockCursor(): void {
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
+    }
+  }
+
+  public lockCursor(): void {
+    if (!('ontouchstart' in window) && !document.pointerLockElement) {
+      document.body.requestPointerLock?.();
+    }
   }
 }

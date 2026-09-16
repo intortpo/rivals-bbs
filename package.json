@@ -9,7 +9,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build": "vite build && tsc --noEmit",
     "start": "tsx src/server/server.ts",
-    "test": "tsx tests/server-room.test.ts"
+    "test": "tsx tests/character-builder-collision.test.ts && tsx tests/wave-mode.test.ts && tsx tests/server-room.test.ts && tsx tests/grammar.test.ts && tsx tests/auth.test.ts"
   },
   "dependencies": {
     "express": "^4.21.2",

@@ -5,23 +5,36 @@ import { AudioManager } from './engine/AudioManager.js';
 import { FXManager } from './engine/FXManager.js';
 import { WeaponManager } from './engine/WeaponManager.js';
 import { CharacterModel } from './engine/CharacterModel.js';
+import { PowerupManager } from './engine/PowerupManager.js';
 import { InputManager } from './controls/InputManager.js';
 import { TouchHUD } from './ui/TouchHUD.js';
 import { QRManager } from './ui/QRManager.js';
 import { LobbyUI } from './ui/LobbyUI.js';
+import { AuthUI } from './ui/AuthUI.js';
+import { GrammarReloadUI } from './ui/GrammarReloadUI.js';
+import { SettingsUI } from './ui/SettingsUI.js';
+import { DashboardUI } from './ui/DashboardUI.js';
+import { CharacterBuilderUI } from './ui/CharacterBuilderUI.js';
 import { NetworkClient } from './network/NetworkClient.js';
 import { MOVEMENT, NETWORK, WEAPON_ORDER } from '../shared/constants.js';
+import { TeamColor } from '../shared/types.js';
 
 class GameApp {
   private appContainer: HTMLElement;
   private renderer!: Renderer;
   private audio!: AudioManager;
   private fx!: FXManager;
+  private powerupManager!: PowerupManager;
   private weaponManager!: WeaponManager;
   private input!: InputManager;
   private hud!: TouchHUD;
+  private settingsUI!: SettingsUI;
+  private dashboardUI!: DashboardUI;
+  private characterBuilderUI!: CharacterBuilderUI;
   private qrManager!: QRManager;
   private lobbyUI!: LobbyUI;
+  private authUI!: AuthUI;
+  private grammarReloadUI!: GrammarReloadUI;
   private networkClient!: NetworkClient;
   private mapBuilder!: MapBuilder;
 
@@ -35,6 +48,8 @@ class GameApp {
   private slideTimer: number = 0;
   private slideDirection = new THREE.Vector3();
   private currentHp: number = 100;
+  private currentShield: number = 0;
+  private myTeam: TeamColor = 'none';
   private isDead: boolean = false;
 
   private lastTime: number = performance.now();
@@ -49,16 +64,42 @@ class GameApp {
     return this.currentHp;
   }
 
+  public getCurrentShield(): number {
+    return this.currentShield;
+  }
+
   private async init(): Promise<void> {
     // 1. Core systems
     this.renderer = new Renderer(this.appContainer);
     this.audio = new AudioManager();
     this.fx = new FXManager(this.renderer.scene);
+    this.powerupManager = new PowerupManager(this.renderer.scene, this.audio);
     this.weaponManager = new WeaponManager(this.renderer.scene, this.renderer.camera);
     this.input = new InputManager(this.appContainer);
     this.hud = new TouchHUD(this.appContainer);
+    this.settingsUI = new SettingsUI(this.appContainer, (settings) => {
+      this.audio.setMasterVolume(settings.masterVolume);
+      this.audio.setSfxVolume(settings.sfxVolume);
+      this.audio.setVoiceVolume(settings.voiceVolume);
+      this.audio.setMuted(settings.isMuted);
+      this.input.touch.sensitivity = settings.touchSensitivity;
+    });
+    this.dashboardUI = new DashboardUI(this.appContainer);
     this.qrManager = new QRManager();
-    this.mapBuilder = new MapBuilder(this.renderer.scene, 'Arena Classic');
+    this.mapBuilder = new MapBuilder(this.renderer.scene, 'Cartoon City', 'twilight');
+
+    // Wire HUD top-right quick access and powerup buttons
+    this.hud.onPowerupClick = () => {
+      this.activateCurrentPowerup();
+    };
+    this.hud.onOpenDashboard = () => {
+      this.input.unlockCursor();
+      this.dashboardUI.open(this.authUI?.currentUser || null);
+    };
+    this.hud.onOpenSettings = () => {
+      this.input.unlockCursor();
+      this.settingsUI.open();
+    };
 
     // 2. Network Client
     this.networkClient = new NetworkClient(
@@ -70,11 +111,14 @@ class GameApp {
 
     // 3. Lobby UI
     this.lobbyUI = new LobbyUI(this.appContainer, {
-      onCreateRoom: async (name, mode, fragLimit, mapName) => {
+      onCreateRoom: async (name, mode, fragLimit, mapName, skyTheme = 'twilight', outfitIndex = 0, customization) => {
         this.audio.touchUnlock();
-        // Rebuild map if different
-        this.mapBuilder = new MapBuilder(this.renderer.scene, mapName);
-        const res = await this.networkClient.createRoom(name, mode, fragLimit, mapName);
+        // Rebuild map or sky if different
+        if (this.mapBuilder.mapName !== mapName || this.mapBuilder.skyTheme !== skyTheme) {
+          this.mapBuilder.dispose();
+          this.mapBuilder = new MapBuilder(this.renderer.scene, mapName, skyTheme);
+        }
+        const res = await this.networkClient.createRoom(name, mode, fragLimit, mapName, outfitIndex, customization);
         if (res.success && res.roomId) {
           if (this.networkClient.currentRoomState) {
             this.lobbyUI.showInRoomLobby(this.networkClient.currentRoomState, true);
@@ -85,14 +129,25 @@ class GameApp {
           alert(res.error || 'Failed to create room');
         }
       },
-      onJoinRoom: async (roomId, name) => {
+      onJoinRoom: async (roomId, name, outfitIndex = 0, customization) => {
         this.audio.touchUnlock();
-        const res = await this.networkClient.joinRoom(roomId, name);
+        const res = await this.networkClient.joinRoom(roomId, name, outfitIndex, customization);
         if (res.success && this.networkClient.currentRoomState) {
-          this.lobbyUI.showInRoomLobby(this.networkClient.currentRoomState, false);
+          const state = this.networkClient.currentRoomState;
+          if (state.status === 'playing') {
+            this.startLocalMatch(state);
+          } else if (state.status === 'countdown') {
+            this.lobbyUI.hideLobby();
+            this.hud.setVisible(true);
+          } else {
+            this.lobbyUI.showInRoomLobby(state, false);
+          }
         } else {
           alert(res.error || 'Failed to join room');
         }
+      },
+      onLeaveRoom: () => {
+        this.networkClient.leaveRoom();
       },
       onOpenQRScanner: () => {
         this.audio.touchUnlock();
@@ -107,13 +162,66 @@ class GameApp {
       },
       onStartMatch: () => {
         this.networkClient.startCountdown();
+      },
+      onAuthClick: () => {
+        this.audio.touchUnlock();
+        this.authUI.openModal();
+      },
+      onOpenDashboard: () => {
+        this.input.unlockCursor();
+        this.dashboardUI.open(this.authUI?.currentUser || null);
+      },
+      onOpenSettings: () => {
+        this.input.unlockCursor();
+        this.settingsUI.open();
+      },
+      onOpenCharacterBuilder: () => {
+        this.input.unlockCursor();
+        this.characterBuilderUI.open(this.lobbyUI.customOutfit || undefined);
+      },
+      onRefreshRooms: async () => {
+        try {
+          const res = await fetch('/api/rooms');
+          const data = await res.json();
+          if (data?.rooms) {
+            this.lobbyUI.updateOpenRooms(data.rooms);
+          }
+        } catch (e) {
+          console.error('Failed to fetch rooms:', e);
+        }
       }
     });
 
-    // 4. Hook Network Callbacks
+    // Initial fetch of public rooms
+    fetch('/api/rooms')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.rooms) this.lobbyUI.updateOpenRooms(data.rooms);
+      })
+      .catch(() => {});
+
+    // 4. Initialize Character Builder, Auth & Grammar Reload UI
+    this.characterBuilderUI = new CharacterBuilderUI(this.appContainer, (custom) => {
+      this.lobbyUI.setSelectedOutfitCustom(custom);
+    });
+
+    const savedCustom = localStorage.getItem('bbs_character_customization');
+    if (savedCustom) {
+      try {
+        const parsed = JSON.parse(savedCustom);
+        this.lobbyUI.setSelectedOutfitCustom(parsed);
+      } catch {}
+    }
+
+    this.authUI = new AuthUI(this.appContainer, (user) => {
+      this.lobbyUI.updateAccountDisplay(user);
+    });
+    this.grammarReloadUI = new GrammarReloadUI(this.appContainer);
+
+    // 5. Hook Network Callbacks
     this.setupNetworkCallbacks();
 
-    // 5. Check URL parameters for direct join via QR scan or shared link (?room=RV-XXXX)
+    // 6. Check URL parameters for direct join via QR scan or shared link (?room=RV-XXXX)
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
@@ -121,7 +229,7 @@ class GameApp {
       if (codeInput) codeInput.value = roomParam.toUpperCase();
     }
 
-    // 6. Start Render & Game Loop
+    // 7. Start Render & Game Loop
     requestAnimationFrame(this.gameLoop.bind(this));
   }
 
@@ -145,30 +253,63 @@ class GameApp {
     };
 
     this.networkClient.onGameStart = () => {
-      this.currentHp = 100;
-      this.isDead = false;
-      this.hud.updateHealth(100);
-      this.hud.setVisible(true);
-      this.lobbyUI.hideLobby();
-
-      // Find local spawn from room state
       if (this.networkClient.currentRoomState) {
-        const myState = this.networkClient.currentRoomState.players[this.networkClient.myId];
-        if (myState) {
-          this.playerPos.set(myState.x, myState.y, myState.z);
-          this.playerYaw = myState.yaw;
-          this.playerVel.set(0, 0, 0);
-        }
+        this.startLocalMatch(this.networkClient.currentRoomState);
       }
     };
 
-    this.networkClient.onLocalPlayerDamaged = (remainingHp) => {
+    this.networkClient.onLocalPlayerDamaged = (remainingHp, _maxHp, remainingShield) => {
       this.currentHp = remainingHp;
+      if (remainingShield !== undefined) {
+        this.currentShield = remainingShield;
+        this.hud.updateShield(remainingShield);
+      }
       this.hud.updateHealth(remainingHp);
       this.hud.flashDamage();
 
       if (remainingHp <= 0) {
         this.isDead = true;
+      }
+    };
+
+    this.networkClient.onPowerupActivated = (payload) => {
+      if (payload.playerId === this.networkClient.myId) {
+        this.powerupManager.applyActivePowerup(payload.powerup, payload.durationSec);
+      } else {
+        const remote = this.networkClient.remotePlayers.get(payload.playerId);
+        if (remote) {
+          this.powerupManager.triggerRemoteAura(remote.model.root, payload.powerup);
+        }
+      }
+    };
+
+    this.networkClient.onOpenRoomsList = (rooms) => {
+      this.lobbyUI.updateOpenRooms(rooms);
+    };
+
+    this.networkClient.onWaveCleared = (payload) => {
+      this.audio.playWaveClear();
+      this.hud.showWaveCleared(payload.waveNumber, payload.nextWaveInSec);
+
+      // Free ammo bonus
+      this.weaponManager.grantAmmo(35);
+
+      // Boost shield & revive local player if downed
+      this.currentShield = Math.min(50, this.currentShield + 25);
+      this.hud.updateShield(this.currentShield);
+
+      if (this.isDead) {
+        this.isDead = false;
+        this.currentHp = 100;
+        this.hud.updateHealth(100);
+      }
+    };
+
+    this.networkClient.onWaveStart = (_payload) => {
+      this.audio.playWaveStart();
+      this.hud.hideWaveBanner();
+      if (this.networkClient.currentRoomState) {
+        this.updateHUDMatchStats(this.networkClient.currentRoomState);
       }
     };
 
@@ -182,12 +323,16 @@ class GameApp {
 
       if (payload.victimId === this.networkClient.myId) {
         this.isDead = true;
-        // Auto respawn after 3s
-        setTimeout(() => {
-          this.currentHp = 100;
-          this.isDead = false;
-          this.hud.updateHealth(100);
-        }, NETWORK.RESPAWN_DELAY_SEC * 1000);
+        // In wave mode, player waits for wave clear revive; in PvP auto-respawn after 3s
+        if (this.networkClient.currentRoomState?.mode !== 'wave') {
+          setTimeout(() => {
+            this.currentHp = 100;
+            this.currentShield = 0;
+            this.isDead = false;
+            this.hud.updateHealth(100);
+            this.hud.updateShield(0);
+          }, NETWORK.RESPAWN_DELAY_SEC * 1000);
+        }
       }
 
       if (this.networkClient.currentRoomState) {
@@ -195,19 +340,87 @@ class GameApp {
       }
     };
 
-    this.networkClient.onGameOver = (payload) => {
-      this.hud.showGameOver(payload, this.networkClient.myId, () => {
-        this.lobbyUI.showMainMenu();
-        this.hud.setVisible(false);
-      });
+    this.networkClient.onGameOver = async (payload) => {
+      const mode = this.networkClient.currentRoomState?.mode;
+      const currentWave = this.networkClient.currentRoomState?.waveState?.currentWave;
+
+      this.hud.showGameOver(
+        payload,
+        this.networkClient.myId,
+        () => {
+          this.networkClient.leaveRoom();
+          this.lobbyUI.showMainMenu();
+          this.hud.setVisible(false);
+        },
+        mode,
+        currentWave
+      );
+
+      // Record match result to dashboard if logged in
+      try {
+        const myScoreEntry = payload.scores.find((s) => s.id === this.networkClient.myId);
+        const won =
+          payload.winnerId === this.networkClient.myId ||
+          (payload.winningTeam && payload.winningTeam === this.myTeam);
+        await fetch('/api/stats/match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: this.networkClient.currentRoomState?.mode || '1v1',
+            kills: myScoreEntry?.kills || 0,
+            deaths: myScoreEntry?.deaths || 0,
+            won: Boolean(won),
+            powerupsUsed: this.powerupManager.powerupsUsedInMatch
+          })
+        });
+      } catch (err) {
+        console.error('Failed to log match result:', err);
+      }
     };
+  }
+
+  private startLocalMatch(state: any): void {
+    this.networkClient.isInGame = true;
+    this.currentHp = 100;
+    this.currentShield = 0;
+    this.isDead = false;
+    this.powerupManager.reset();
+    this.hud.updateHealth(100);
+    this.hud.updateShield(0);
+    this.hud.updatePowerupSlot(null, false, 0);
+    this.hud.setVisible(true);
+    this.lobbyUI.hideLobby();
+
+    // Ensure local client has loaded the room's selected map
+    const chosenMap = state.mapName || 'Cartoon City';
+    if (this.mapBuilder.mapName !== chosenMap) {
+      this.mapBuilder.dispose();
+      this.mapBuilder = new MapBuilder(this.renderer.scene, chosenMap);
+    }
+
+    const myState = state.players[this.networkClient.myId];
+    if (myState) {
+      this.myTeam = myState.team || 'none';
+      this.playerPos.set(myState.x, myState.y, myState.z);
+      this.playerYaw = myState.yaw;
+      this.playerVel.set(0, 0, 0);
+    }
+
+    this.updateHUDMatchStats(state);
   }
 
   private updateHUDMatchStats(state: any): void {
     const players = Object.values(state.players) as any[];
     const scoreA = players[0]?.score || 0;
     const scoreB = players[1]?.score || 0;
-    this.hud.updateMatchHeader(state.mode, scoreA, scoreB, state.fragLimit);
+    this.hud.updateMatchHeader(
+      state.mode,
+      scoreA,
+      scoreB,
+      state.fragLimit,
+      state.teamScores,
+      state.waveState
+    );
   }
 
   private gameLoop(currentTime: number): void {
@@ -223,6 +436,12 @@ class GameApp {
     }
 
     // Engine updates
+    this.powerupManager.update(delta, this.playerPos);
+    this.hud.updatePowerupSlot(
+      this.powerupManager.storedPowerup || this.powerupManager.activePowerup,
+      this.powerupManager.hasActivePowerup(),
+      this.powerupManager.remainingActiveSec
+    );
     this.networkClient.update(delta);
     this.weaponManager.update(delta);
     this.fx.update(delta);
@@ -240,7 +459,7 @@ class GameApp {
 
     // 2. Input movement vector
     const move = this.input.getMoveVector();
-    const isMovingInput = Math.abs(move.x) > 0.05 || Math.abs(move.z) > 0.05;
+    const isMovingInput = Math.abs(move.forward) > 0.05 || Math.abs(move.right) > 0.05;
 
     // Movement forward/right relative to yaw
     const forward = new THREE.Vector3(-Math.sin(this.playerYaw), 0, -Math.cos(this.playerYaw));
@@ -252,7 +471,7 @@ class GameApp {
       // Initiate slide boost
       this.isSliding = true;
       this.slideTimer = MOVEMENT.SLIDE_DURATION_MAX;
-      this.slideDirection.copy(forward).multiplyScalar(move.z).add(right.clone().multiplyScalar(move.x)).normalize();
+      this.slideDirection.copy(forward).multiplyScalar(move.forward).add(right.clone().multiplyScalar(move.right)).normalize();
       this.playerVel.x = this.slideDirection.x * MOVEMENT.SLIDE_INITIAL_SPEED;
       this.playerVel.z = this.slideDirection.z * MOVEMENT.SLIDE_INITIAL_SPEED;
       this.audio.playSlide();
@@ -281,9 +500,10 @@ class GameApp {
         this.isSliding = false;
       }
     } else if (this.isGrounded) {
-      // Normal walk / sprint
-      const targetSpeed = MOVEMENT.WALK_SPEED;
-      const moveDir = forward.clone().multiplyScalar(move.z).add(right.clone().multiplyScalar(move.x));
+      // Normal walk / sprint with speed boost support
+      const speedMult = this.powerupManager.getSpeedMultiplier();
+      const targetSpeed = MOVEMENT.WALK_SPEED * speedMult;
+      const moveDir = forward.clone().multiplyScalar(move.forward).add(right.clone().multiplyScalar(move.right));
       this.playerVel.x = moveDir.x * targetSpeed;
       this.playerVel.z = moveDir.z * targetSpeed;
 
@@ -300,7 +520,7 @@ class GameApp {
     this.playerPos.add(this.playerVel.clone().multiplyScalar(delta));
 
     // Floor collision & Jump pads
-    const groundLevel = 1.0;
+    const groundLevel = this.mapBuilder.getGroundLevel(this.playerPos);
     if (this.playerPos.y <= groundLevel) {
       this.playerPos.y = groundLevel;
       this.playerVel.y = 0;
@@ -329,32 +549,53 @@ class GameApp {
   }
 
   private resolveArenaCollisions(): void {
-    // Keep within outer boundary [-28, 28]
-    const bound = 28;
-    this.playerPos.x = Math.max(-bound, Math.min(bound, this.playerPos.x));
-    this.playerPos.z = Math.max(-bound, Math.min(bound, this.playerPos.z));
+    // Keep within map boundaries
+    const b = this.mapBuilder.bounds;
+    this.playerPos.x = Math.max(b.minX, Math.min(b.maxX, this.playerPos.x));
+    this.playerPos.z = Math.max(b.minZ, Math.min(b.maxZ, this.playerPos.z));
 
-    // Check box obstacles
+    // Check box obstacles with vertical clearance and tangential sliding
     const playerRadius = MOVEMENT.PLAYER_RADIUS;
+    const playerFeet = this.playerPos.y;
+    const playerHead = this.playerPos.y + (this.isSliding ? 1.0 : 1.8);
+
     for (const box of this.mapBuilder.collisionBoxes) {
+      // If player's feet are above the obstacle surface, they are standing or landing on top
+      if (playerFeet >= box.max.y - 0.2) {
+        continue;
+      }
+      // If player's head is completely beneath an elevated obstacle
+      if (playerHead <= box.min.y + 0.1) {
+        continue;
+      }
+
+      // Horizontal cylinder vs AABB intersection
       if (
         this.playerPos.x + playerRadius > box.min.x &&
         this.playerPos.x - playerRadius < box.max.x &&
         this.playerPos.z + playerRadius > box.min.z &&
-        this.playerPos.z - playerRadius < box.max.z &&
-        this.playerPos.y < box.max.y
+        this.playerPos.z - playerRadius < box.max.z
       ) {
-        // Simple push-out along smallest penetration axis
+        // Penetration depths from each boundary
         const dx1 = Math.abs(this.playerPos.x + playerRadius - box.min.x);
         const dx2 = Math.abs(box.max.x - (this.playerPos.x - playerRadius));
         const dz1 = Math.abs(this.playerPos.z + playerRadius - box.min.z);
         const dz2 = Math.abs(box.max.z - (this.playerPos.z - playerRadius));
 
         const min = Math.min(dx1, dx2, dz1, dz2);
-        if (min === dx1) this.playerPos.x = box.min.x - playerRadius;
-        else if (min === dx2) this.playerPos.x = box.max.x + playerRadius;
-        else if (min === dz1) this.playerPos.z = box.min.z - playerRadius;
-        else if (min === dz2) this.playerPos.z = box.max.z + playerRadius;
+        if (min === dx1) {
+          this.playerPos.x = box.min.x - playerRadius;
+          if (this.playerVel.x > 0) this.playerVel.x = 0; // zero penetration velocity, slide freely along Z
+        } else if (min === dx2) {
+          this.playerPos.x = box.max.x + playerRadius;
+          if (this.playerVel.x < 0) this.playerVel.x = 0; // zero penetration velocity, slide freely along Z
+        } else if (min === dz1) {
+          this.playerPos.z = box.min.z - playerRadius;
+          if (this.playerVel.z > 0) this.playerVel.z = 0; // zero penetration velocity, slide freely along X
+        } else if (min === dz2) {
+          this.playerPos.z = box.max.z + playerRadius;
+          if (this.playerVel.z < 0) this.playerVel.z = 0; // zero penetration velocity, slide freely along X
+        }
       }
     }
   }
@@ -370,9 +611,12 @@ class GameApp {
 
     // Reload
     if (this.input.consumeReload()) {
-      if (this.weaponManager.startReload()) {
-        this.audio.playReload();
-      }
+      this.triggerReloadFlow();
+    }
+
+    // Powerup trigger
+    if (this.input.consumePowerup()) {
+      this.activateCurrentPowerup();
     }
 
     // Aim down sights (ADS)
@@ -383,25 +627,32 @@ class GameApp {
 
     // Shooting
     if (this.input.isFiring()) {
-      const targetMeshes = this.networkClient.getTargetableMeshes();
-      const fireRes = this.weaponManager.fire(this.renderer.camera, targetMeshes);
+      if (
+        this.weaponManager.ammoInMag[this.weaponManager.currentWeaponType] <= 0 &&
+        this.weaponManager.currentStats.type !== 'katana'
+      ) {
+        this.triggerReloadFlow();
+      } else {
+        const targetMeshes = this.networkClient.getTargetableMeshes();
+        const fireRes = this.weaponManager.fire(this.renderer.camera, targetMeshes);
 
-      if (fireRes.fired) {
-        this.audio.playShoot(this.weaponManager.currentWeaponType);
+        if (fireRes.fired) {
+          this.audio.playShoot(this.weaponManager.currentWeaponType);
 
-        const camPos = new THREE.Vector3();
-        this.renderer.camera.getWorldPosition(camPos);
-        const camDir = new THREE.Vector3();
-        this.renderer.camera.getWorldDirection(camDir);
+          const camPos = new THREE.Vector3();
+          this.renderer.camera.getWorldPosition(camPos);
+          const camDir = new THREE.Vector3();
+          this.renderer.camera.getWorldDirection(camDir);
 
-        this.networkClient.sendFire({
-          weaponType: this.weaponManager.currentWeaponType,
-          origin: [camPos.x, camPos.y, camPos.z],
-          direction: [camDir.x, camDir.y, camDir.z],
-          targetPlayerId: fireRes.hitPlayerId,
-          isHeadshot: fireRes.isHeadshot,
-          hitPoint: fireRes.hitPoint
-        });
+          this.networkClient.sendFire({
+            weaponType: this.weaponManager.currentWeaponType,
+            origin: [camPos.x, camPos.y, camPos.z],
+            direction: [camDir.x, camDir.y, camDir.z],
+            targetPlayerId: fireRes.hitPlayerId,
+            isHeadshot: fireRes.isHeadshot,
+            hitPoint: fireRes.hitPoint
+          });
+        }
       }
     }
 
@@ -410,7 +661,58 @@ class GameApp {
       this.weaponManager.ammoInMag[this.weaponManager.currentWeaponType],
       this.weaponManager.currentStats,
       this.weaponManager.isReloading,
-      this.weaponManager.reloadProgress
+      this.weaponManager.reloadProgress,
+      this.weaponManager.ammoReserve[this.weaponManager.currentWeaponType]
+    );
+  }
+
+  private activateCurrentPowerup(): void {
+    const pType = this.powerupManager.storedPowerup;
+    if (!pType) return;
+
+    let targetPoint: [number, number, number] | undefined;
+    if (pType === 'airstrike') {
+      const forward = new THREE.Vector3(-Math.sin(this.playerYaw), 0, -Math.cos(this.playerYaw));
+      targetPoint = [
+        this.playerPos.x + forward.x * 20,
+        this.playerPos.y,
+        this.playerPos.z + forward.z * 20
+      ];
+    }
+
+    this.networkClient.activatePowerup(pType, targetPoint);
+    this.powerupManager.activatePowerup(pType, targetPoint);
+    if (pType === 'shield') {
+      this.currentShield = 50;
+      this.hud.updateShield(50);
+    }
+  }
+
+  private triggerReloadFlow(): void {
+    if (this.weaponManager.currentStats.type === 'katana') return;
+    if (this.grammarReloadUI.isOpen()) return;
+
+    this.input.unlockCursor();
+    this.grammarReloadUI.open(
+      async (grantedAmmo, awardedPowerup, _streak) => {
+        this.weaponManager.grantAmmo(grantedAmmo);
+        this.audio.playGrammarSuccess();
+        this.audio.playReload();
+
+        if (awardedPowerup) {
+          this.powerupManager.storePowerup(awardedPowerup);
+          this.hud.updatePowerupSlot(
+            this.powerupManager.storedPowerup,
+            this.powerupManager.hasActivePowerup(),
+            this.powerupManager.remainingActiveSec
+          );
+        }
+
+        await this.authUI.recordGrammarStats(2, 2, grantedAmmo);
+      },
+      () => {
+        // Canceled reload
+      }
     );
   }
 

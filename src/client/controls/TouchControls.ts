@@ -1,6 +1,8 @@
 export interface TouchInputState {
-  moveX: number; // -1 to 1
-  moveZ: number; // -1 to 1
+  forward: number; // +1 = forward (thumb up), -1 = backward (thumb down)
+  right: number;   // +1 = right, -1 = left
+  moveX: number; // legacy compatibility
+  moveZ: number; // legacy compatibility
   lookDeltaYaw: number;
   lookDeltaPitch: number;
   isFiring: boolean;
@@ -13,6 +15,8 @@ export interface TouchInputState {
 
 export class TouchControls {
   public state: TouchInputState = {
+    forward: 0,
+    right: 0,
     moveX: 0,
     moveZ: 0,
     lookDeltaYaw: 0,
@@ -341,6 +345,8 @@ export class TouchControls {
         this.joystickBaseEl.style.display = 'block';
 
         this.joystickThumbEl.style.transform = 'translate(-50%, -50%)';
+        this.state.forward = 0;
+        this.state.right = 0;
         this.state.moveX = 0;
         this.state.moveZ = 0;
       } else if (!isLeftSide && this.lookTouchId === null) {
@@ -367,9 +373,13 @@ export class TouchControls {
 
         this.joystickThumbEl.style.transform = `translate(calc(-50% + ${thumbX}px), calc(-50% + ${thumbY}px))`;
 
-        // Normalize movement vector
-        this.state.moveX = clampedDist > 8 ? (thumbX / this.joystickMaxRadius) : 0;
-        this.state.moveZ = clampedDist > 8 ? (thumbY / this.joystickMaxRadius) : 0;
+        // Normalize movement vector: thumb up (dy < 0) = forward (+), thumb down (dy > 0) = backward (-)
+        const forwardVal = clampedDist > 8 ? (-thumbY / this.joystickMaxRadius) : 0;
+        const rightVal = clampedDist > 8 ? (thumbX / this.joystickMaxRadius) : 0;
+        this.state.forward = forwardVal;
+        this.state.right = rightVal;
+        this.state.moveX = rightVal;
+        this.state.moveZ = -forwardVal;
       } else if (touch.identifier === this.lookTouchId) {
         const dx = touch.clientX - this.lookLastPos.x;
         const dy = touch.clientY - this.lookLastPos.y;
@@ -392,6 +402,8 @@ export class TouchControls {
       if (touch.identifier === this.joystickTouchId) {
         this.joystickTouchId = null;
         this.joystickBaseEl.style.display = 'none';
+        this.state.forward = 0;
+        this.state.right = 0;
         this.state.moveX = 0;
         this.state.moveZ = 0;
       } else if (touch.identifier === this.lookTouchId) {

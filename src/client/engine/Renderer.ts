@@ -18,6 +18,14 @@ export class Renderer {
     );
     this.camera.rotation.order = 'YXZ'; // FPS camera rotation order
 
+    // CRITICAL: In Three.js, camera must be in scene for camera children (viewmodel) to render!
+    this.scene.add(this.camera);
+
+    // Dedicated viewmodel light so weapons are always visible and illuminated
+    const vmLight = new THREE.PointLight('#ffffff', 1.2, 4);
+    vmLight.position.set(0.25, 0.2, -0.3);
+    this.camera.add(vmLight);
+
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance'

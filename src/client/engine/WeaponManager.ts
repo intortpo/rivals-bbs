@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { WeaponStats, WeaponType } from '../../shared/types.js';
 import { WEAPONS } from '../../shared/constants.js';
 
@@ -19,16 +20,27 @@ export class WeaponManager {
     katana: WEAPONS.katana.magazineSize
   };
 
+  public ammoReserve: Record<WeaponType, number> = {
+    rifle: 60,
+    shotgun: 24,
+    sniper: 12,
+    katana: 0
+  };
+
   public isReloading: boolean = false;
   public reloadProgress: number = 0; // 0 to 1
   private lastFireTime: number = 0;
 
   // Viewmodel (first-person hands & gun pinned to camera)
   public viewModelContainer: THREE.Group;
+  public viewModelPivot: THREE.Group;
   private weaponMeshes: Map<WeaponType, THREE.Group> = new Map();
   private muzzleFlashLight: THREE.PointLight;
   private muzzleFlashMesh: THREE.Mesh;
   private flashDuration: number = 0;
+
+  // Static cache of loaded weapon scenes for third-person CharacterModel reuse
+  public static cachedWeaponModels: Map<WeaponType, THREE.Group> = new Map();
 
   private tracers: Tracer[] = [];
   private sceneRef: THREE.Scene;
@@ -43,15 +55,18 @@ export class WeaponManager {
     this.viewModelContainer = new THREE.Group();
     camera.add(this.viewModelContainer);
 
-    // Build 3D models for all 4 weapons
-    this.buildWeaponModels();
+    this.viewModelPivot = new THREE.Group();
+    this.viewModelContainer.add(this.viewModelPivot);
+
+    // Build procedural fallback models first (zero delay)
+    this.buildProceduralWeaponModels();
 
     // Muzzle flash
     this.muzzleFlashLight = new THREE.PointLight('#ffdd88', 0, 10);
-    this.muzzleFlashLight.position.set(0.28, -0.22, -0.85);
+    this.muzzleFlashLight.position.set(0.2, -0.16, -0.85);
     this.viewModelContainer.add(this.muzzleFlashLight);
 
-    const flashGeo = new THREE.PlaneGeometry(0.3, 0.3);
+    const flashGeo = new THREE.PlaneGeometry(0.35, 0.35);
     const flashMat = new THREE.MeshBasicMaterial({
       color: '#ffffff',
       transparent: true,
@@ -60,8 +75,11 @@ export class WeaponManager {
       side: THREE.DoubleSide
     });
     this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
-    this.muzzleFlashMesh.position.set(0.28, -0.22, -0.85);
+    this.muzzleFlashMesh.position.set(0.2, -0.16, -0.85);
     this.viewModelContainer.add(this.muzzleFlashMesh);
+
+    // Load high-quality 3D GLB models from public/models/weapons/
+    this.loadGLBWeapons();
 
     this.selectWeapon('rifle');
   }
@@ -70,96 +88,190 @@ export class WeaponManager {
     return WEAPONS[this.currentWeaponType];
   }
 
-  private buildWeaponModels(): void {
+  private buildProceduralWeaponModels(): void {
     // 1. Assault Rifle
     const rifleGroup = new THREE.Group();
     const darkMat = new THREE.MeshStandardMaterial({ color: '#2b2d42', roughness: 0.3 });
     const metalMat = new THREE.MeshStandardMaterial({ color: '#8d99ae', metalness: 0.6, roughness: 0.2 });
     const neonCyan = new THREE.MeshStandardMaterial({ color: '#00d2ff', emissive: '#00d2ff', emissiveIntensity: 0.6 });
 
-    // Receiver
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.16, 0.6), darkMat);
     rifleGroup.add(body);
-    // Barrel
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.4), metalMat);
     barrel.position.set(0, 0.04, -0.45);
     rifleGroup.add(barrel);
-    // Magazine
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.12), darkMat);
     mag.position.set(0, -0.15, -0.05);
     mag.rotation.x = 0.2;
     rifleGroup.add(mag);
-    // Sight Rail & Neon Sight
     const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.15), neonCyan);
     sight.position.set(0, 0.11, 0.05);
     rifleGroup.add(sight);
 
-    rifleGroup.position.set(0.28, -0.24, -0.55);
-    this.viewModelContainer.add(rifleGroup);
+    rifleGroup.position.set(0.22, -0.22, -0.5);
+    this.viewModelPivot.add(rifleGroup);
     this.weaponMeshes.set('rifle', rifleGroup);
 
-    // 2. Pump Shotgun
+    // 2. Shotgun
     const shotgunGroup = new THREE.Group();
     const woodMat = new THREE.MeshStandardMaterial({ color: '#8b5a2b', roughness: 0.6 });
     const sBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.7), metalMat);
     shotgunGroup.add(sBody);
-    // Double Barrel
     const sBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 8), darkMat);
     sBarrel.rotation.x = Math.PI / 2;
     sBarrel.position.set(0, 0.04, -0.5);
     shotgunGroup.add(sBarrel);
-    // Pump Grip
     const sPump = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.2), woodMat);
     sPump.position.set(0, -0.04, -0.38);
     shotgunGroup.add(sPump);
 
-    shotgunGroup.position.set(0.28, -0.26, -0.55);
-    this.viewModelContainer.add(shotgunGroup);
+    shotgunGroup.position.set(0.22, -0.22, -0.5);
+    this.viewModelPivot.add(shotgunGroup);
     this.weaponMeshes.set('shotgun', shotgunGroup);
 
-    // 3. Sniper Rifle
+    // 3. Sniper
     const sniperGroup = new THREE.Group();
     const snipBody = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.18, 0.9), darkMat);
     sniperGroup.add(snipBody);
-    // Long barrel
     const snipBarrel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.8), metalMat);
     snipBarrel.position.set(0, 0.03, -0.75);
     sniperGroup.add(snipBarrel);
-    // Scope cylinder
     const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.35, 12), darkMat);
     scope.rotation.x = Math.PI / 2;
     scope.position.set(0, 0.14, -0.05);
     sniperGroup.add(scope);
 
-    sniperGroup.position.set(0.28, -0.24, -0.6);
-    this.viewModelContainer.add(sniperGroup);
+    sniperGroup.position.set(0.22, -0.22, -0.55);
+    this.viewModelPivot.add(sniperGroup);
     this.weaponMeshes.set('sniper', sniperGroup);
 
-    // 4. Energy Katana
-    const katanaGroup = new THREE.Group();
+    // 4. Knife / Melee
+    const knifeGroup = new THREE.Group();
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 8), darkMat);
-    katanaGroup.add(handle);
+    knifeGroup.add(handle);
     const guard = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.03, 0.1), metalMat);
     guard.position.y = 0.16;
-    katanaGroup.add(guard);
+    knifeGroup.add(guard);
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.02), neonCyan);
     blade.position.y = 0.65;
-    katanaGroup.add(blade);
+    knifeGroup.add(blade);
 
-    katanaGroup.rotation.set(-Math.PI / 4, Math.PI / 6, -Math.PI / 6);
-    katanaGroup.position.set(0.3, -0.28, -0.45);
-    this.viewModelContainer.add(katanaGroup);
-    this.weaponMeshes.set('katana', katanaGroup);
+    knifeGroup.rotation.set(-Math.PI / 4, Math.PI / 6, -Math.PI / 6);
+    knifeGroup.position.set(0.24, -0.25, -0.4);
+    this.viewModelPivot.add(knifeGroup);
+    this.weaponMeshes.set('katana', knifeGroup);
+  }
+
+  private loadGLBWeapons(): void {
+    const loader = new GLTFLoader();
+
+    const configs: {
+      type: WeaponType;
+      url: string;
+      scale: number;
+      position: [number, number, number];
+      rotation: [number, number, number];
+      muzzleOffset: [number, number, number];
+    }[] = [
+      {
+        type: 'rifle',
+        url: '/models/weapons/rifle_001.glb',
+        scale: 0.36,
+        // Model length is on +X, rotate Y +PI/2 to point down -Z (forward)
+        position: [0.22, -0.24, -0.42],
+        rotation: [0, Math.PI / 2, 0],
+        muzzleOffset: [0.22, -0.16, -0.85]
+      },
+      {
+        type: 'shotgun',
+        url: '/models/weapons/shotgun_001.glb',
+        scale: 0.36,
+        position: [0.22, -0.24, -0.44],
+        rotation: [0, Math.PI / 2, 0],
+        muzzleOffset: [0.22, -0.16, -0.85]
+      },
+      {
+        type: 'sniper',
+        url: '/models/weapons/sniper_rifle_001.glb',
+        scale: 0.32,
+        position: [0.22, -0.24, -0.48],
+        rotation: [0, Math.PI / 2, 0],
+        muzzleOffset: [0.22, -0.15, -0.92]
+      },
+      {
+        type: 'katana', // Knife model
+        url: '/models/weapons/knife_001.glb',
+        scale: 0.55,
+        position: [0.22, -0.25, -0.38],
+        // Knife length is on +Y, angle forward
+        rotation: [-Math.PI / 2.8, Math.PI / 5, -Math.PI / 10],
+        muzzleOffset: [0.22, -0.2, -0.6]
+      }
+    ];
+
+    configs.forEach((cfg) => {
+      loader.load(
+        cfg.url,
+        (gltf) => {
+          const model = gltf.scene;
+          model.scale.setScalar(cfg.scale);
+          model.position.set(...cfg.position);
+          model.rotation.set(...cfg.rotation);
+
+          model.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              // Ensure material is responsive to lights
+              const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+              if (mat) {
+                mat.roughness = 0.35;
+                mat.metalness = 0.2;
+              }
+            }
+          });
+
+          // Cache for CharacterModel
+          WeaponManager.cachedWeaponModels.set(cfg.type, model.clone());
+
+          // Replace the procedural fallback model
+          const oldMesh = this.weaponMeshes.get(cfg.type);
+          if (oldMesh) {
+            this.viewModelPivot.remove(oldMesh);
+          }
+
+          this.viewModelPivot.add(model);
+          this.weaponMeshes.set(cfg.type, model);
+
+          // Update visibility according to active weapon
+          model.visible = this.currentWeaponType === cfg.type;
+
+          console.log(`[WeaponManager] Successfully loaded 3D GLB model for ${cfg.type}`);
+        },
+        undefined,
+        (err) => {
+          console.warn(`[WeaponManager] Could not load ${cfg.url}, using procedural fallback:`, err);
+        }
+      );
+    });
   }
 
   public selectWeapon(type: WeaponType): void {
-    if (this.currentWeaponType === type) return;
     this.currentWeaponType = type;
     this.isReloading = false;
     this.reloadProgress = 0;
 
     for (const [t, mesh] of this.weaponMeshes.entries()) {
       mesh.visible = t === type;
+    }
+
+    // Adjust muzzle flash offset for weapon
+    if (type === 'sniper') {
+      this.muzzleFlashLight.position.set(0.22, -0.15, -0.92);
+      this.muzzleFlashMesh.position.set(0.22, -0.15, -0.92);
+    } else {
+      this.muzzleFlashLight.position.set(0.22, -0.16, -0.85);
+      this.muzzleFlashMesh.position.set(0.22, -0.16, -0.85);
     }
   }
 
@@ -172,11 +284,27 @@ export class WeaponManager {
     return true;
   }
 
+  public grantAmmo(amount: number = 60): void {
+    const stats = this.currentStats;
+    if (stats.type === 'katana') return;
+
+    this.ammoReserve[this.currentWeaponType] += amount;
+    // Immediately refill current magazine
+    const needed = stats.magazineSize - this.ammoInMag[this.currentWeaponType];
+    const fill = Math.min(needed, this.ammoReserve[this.currentWeaponType]);
+    this.ammoInMag[this.currentWeaponType] += fill;
+    this.ammoReserve[this.currentWeaponType] -= fill;
+
+    this.isReloading = false;
+    this.reloadProgress = 0;
+  }
+
   public startReload(): boolean {
     const stats = this.currentStats;
     if (stats.type === 'katana') return false;
     if (this.isReloading) return false;
     if (this.ammoInMag[this.currentWeaponType] >= stats.magazineSize) return false;
+    if (this.ammoReserve[this.currentWeaponType] <= 0) return false;
 
     this.isReloading = true;
     this.reloadProgress = 0;
@@ -210,9 +338,9 @@ export class WeaponManager {
     // Trigger visual muzzle flash
     this.triggerMuzzleFlash();
 
-    // Weapon recoil animation
-    this.recoilOffset.z = 0.12;
-    this.recoilRotation.x = 0.18;
+    // Weapon recoil animation on pivot
+    this.recoilOffset.z = stats.type === 'sniper' ? 0.16 : 0.09;
+    this.recoilRotation.x = stats.type === 'sniper' ? 0.22 : 0.12;
 
     // Raycast shooting
     const raycaster = new THREE.Raycaster();
@@ -307,37 +435,36 @@ export class WeaponManager {
       }
     }
 
-    // Update reload progress
+    // Update reload progress with clean pivot rotation & translation
     if (this.isReloading) {
       const stats = this.currentStats;
       this.reloadProgress += delta / stats.reloadTime;
 
-      // Reload dip animation
-      const currentMesh = this.weaponMeshes.get(this.currentWeaponType);
-      if (currentMesh) {
-        currentMesh.position.y = -0.24 - Math.sin(this.reloadProgress * Math.PI) * 0.2;
-        currentMesh.rotation.z = Math.sin(this.reloadProgress * Math.PI) * 0.4;
-      }
+      this.viewModelPivot.position.y = -Math.sin(this.reloadProgress * Math.PI) * 0.18;
+      this.viewModelPivot.rotation.z = Math.sin(this.reloadProgress * Math.PI) * 0.35;
 
       if (this.reloadProgress >= 1.0) {
         this.isReloading = false;
         this.reloadProgress = 0;
-        this.ammoInMag[this.currentWeaponType] = stats.magazineSize;
-        if (currentMesh) {
-          currentMesh.position.y = -0.24;
-          currentMesh.rotation.z = 0;
-        }
+        const needed = stats.magazineSize - this.ammoInMag[this.currentWeaponType];
+        const fill = Math.min(needed, this.ammoReserve[this.currentWeaponType]);
+        this.ammoInMag[this.currentWeaponType] += fill;
+        this.ammoReserve[this.currentWeaponType] -= fill;
+        this.viewModelPivot.position.y = 0;
+        this.viewModelPivot.rotation.z = 0;
       }
+    } else {
+      this.viewModelPivot.position.y = 0;
+      this.viewModelPivot.rotation.z = 0;
     }
 
-    // Recover weapon recoil smoothly
+    // Recover weapon recoil smoothly on viewModelPivot
     this.recoilOffset.lerp(new THREE.Vector3(0, 0, 0), delta * 15);
     this.recoilRotation.x = THREE.MathUtils.lerp(this.recoilRotation.x, 0, delta * 15);
 
-    const currentMesh = this.weaponMeshes.get(this.currentWeaponType);
-    if (currentMesh && !this.isReloading) {
-      currentMesh.position.z = -0.55 + this.recoilOffset.z;
-      currentMesh.rotation.x = this.recoilRotation.x;
+    if (!this.isReloading) {
+      this.viewModelPivot.position.z = this.recoilOffset.z;
+      this.viewModelPivot.rotation.x = this.recoilRotation.x;
     }
 
     // Update bullet tracers

@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { WeaponType } from '../../shared/types.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { WeaponType, CharacterCustomization } from '../../shared/types.js';
+import { WeaponManager } from './WeaponManager.js';
 
 interface BrickDebris {
   mesh: THREE.Mesh;
@@ -12,33 +15,265 @@ interface BrickDebris {
   life: number;
 }
 
+export interface ModularItemOption {
+  id: string;
+  name: string;
+  category: 'headwear' | 'hair' | 'face' | 'top' | 'bottom' | 'shoes' | 'accessories' | 'gloves';
+  icon: string;
+}
+
+export const MODULAR_CATALOG: ModularItemOption[] = [
+  // Faces / Emotions
+  { id: 'Male_emotion_usual_001', name: 'Classic Focused', category: 'face', icon: '😐' },
+  { id: 'Male_emotion_happy_002', name: 'Confident Grin', category: 'face', icon: '😄' },
+  { id: 'Male_emotion_angry_003', name: 'Battle Fierce', category: 'face', icon: '😠' },
+
+  // Hairstyles
+  { id: 'none', name: 'None / Shaved', category: 'hair', icon: '🧑‍🦲' },
+  { id: 'Hairstyle_male_010', name: 'Slick Undercut', category: 'hair', icon: '💇‍♂️' },
+  { id: 'Hairstyle_male_012', name: 'Messy Modern', category: 'hair', icon: '🦱' },
+
+  // Headwear
+  { id: 'none', name: 'No Hat', category: 'headwear', icon: '❌' },
+  { id: 'Hat_010', name: 'Street Ballcap', category: 'headwear', icon: '🧢' },
+  { id: 'Hat_049', name: 'Slouch Beanie', category: 'headwear', icon: '🎿' },
+  { id: 'Hat_057', name: 'Spec-Ops Cap', category: 'headwear', icon: '🪖' },
+
+  // Eyewear
+  { id: 'none', name: 'No Eyewear', category: 'accessories', icon: '❌' },
+  { id: 'Glasses_004', name: 'Cyber Sunshades', category: 'accessories', icon: '🕶️' },
+  { id: 'Glasses_006', name: 'Scholar Specs', category: 'accessories', icon: '👓' },
+
+  // Props & Facial Accessories
+  { id: 'Headphones_002', name: 'Pro Headset', category: 'accessories', icon: '🎧' },
+  { id: 'Moustache_001', name: 'Gentleman Stache', category: 'accessories', icon: '🥸' },
+  { id: 'Moustache_002', name: 'Handlebar Stache', category: 'accessories', icon: '👨‍🦰' },
+  { id: 'Clown_nose_001', name: 'Clown Nose', category: 'accessories', icon: '🔴' },
+  { id: 'Pacifier_001', name: 'Golden Binky', category: 'accessories', icon: '🍼' },
+
+  // Tops & Outerwear
+  { id: 'T_Shirt_009', name: 'BBS Crewneck Tee', category: 'top', icon: '👕' },
+  { id: 'Outerwear_029', name: 'Runner Windbreaker', category: 'top', icon: '🧥' },
+  { id: 'Costume_10_001', name: 'Armored Tac-Vest', category: 'top', icon: '🦺' },
+  { id: 'Costume_6_001', name: 'Stealth Jumpsuit', category: 'top', icon: '🥋' },
+  { id: 'Outerwear_036', name: 'Subzero Puffer', category: 'top', icon: '🥼' },
+
+  // Bottoms
+  { id: 'Pants_010', name: 'Street Cargo Jeans', category: 'bottom', icon: '👖' },
+  { id: 'Pants_014', name: 'BDU Tactical Slacks', category: 'bottom', icon: '🪖' },
+  { id: 'Shorts_003', name: 'Athletic Shorts', category: 'bottom', icon: '🩳' },
+
+  // Shoes
+  { id: 'Shoe_Sneakers_009', name: 'High-Top Kicks', category: 'shoes', icon: '👟' },
+  { id: 'Shoe_Slippers_002', name: 'Chill Slides', category: 'shoes', icon: '🩴' },
+  { id: 'Shoe_Slippers_005', name: 'Cozy Slippers', category: 'shoes', icon: '🥿' },
+
+  // Gloves
+  { id: 'none', name: 'Bare Hands', category: 'gloves', icon: '❌' },
+  { id: 'Gloves_006', name: 'Half-Finger Grip', category: 'gloves', icon: '🧤' },
+  { id: 'Gloves_014', name: 'Tactical Gauntlets', category: 'gloves', icon: '🥊' }
+];
+
+export const CHARACTER_PRESETS = [
+  {
+    name: 'Cyber Scout',
+    meshes: [
+      'Body_010',
+      'T_Shirt_009',
+      'Outerwear_029',
+      'Pants_010',
+      'Shoe_Sneakers_009',
+      'Hairstyle_male_010',
+      'Headphones_002',
+      'Glasses_004',
+      'Male_emotion_usual_001'
+    ]
+  },
+  {
+    name: 'Tactical Agent',
+    meshes: [
+      'Body_010',
+      'Costume_10_001',
+      'Pants_014',
+      'Shoe_Sneakers_009',
+      'Hat_057',
+      'Glasses_006',
+      'Gloves_014',
+      'Male_emotion_angry_003'
+    ]
+  },
+  {
+    name: 'Urban Runner',
+    meshes: [
+      'Body_010',
+      'T_Shirt_009',
+      'Shorts_003',
+      'Socks_008',
+      'Shoe_Sneakers_009',
+      'Hat_010',
+      'Gloves_006',
+      'Male_emotion_happy_002'
+    ]
+  },
+  {
+    name: 'Beanie Merc',
+    meshes: [
+      'Body_010',
+      'Outerwear_036',
+      'Pants_010',
+      'Shoe_Sneakers_009',
+      'Hat_049',
+      'Moustache_001',
+      'Male_emotion_usual_001'
+    ]
+  }
+];
+
+export const DEFAULT_CUSTOMIZATION: CharacterCustomization = {
+  face: 'Male_emotion_usual_001',
+  hair: 'Hairstyle_male_010',
+  headwear: 'none',
+  eyewear: 'Glasses_004',
+  accessories: ['Headphones_002'],
+  top: 'Outerwear_029',
+  bottom: 'Pants_010',
+  shoes: 'Shoe_Sneakers_009',
+  socks: false,
+  gloves: 'none',
+  accentColor: '#00d2ff'
+};
+
+export function customizationToMeshNames(config: CharacterCustomization): Set<string> {
+  const set = new Set<string>();
+  set.add('Body_010'); // Always active base body
+  if (config.face) set.add(config.face);
+  if (config.hair && config.hair !== 'none') set.add(config.hair);
+  if (config.headwear && config.headwear !== 'none') set.add(config.headwear);
+  if (config.eyewear && config.eyewear !== 'none') set.add(config.eyewear);
+  if (config.accessories && Array.isArray(config.accessories)) {
+    for (const acc of config.accessories) {
+      if (acc && acc !== 'none') set.add(acc);
+    }
+  }
+  if (config.top && config.top !== 'none') set.add(config.top);
+  if (config.bottom && config.bottom !== 'none') set.add(config.bottom);
+  if (config.shoes && config.shoes !== 'none') set.add(config.shoes);
+  if (config.socks) set.add('Socks_008');
+  if (config.gloves && config.gloves !== 'none') set.add(config.gloves);
+  return set;
+}
+
+export function presetToCustomization(outfitIndex: number, accentColor: string = '#00d2ff'): CharacterCustomization {
+  const idx = Math.max(0, Math.min(CHARACTER_PRESETS.length - 1, outfitIndex));
+  switch (idx) {
+    case 1:
+      return {
+        face: 'Male_emotion_angry_003',
+        hair: 'none',
+        headwear: 'Hat_057',
+        eyewear: 'Glasses_006',
+        accessories: [],
+        top: 'Costume_10_001',
+        bottom: 'Pants_014',
+        shoes: 'Shoe_Sneakers_009',
+        socks: false,
+        gloves: 'Gloves_014',
+        accentColor: accentColor || '#ff2a55'
+      };
+    case 2:
+      return {
+        face: 'Male_emotion_happy_002',
+        hair: 'none',
+        headwear: 'Hat_010',
+        eyewear: 'none',
+        accessories: [],
+        top: 'T_Shirt_009',
+        bottom: 'Shorts_003',
+        shoes: 'Shoe_Sneakers_009',
+        socks: true,
+        gloves: 'Gloves_006',
+        accentColor: accentColor || '#00ff88'
+      };
+    case 3:
+      return {
+        face: 'Male_emotion_usual_001',
+        hair: 'none',
+        headwear: 'Hat_049',
+        eyewear: 'none',
+        accessories: ['Moustache_001'],
+        top: 'Outerwear_036',
+        bottom: 'Pants_010',
+        shoes: 'Shoe_Sneakers_009',
+        socks: false,
+        gloves: 'none',
+        accentColor: accentColor || '#ffaa00'
+      };
+    case 0:
+    default:
+      return {
+        face: 'Male_emotion_usual_001',
+        hair: 'Hairstyle_male_010',
+        headwear: 'none',
+        eyewear: 'Glasses_004',
+        accessories: ['Headphones_002'],
+        top: 'Outerwear_029',
+        bottom: 'Pants_010',
+        shoes: 'Shoe_Sneakers_009',
+        socks: false,
+        gloves: 'none',
+        accentColor: accentColor || '#00d2ff'
+      };
+  }
+}
+
 export class CharacterModel {
   public root: THREE.Group;
-  public headMesh!: THREE.Mesh;
-  public torsoMesh!: THREE.Mesh;
-  public leftArmMesh!: THREE.Mesh;
-  public rightArmMesh!: THREE.Mesh;
-  public leftLegMesh!: THREE.Mesh;
-  public rightLegMesh!: THREE.Mesh;
-  public weaponSocket!: THREE.Group;
-  public nameplateGroup!: THREE.Group;
-  private nameCanvas!: HTMLCanvasElement;
-  private nameTexture!: THREE.CanvasTexture;
-
-  private leftArmPivot!: THREE.Group;
-  private rightArmPivot!: THREE.Group;
-  private leftLegPivot!: THREE.Group;
-  private rightLegPivot!: THREE.Group;
-
   public isLocal: boolean;
   public playerId: string;
   public playerName: string;
   public playerColor: string;
   public currentWeapon: WeaponType = 'rifle';
+  public outfitIndex: number = 0;
+  public customization: CharacterCustomization | null = null;
+
+  // Visual GLB scene & bones
+  public characterMesh: THREE.Group | null = null;
+  public weaponSocket: THREE.Group;
+  public nameplateGroup!: THREE.Group;
+
+  // Rigged humanoid bones
+  private hipsBone: THREE.Object3D | null = null;
+  private spineBone: THREE.Object3D | null = null;
+  private headBone: THREE.Object3D | null = null;
+  private leftArmBone: THREE.Object3D | null = null;
+  private leftForeArmBone: THREE.Object3D | null = null;
+  private rightArmBone: THREE.Object3D | null = null;
+  private rightForeArmBone: THREE.Object3D | null = null;
+  private leftLegBone: THREE.Object3D | null = null;
+  private rightLegBone: THREE.Object3D | null = null;
+
+  // Rest transforms cached for pristine deformation
+  private initialHipsPos: THREE.Vector3 = new THREE.Vector3();
+  private initialBoneRotations: Map<string, THREE.Quaternion> = new Map();
+
+  // Hitbox meshes for precise raycasting
+  public headCollider!: THREE.Mesh;
+  public bodyCollider!: THREE.Mesh;
+
+  public get torsoMesh(): THREE.Mesh {
+    return this.bodyCollider;
+  }
+  public get headMesh(): THREE.Mesh {
+    return this.headCollider;
+  }
 
   private animTime: number = 0;
   private isDead: boolean = false;
+  private equippedWeaponMeshes: Map<WeaponType, THREE.Group> = new Map();
 
+  private static cachedCharacterGLTF: THREE.Group | null = null;
+  private static isLoadingGLTF: boolean = false;
+  private static loadWaiters: Array<(gltf: THREE.Group) => void> = [];
   private static debrisList: BrickDebris[] = [];
   private static sceneRef: THREE.Scene | null = null;
 
@@ -47,17 +282,28 @@ export class CharacterModel {
     playerId: string,
     playerName: string,
     playerColor: string,
-    isLocal: boolean = false
+    isLocal: boolean = false,
+    outfitIndex: number = 0,
+    customization?: CharacterCustomization
   ) {
     CharacterModel.sceneRef = scene;
     this.playerId = playerId;
     this.playerName = playerName;
     this.playerColor = playerColor;
     this.isLocal = isLocal;
+    this.outfitIndex = outfitIndex % CHARACTER_PRESETS.length;
+    this.customization = customization || presetToCustomization(this.outfitIndex, playerColor);
 
     this.root = new THREE.Group();
-    this.buildRobloxR6Mesh();
+    this.weaponSocket = new THREE.Group();
 
+    // 1. Build precise physics raycasting hitboxes
+    this.buildHitboxes();
+
+    // 2. Load and attach the 3D Creative Humanoid character model
+    this.loadCharacterMesh();
+
+    // 3. Build overhead nameplate
     if (!isLocal) {
       this.buildNameplate();
     }
@@ -65,171 +311,276 @@ export class CharacterModel {
     scene.add(this.root);
   }
 
-  private buildRobloxR6Mesh(): void {
-    // Plastic materials like Roblox
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: this.playerColor,
-      roughness: 0.25,
-      metalness: 0.08
+  private buildHitboxes(): void {
+    // Transparent / raycastable materials
+    const hitMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
     });
 
-    const skinMat = new THREE.MeshStandardMaterial({
-      color: '#f5cd90', // Classic Roblox skin yellow/tan
-      roughness: 0.35,
-      metalness: 0.05
+    // Body / Torso Box: Height 1.0m, Width 0.55m, Depth 0.4m
+    const bodyGeo = new THREE.BoxGeometry(0.55, 1.0, 0.4);
+    this.bodyCollider = new THREE.Mesh(bodyGeo, hitMat);
+    this.bodyCollider.position.set(0, 0.85, 0);
+    this.bodyCollider.userData = { playerId: this.playerId, isHeadshot: false };
+    this.root.add(this.bodyCollider);
+
+    // Head Sphere: Radius 0.22m, elevated at y = 1.55m
+    const headGeo = new THREE.SphereGeometry(0.22, 12, 12);
+    this.headCollider = new THREE.Mesh(headGeo, hitMat);
+    this.headCollider.position.set(0, 1.55, 0);
+    this.headCollider.userData = { playerId: this.playerId, isHeadshot: true };
+    this.root.add(this.headCollider);
+  }
+
+  private loadCharacterMesh(): void {
+    if (CharacterModel.cachedCharacterGLTF) {
+      this.attachClonedModel(CharacterModel.cachedCharacterGLTF);
+      return;
+    }
+
+    if (CharacterModel.isLoadingGLTF) {
+      CharacterModel.loadWaiters.push((model) => this.attachClonedModel(model));
+      return;
+    }
+
+    CharacterModel.isLoadingGLTF = true;
+    const loader = new GLTFLoader();
+    loader.load(
+      '/models/characters/creative_character.glb',
+      (gltf) => {
+        CharacterModel.cachedCharacterGLTF = gltf.scene;
+        CharacterModel.isLoadingGLTF = false;
+        this.attachClonedModel(gltf.scene);
+        for (const waiter of CharacterModel.loadWaiters) {
+          waiter(gltf.scene);
+        }
+        CharacterModel.loadWaiters = [];
+      },
+      undefined,
+      (err) => {
+        console.warn('[CharacterModel] Could not load creative_character.glb, fallback to procedural:', err);
+        CharacterModel.isLoadingGLTF = false;
+      }
+    );
+  }
+
+  public applyCustomization(custom: CharacterCustomization): void {
+    this.customization = custom;
+    if (!this.characterMesh) return;
+
+    const allowed = customizationToMeshNames(custom);
+    this.characterMesh.traverse((child: any) => {
+      if (child.isMesh) {
+        child.visible = allowed.has(child.name);
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m: THREE.Material) => {
+              m.side = THREE.DoubleSide;
+            });
+          } else {
+            child.material.side = THREE.DoubleSide;
+          }
+        }
+      }
     });
+  }
 
-    const pantsMat = new THREE.MeshStandardMaterial({
-      color: '#1a2238', // Dark tactical jeans
-      roughness: 0.4
-    });
+  private attachClonedModel(source: THREE.Group): void {
+    const clone = SkeletonUtils.clone(source) as THREE.Group;
 
-    // 1. Torso: width 1.0, height 1.0, depth 0.5
-    const torsoGeo = new THREE.BoxGeometry(1.0, 1.0, 0.5);
-    this.torsoMesh = new THREE.Mesh(torsoGeo, bodyMat);
-    this.torsoMesh.position.y = 1.0;
-    this.torsoMesh.castShadow = true;
-    this.torsoMesh.receiveShadow = true;
-    this.root.add(this.torsoMesh);
+    // Scale to natural human proportion: 1.78m height (2.10 * 0.85 = 1.785m)
+    clone.scale.set(0.85, 0.85, 0.85);
+    clone.position.set(0, 0, 0);
 
-    // 2. Head: 0.6 x 0.6 x 0.6
-    const headGeo = new THREE.BoxGeometry(0.65, 0.65, 0.65);
-    this.headMesh = new THREE.Mesh(headGeo, skinMat);
-    this.headMesh.position.y = 0.85; // on top of torso
-    this.headMesh.castShadow = true;
-    this.torsoMesh.add(this.headMesh);
+    // Locate bones
+    this.hipsBone = clone.getObjectByName('Hips') || null;
+    this.spineBone = clone.getObjectByName('Spine') || null;
+    this.headBone = clone.getObjectByName('Head') || null;
+    this.leftArmBone = clone.getObjectByName('LeftArm') || null;
+    this.leftForeArmBone = clone.getObjectByName('LeftForeArm') || null;
+    this.rightArmBone = clone.getObjectByName('RightArm') || null;
+    this.rightForeArmBone = clone.getObjectByName('RightForeArm') || null;
+    this.leftLegBone = clone.getObjectByName('LeftUpLeg') || null;
+    this.rightLegBone = clone.getObjectByName('RightUpLeg') || null;
 
-    // Head Visor / Face
-    const visorGeo = new THREE.BoxGeometry(0.5, 0.2, 0.06);
-    const visorMat = new THREE.MeshStandardMaterial({
-      color: '#111',
-      roughness: 0.1,
-      metalness: 0.9
-    });
-    const visor = new THREE.Mesh(visorGeo, visorMat);
-    visor.position.set(0, 0.05, 0.33);
-    this.headMesh.add(visor);
+    // Cache initial bind-pose transforms for faithful animation deformation
+    if (this.hipsBone) {
+      this.initialHipsPos.copy(this.hipsBone.position);
+      this.initialBoneRotations.set('Hips', this.hipsBone.quaternion.clone());
+    }
+    const trackedBones = [
+      ['Spine', this.spineBone],
+      ['Head', this.headBone],
+      ['LeftArm', this.leftArmBone],
+      ['LeftForeArm', this.leftForeArmBone],
+      ['RightArm', this.rightArmBone],
+      ['RightForeArm', this.rightForeArmBone],
+      ['LeftUpLeg', this.leftLegBone],
+      ['RightUpLeg', this.rightLegBone]
+    ] as const;
 
-    // 3. Left Arm Pivot & Mesh
-    this.leftArmPivot = new THREE.Group();
-    this.leftArmPivot.position.set(-0.75, 0.45, 0);
-    this.torsoMesh.add(this.leftArmPivot);
+    for (const [name, bone] of trackedBones) {
+      if (bone) {
+        this.initialBoneRotations.set(name, bone.quaternion.clone());
+      }
+    }
 
-    const armGeo = new THREE.BoxGeometry(0.45, 1.0, 0.45);
-    this.leftArmMesh = new THREE.Mesh(armGeo, bodyMat);
-    this.leftArmMesh.position.y = -0.45;
-    this.leftArmMesh.castShadow = true;
-    this.leftArmPivot.add(this.leftArmMesh);
+    // Relax arms from T-pose into natural tactical combat stance
+    const qLeftArm = this.initialBoneRotations.get('LeftArm');
+    if (this.leftArmBone && qLeftArm) {
+      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.2, Math.PI * 0.35));
+      this.leftArmBone.quaternion.multiplyQuaternions(qLeftArm, delta);
+    }
+    const qLeftForeArm = this.initialBoneRotations.get('LeftForeArm');
+    if (this.leftForeArmBone && qLeftForeArm) {
+      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.15, Math.PI * 0.15));
+      this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArm, delta);
+    }
+    const qRightArm = this.initialBoneRotations.get('RightArm');
+    if (this.rightArmBone && qRightArm) {
+      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.2, -Math.PI * 0.35));
+      this.rightArmBone.quaternion.multiplyQuaternions(qRightArm, delta);
+    }
+    const qRightForeArm = this.initialBoneRotations.get('RightForeArm');
+    if (this.rightForeArmBone && qRightForeArm) {
+      const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.15, -Math.PI * 0.15));
+      this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArm, delta);
+    }
 
-    // 4. Right Arm Pivot & Mesh
-    this.rightArmPivot = new THREE.Group();
-    this.rightArmPivot.position.set(0.75, 0.45, 0);
-    this.torsoMesh.add(this.rightArmPivot);
+    // Attach weapon socket to right hand prop
+    const handProp = clone.getObjectByName('RightHandProp') || clone.getObjectByName('RightHand');
+    if (handProp) {
+      this.weaponSocket.position.set(0, 0, 0);
+      this.weaponSocket.rotation.set(0, 0, 0);
+      handProp.add(this.weaponSocket);
+    } else {
+      this.weaponSocket.position.set(0.3, 0.9, 0.3);
+      clone.add(this.weaponSocket);
+    }
 
-    this.rightArmMesh = new THREE.Mesh(armGeo, bodyMat);
-    this.rightArmMesh.position.y = -0.45;
-    this.rightArmMesh.castShadow = true;
-    this.rightArmPivot.add(this.rightArmMesh);
+    this.characterMesh = clone;
+    this.root.add(clone);
 
-    // Weapon socket attached to right arm
-    this.weaponSocket = new THREE.Group();
-    this.weaponSocket.position.set(0, -0.45, 0.35);
-    this.rightArmMesh.add(this.weaponSocket);
+    // Apply modular outfit pieces
+    const activeCustom = this.customization || presetToCustomization(this.outfitIndex, this.playerColor);
+    this.applyCustomization(activeCustom);
 
-    // 5. Left Leg Pivot & Mesh
-    this.leftLegPivot = new THREE.Group();
-    this.leftLegPivot.position.set(-0.25, -0.5, 0);
-    this.torsoMesh.add(this.leftLegPivot);
+    // Attach third-person weapon models
+    this.setupWeaponsInSocket();
+    this.setEquippedWeapon(this.currentWeapon);
 
-    const legGeo = new THREE.BoxGeometry(0.45, 1.0, 0.45);
-    this.leftLegMesh = new THREE.Mesh(legGeo, pantsMat);
-    this.leftLegMesh.position.y = -0.45;
-    this.leftLegMesh.castShadow = true;
-    this.leftLegPivot.add(this.leftLegMesh);
-
-    // 6. Right Leg Pivot & Mesh
-    this.rightLegPivot = new THREE.Group();
-    this.rightLegPivot.position.set(0.25, -0.5, 0);
-    this.torsoMesh.add(this.rightLegPivot);
-
-    this.rightLegMesh = new THREE.Mesh(legGeo, pantsMat);
-    this.rightLegMesh.position.y = -0.45;
-    this.rightLegMesh.castShadow = true;
-    this.rightLegPivot.add(this.rightLegMesh);
-
-    // Tag parts for raycast hit detection
-    this.headMesh.userData = { isHead: true, playerId: this.playerId };
-    this.torsoMesh.userData = { isBody: true, playerId: this.playerId };
-    this.leftArmMesh.userData = { isBody: true, playerId: this.playerId };
-    this.rightArmMesh.userData = { isBody: true, playerId: this.playerId };
-    this.leftLegMesh.userData = { isBody: true, playerId: this.playerId };
-    this.rightLegMesh.userData = { isBody: true, playerId: this.playerId };
-
+    // If local player, hide third-person body so it doesn't block camera
     if (this.isLocal) {
-      // Local player body is hidden in first-person view, or visible shadow
-      this.torsoMesh.castShadow = true;
-      // Keep meshes visible in 3rd person or shadow
+      clone.visible = false;
+    }
+  }
+
+  private setupWeaponsInSocket(): void {
+    const types: WeaponType[] = ['rifle', 'shotgun', 'sniper', 'katana'];
+    for (const t of types) {
+      const cached = WeaponManager.cachedWeaponModels.get(t);
+      if (cached) {
+        const wClone = cached.clone(true);
+        wClone.scale.set(0.7, 0.7, 0.7);
+        wClone.position.set(0, -0.05, 0.1);
+        wClone.visible = t === this.currentWeapon;
+        this.weaponSocket.add(wClone);
+        this.equippedWeaponMeshes.set(t, wClone);
+      }
+    }
+  }
+
+  public setEquippedWeapon(weapon: WeaponType): void {
+    this.currentWeapon = weapon;
+    for (const [t, mesh] of this.equippedWeaponMeshes.entries()) {
+      mesh.visible = t === weapon;
     }
   }
 
   private buildNameplate(): void {
-    this.nameCanvas = document.createElement('canvas');
-    this.nameCanvas.width = 256;
-    this.nameCanvas.height = 64;
-
-    this.nameTexture = new THREE.CanvasTexture(this.nameCanvas);
-    this.nameTexture.minFilter = THREE.LinearFilter;
-
-    const spriteMat = new THREE.SpriteMaterial({
-      map: this.nameTexture,
-      transparent: true,
-      depthTest: false
-    });
-
-    const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(2.4, 0.6, 1);
-    sprite.position.y = 2.4;
-
     this.nameplateGroup = new THREE.Group();
+    this.nameplateGroup.position.y = 2.05; // Placed right above character head
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
+
+    // Background pill
+    ctx.fillStyle = 'rgba(15, 20, 32, 0.75)';
+    ctx.roundRect(10, 8, 236, 48, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#00d2ff';
+    ctx.lineWidth = 3;
+    ctx.roundRect(10, 8, 236, 48, 12);
+    ctx.stroke();
+
+    // Name text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.playerName.slice(0, 12), 128, 26);
+
+    // Mini Health Bar
+    ctx.fillStyle = '#ff2a55';
+    ctx.fillRect(28, 42, 200, 6);
+    ctx.fillStyle = '#00ff88';
+    ctx.fillRect(28, 42, 200, 6);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(1.4, 0.35, 1.0);
+
     this.nameplateGroup.add(sprite);
     this.root.add(this.nameplateGroup);
-
-    this.updateNameplate(100);
   }
 
   public updateNameplate(hp: number): void {
-    if (!this.nameCanvas) return;
-    const ctx = this.nameCanvas.getContext('2d');
+    const sprite = this.nameplateGroup?.children[0] as THREE.Sprite;
+    if (!sprite || !sprite.material.map) return;
+
+    const canvas = sprite.material.map.image as HTMLCanvasElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.clearRect(0, 0, 256, 64);
-
-    // Rounded background box
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.beginPath();
-    ctx.roundRect(8, 6, 240, 52, 10);
+    ctx.fillStyle = 'rgba(15, 20, 32, 0.75)';
+    ctx.roundRect(10, 8, 236, 48, 12);
     ctx.fill();
+    ctx.strokeStyle = '#00d2ff';
+    ctx.lineWidth = 3;
+    ctx.roundRect(10, 8, 236, 48, 12);
+    ctx.stroke();
 
-    // Name text
-    ctx.font = 'bold 22px system-ui, sans-serif';
-    ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(this.playerName, 128, 30);
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.playerName.slice(0, 12), 128, 26);
 
-    // Mini Health Bar
-    const barWidth = 190;
-    const barHeight = 8;
-    const barX = 33;
-    const barY = 38;
+    // HP Fill
+    const pct = Math.max(0, Math.min(100, hp)) / 100;
+    ctx.fillStyle = '#331111';
+    ctx.fillRect(28, 42, 200, 6);
+    ctx.fillStyle = pct > 0.4 ? '#00ff88' : '#ff2a55';
+    ctx.fillRect(28, 42, 200 * pct, 6);
 
-    ctx.fillStyle = '#333';
-    ctx.fillRect(barX, barY, barWidth, barHeight);
+    sprite.material.map.needsUpdate = true;
+  }
 
-    const hpPercent = Math.max(0, Math.min(1, hp / 100));
-    ctx.fillStyle = hpPercent > 0.4 ? '#00ff88' : hpPercent > 0.2 ? '#ffbb00' : '#ff2a55';
-    ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
-
-    this.nameTexture.needsUpdate = true;
+  public triggerRecoil(): void {
+    const qRightArm = this.initialBoneRotations.get('RightArm');
+    if (this.rightArmBone && qRightArm) {
+      const recoilQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0, 0));
+      this.rightArmBone.quaternion.multiply(recoilQ);
+    }
   }
 
   public update(
@@ -241,149 +592,154 @@ export class CharacterModel {
   ): void {
     if (this.isDead) return;
 
-    // Pitch adjusts head angle
-    this.headMesh.rotation.x = pitch;
+    const qLeftLegInit = this.initialBoneRotations.get('LeftUpLeg');
+    const qRightLegInit = this.initialBoneRotations.get('RightUpLeg');
+    const qSpineInit = this.initialBoneRotations.get('Spine');
+    const qHeadInit = this.initialBoneRotations.get('Head');
 
-    if (isSliding) {
-      // Sliding pose: lean torso back, legs extended forward, arms balancing
-      this.torsoMesh.rotation.x = -0.45;
-      this.torsoMesh.position.y = 0.55; // lowered center of gravity
-      this.leftLegPivot.rotation.x = -1.1;
-      this.rightLegPivot.rotation.x = -1.1;
-      this.leftArmPivot.rotation.x = 0.6;
-      this.rightArmPivot.rotation.x = -0.8;
-      this.animTime = 0;
+    // Running leg swing animation along local Z axis (preserving glTF bind pose)
+    if (isMoving && !isSliding) {
+      this.animTime += delta * 11;
+      const legAngle = Math.sin(this.animTime) * 0.45;
+
+      if (this.leftLegBone && qLeftLegInit) {
+        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), legAngle);
+        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, deltaQ);
+      }
+      if (this.rightLegBone && qRightLegInit) {
+        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -legAngle);
+        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, deltaQ);
+      }
     } else if (isJumping) {
-      // In-air pose
-      this.torsoMesh.rotation.x = 0;
-      this.torsoMesh.position.y = 1.0;
-      this.leftLegPivot.rotation.x = 0.4;
-      this.rightLegPivot.rotation.x = -0.3;
-      this.leftArmPivot.rotation.x = -0.9;
-      this.rightArmPivot.rotation.x = -0.9;
-    } else if (isMoving) {
-      // Running gait
-      this.animTime += delta * 14;
-      this.torsoMesh.rotation.x = 0.1;
-      this.torsoMesh.position.y = 1.0 + Math.abs(Math.sin(this.animTime)) * 0.1;
-
-      const swing = Math.sin(this.animTime) * 0.7;
-      this.leftArmPivot.rotation.x = swing;
-      this.rightArmPivot.rotation.x = -0.8 + swing * 0.2; // holding weapon forward
-      this.leftLegPivot.rotation.x = -swing;
-      this.rightLegPivot.rotation.x = swing;
+      // Jumping posture
+      if (this.leftLegBone && qLeftLegInit) {
+        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.28);
+        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, deltaQ);
+      }
+      if (this.rightLegBone && qRightLegInit) {
+        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.22);
+        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, deltaQ);
+      }
     } else {
-      // Idle breathing
-      this.animTime += delta * 2;
-      this.torsoMesh.rotation.x = 0;
-      this.torsoMesh.position.y = 1.0 + Math.sin(this.animTime) * 0.02;
-      this.leftLegPivot.rotation.x = 0;
-      this.rightLegPivot.rotation.x = 0;
-      this.leftArmPivot.rotation.x = 0;
-      this.rightArmPivot.rotation.x = -0.8; // ready weapon stance
+      // Idle recovery to rest pose
+      if (this.leftLegBone && qLeftLegInit) {
+        this.leftLegBone.quaternion.slerp(qLeftLegInit, Math.min(1, delta * 12));
+      }
+      if (this.rightLegBone && qRightLegInit) {
+        this.rightLegBone.quaternion.slerp(qRightLegInit, Math.min(1, delta * 12));
+      }
+    }
+
+    // Sliding posture: hips offset relative to initialHipsPos.y
+    if (isSliding) {
+      if (this.hipsBone) {
+        this.hipsBone.position.y = this.initialHipsPos.y - 0.35;
+      }
+      if (this.spineBone && qSpineInit) {
+        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.35);
+        this.spineBone.quaternion.multiplyQuaternions(qSpineInit, deltaQ);
+      }
+    } else {
+      if (this.hipsBone) {
+        this.hipsBone.position.y = this.initialHipsPos.y;
+      }
+      if (this.spineBone && qSpineInit) {
+        this.spineBone.quaternion.slerp(qSpineInit, Math.min(1, delta * 10));
+      }
+    }
+
+    // Head pitch tracking
+    if (this.headBone && qHeadInit) {
+      const clampedPitch = THREE.MathUtils.clamp(-pitch, -0.6, 0.6);
+      const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), clampedPitch);
+      this.headBone.quaternion.multiplyQuaternions(qHeadInit, deltaQ);
     }
   }
 
-  public triggerRecoil(): void {
-    // Right arm kicks back on firing
-    this.rightArmPivot.rotation.x -= 0.25;
-  }
-
   public shatterIntoBricks(): void {
-    if (this.isDead || !CharacterModel.sceneRef) return;
+    if (this.isDead) return;
     this.isDead = true;
 
-    // Hide character model
-    this.root.visible = false;
+    if (this.characterMesh) {
+      this.characterMesh.visible = false;
+    }
+    if (this.nameplateGroup) {
+      this.nameplateGroup.visible = false;
+    }
 
-    // Detach each limb and turn into an explosive physics brick debris
-    const parts = [
-      { mesh: this.headMesh, size: [0.65, 0.65, 0.65], color: '#f5cd90' },
-      { mesh: this.torsoMesh, size: [1.0, 1.0, 0.5], color: this.playerColor },
-      { mesh: this.leftArmMesh, size: [0.45, 1.0, 0.45], color: this.playerColor },
-      { mesh: this.rightArmMesh, size: [0.45, 1.0, 0.45], color: this.playerColor },
-      { mesh: this.leftLegMesh, size: [0.45, 1.0, 0.45], color: '#1a2238' },
-      { mesh: this.rightLegMesh, size: [0.45, 1.0, 0.45], color: '#1a2238' }
-    ];
-
-    const worldPos = new THREE.Vector3();
-    this.root.getWorldPosition(worldPos);
-
-    for (const p of parts) {
-      const geo = new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]);
+    // Spawn celebratory brick debris
+    const colors = [this.playerColor, '#00d2ff', '#ffbb00', '#ffffff', '#222233'];
+    for (let i = 0; i < 12; i++) {
       const mat = new THREE.MeshStandardMaterial({
-        color: p.color,
-        roughness: 0.3,
-        transparent: true,
-        opacity: 1
+        color: colors[i % colors.length],
+        roughness: 0.3
       });
-      const debris = new THREE.Mesh(geo, mat);
-      debris.position.set(
-        worldPos.x + (Math.random() - 0.5) * 0.8,
-        worldPos.y + 0.8 + (Math.random() - 0.5) * 0.6,
-        worldPos.z + (Math.random() - 0.5) * 0.8
-      );
-      debris.castShadow = true;
-      CharacterModel.sceneRef.add(debris);
+      const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+      const brick = new THREE.Mesh(geo, mat);
+
+      brick.position.copy(this.root.position);
+      brick.position.y += 0.5 + Math.random() * 0.8;
+      brick.position.x += (Math.random() - 0.5) * 0.4;
+      brick.position.z += (Math.random() - 0.5) * 0.4;
 
       const angle = Math.random() * Math.PI * 2;
-      const speed = 4 + Math.random() * 6;
+      const speed = 2.5 + Math.random() * 3.5;
 
+      CharacterModel.sceneRef?.add(brick);
       CharacterModel.debrisList.push({
-        mesh: debris,
+        mesh: brick,
         vx: Math.cos(angle) * speed,
-        vy: 5 + Math.random() * 7,
+        vy: 3.5 + Math.random() * 2.5,
         vz: Math.sin(angle) * speed,
-        rx: (Math.random() - 0.5) * 15,
-        ry: (Math.random() - 0.5) * 15,
-        rz: (Math.random() - 0.5) * 15,
-        life: 3.0 // 3 seconds before cleanup
+        rx: (Math.random() - 0.5) * 12,
+        ry: (Math.random() - 0.5) * 12,
+        rz: (Math.random() - 0.5) * 12,
+        life: 2.2
       });
     }
   }
 
   public respawn(x: number, y: number, z: number, yaw: number): void {
     this.isDead = false;
-    this.root.visible = true;
     this.root.position.set(x, y, z);
     this.root.rotation.y = yaw;
-    this.updateNameplate(100);
+
+    if (this.characterMesh && !this.isLocal) {
+      this.characterMesh.visible = true;
+    }
+    if (this.nameplateGroup && !this.isLocal) {
+      this.nameplateGroup.visible = true;
+      this.updateNameplate(100);
+    }
   }
 
   public static updateDebris(delta: number): void {
+    CharacterModel.updateAllDebris(delta);
+  }
+
+  public static updateAllDebris(delta: number): void {
     for (let i = CharacterModel.debrisList.length - 1; i >= 0; i--) {
       const d = CharacterModel.debrisList[i];
-      d.life -= delta;
-
-      // Gravity & velocity
-      d.vy -= 22 * delta;
+      d.vy -= 18 * delta; // Gravity
       d.mesh.position.x += d.vx * delta;
       d.mesh.position.y += d.vy * delta;
       d.mesh.position.z += d.vz * delta;
 
-      // Tumbling rotation
       d.mesh.rotation.x += d.rx * delta;
       d.mesh.rotation.y += d.ry * delta;
       d.mesh.rotation.z += d.rz * delta;
 
-      // Floor bounce
-      if (d.mesh.position.y < 0.25) {
-        d.mesh.position.y = 0.25;
-        d.vy = -d.vy * 0.45;
-        d.vx *= 0.7;
-        d.vz *= 0.7;
+      // Ground bounce
+      if (d.mesh.position.y < 0.1) {
+        d.mesh.position.y = 0.1;
+        d.vy = -d.vy * 0.4;
+        d.vx *= 0.8;
+        d.vz *= 0.8;
       }
 
-      // Fade out near end of life
-      if (d.life < 0.8) {
-        const mat = d.mesh.material as THREE.MeshStandardMaterial;
-        mat.opacity = d.life / 0.8;
-      }
-
+      d.life -= delta;
       if (d.life <= 0) {
-        if (d.mesh.parent) {
-          d.mesh.parent.remove(d.mesh);
-        }
+        CharacterModel.sceneRef?.remove(d.mesh);
         d.mesh.geometry.dispose();
         (d.mesh.material as THREE.Material).dispose();
         CharacterModel.debrisList.splice(i, 1);

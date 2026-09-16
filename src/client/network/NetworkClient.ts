@@ -1,11 +1,16 @@
 import { io, Socket } from 'socket.io-client';
 import * as THREE from 'three';
 import {
+  CharacterCustomization,
   EliminationPayload,
   FireWeaponPayload,
   GameOverPayload,
+  GameMode,
   HitNotificationPayload,
+  OpenRoomSummary,
   PlayerInputPayload,
+  PowerupActivatedPayload,
+  PowerupType,
   RemoteFirePayload,
   RoomNetworkState,
   WorldSnapshot
@@ -45,7 +50,11 @@ export class NetworkClient {
   public onGameStart?: () => void;
   public onPlayerEliminated?: (payload: EliminationPayload) => void;
   public onGameOver?: (payload: GameOverPayload) => void;
-  public onLocalPlayerDamaged?: (hp: number, maxHp: number) => void;
+  public onLocalPlayerDamaged?: (hp: number, maxHp: number, shieldHp?: number) => void;
+  public onPowerupActivated?: (payload: PowerupActivatedPayload) => void;
+  public onOpenRoomsList?: (rooms: OpenRoomSummary[]) => void;
+  public onWaveCleared?: (payload: { waveNumber: number; nextWaveInSec: number; totalWaves: number }) => void;
+  public onWaveStart?: (payload: { waveNumber: number; totalBots: number }) => void;
 
   constructor(
     scene: THREE.Scene,
@@ -121,7 +130,7 @@ export class NetworkClient {
 
       if (data.targetId === this.myId) {
         // Local player took damage
-        this.onLocalPlayerDamaged?.(data.targetRemainingHp, 100);
+        this.onLocalPlayerDamaged?.(data.targetRemainingHp, 100, data.targetRemainingShield);
       } else {
         // Update remote player nameplate health bar
         const target = this.remotePlayers.get(data.targetId);
@@ -145,23 +154,55 @@ export class NetworkClient {
       this.onPlayerEliminated?.(payload);
     });
 
+    this.socket.on('powerup_activated', (payload: PowerupActivatedPayload) => {
+      this.onPowerupActivated?.(payload);
+    });
+
+    const handleRoomsList = (rooms: OpenRoomSummary[]) => {
+      this.onOpenRoomsList?.(rooms);
+    };
+    this.socket.on('open_rooms_update', handleRoomsList);
+    this.socket.on('wave_cleared', (payload: any) => {
+      this.onWaveCleared?.(payload);
+    });
+
+    this.socket.on('wave_start', (payload: any) => {
+      this.onWaveStart?.(payload);
+    });
+
     this.socket.on('game_over', (payload: GameOverPayload) => {
       this.isInGame = false;
       this.onGameOver?.(payload);
     });
   }
 
+  public leaveRoom(): void {
+    this.socket.emit('leave_room');
+    this.isInGame = false;
+    this.currentRoomState = null;
+    for (const remote of this.remotePlayers.values()) {
+      remote.model.dispose();
+    }
+    this.remotePlayers.clear();
+  }
+
+  public activatePowerup(powerup: PowerupType, targetPoint?: [number, number, number]): void {
+    this.socket.emit('activate_powerup', { powerup, targetPoint });
+  }
+
   public createRoom(
     playerName: string,
-    mode: '1v1' | 'ffa',
+    mode: GameMode = '1v1',
     fragLimit: number = 5,
-    mapName: string = 'Arena Classic'
+    mapName: string = 'Arena Classic',
+    outfitIndex: number = 0,
+    customization?: CharacterCustomization
   ): Promise<{ success: boolean; roomId?: string; error?: string }> {
     this.myName = playerName;
     return new Promise((resolve) => {
       this.socket.emit(
         'create_room',
-        { playerName, mode, fragLimit, mapName },
+        { playerName, mode, fragLimit, mapName, outfitIndex, customization },
         (response: any) => {
           if (response?.success) {
             this.currentRoomState = response.roomState;
@@ -177,17 +218,23 @@ export class NetworkClient {
 
   public joinRoom(
     roomId: string,
-    playerName: string
+    playerName: string,
+    outfitIndex: number = 0,
+    customization?: CharacterCustomization
   ): Promise<{ success: boolean; roomId?: string; error?: string }> {
     this.myName = playerName;
     return new Promise((resolve) => {
       this.socket.emit(
         'join_room',
-        { roomId: roomId.trim().toUpperCase(), playerName },
+        { roomId: roomId.trim().toUpperCase(), playerName, outfitIndex, customization },
         (response: any) => {
           if (response?.success) {
             this.currentRoomState = response.roomState;
             this.myId = response.playerId || this.socket.id || '';
+            if (this.currentRoomState?.status === 'playing') {
+              this.isInGame = true;
+            }
+            this.syncRemotePlayerModels(response.roomState);
             resolve({ success: true, roomId: response.roomId });
           } else {
             resolve({ success: false, error: response?.error || 'Join room failed' });
@@ -228,13 +275,22 @@ export class NetworkClient {
     for (const [id, pState] of Object.entries(state.players)) {
       if (id === this.myId) continue; // Skip local player model
       if (!this.remotePlayers.has(id)) {
+        let outfitIndex = 0;
+        if (pState.isBot && pState.botRole) {
+          outfitIndex = pState.botRole === 'heavy' || pState.botRole === 'boss' ? 1 : pState.botRole === 'rusher' ? 2 : pState.botRole === 'sniper' ? 3 : 0;
+        }
         const model = new CharacterModel(
           this.scene,
           id,
           pState.name,
           pState.color,
-          false
+          false,
+          pState.outfitIndex ?? outfitIndex,
+          pState.customization
         );
+        if (pState.botRole === 'boss') {
+          model.root.scale.setScalar(1.35);
+        }
         model.root.position.set(pState.x, pState.y, pState.z);
         model.root.rotation.y = pState.yaw;
 
@@ -270,6 +326,11 @@ export class NetworkClient {
         } else if (!remote.isDead && data.isDead) {
           remote.isDead = true;
           remote.model.shatterIntoBricks();
+        }
+
+        // Sync equipped weapon on remote avatar
+        if (data.currentWeapon && remote.model.currentWeapon !== data.currentWeapon) {
+          remote.model.setEquippedWeapon(data.currentWeapon);
         }
       }
     }

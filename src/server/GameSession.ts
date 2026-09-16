@@ -1,19 +1,27 @@
 import { Server } from 'socket.io';
 import {
+  ActivatePowerupPayload,
+  CharacterCustomization,
   EliminationPayload,
   FireWeaponPayload,
   HitNotificationPayload,
   PlayerInputPayload,
   PlayerNetworkState,
+  PowerupActivatedPayload,
   RoomNetworkState,
+  TeamColor,
   WeaponType,
   WorldSnapshot
 } from '../shared/types.js';
 import {
-  MAP_SPAWNS,
   NETWORK,
-  WEAPONS
+  POWERUPS,
+  TEAM_COLORS,
+  WEAPONS,
+  getMapSpawns,
+  getTeamSpawn
 } from '../shared/constants.js';
+import { WaveManager } from './ai/WaveManager.js';
 
 export class GameSession {
   private io: Server;
@@ -21,24 +29,48 @@ export class GameSession {
   private intervalId: NodeJS.Timeout | null = null;
   private countdownTimer: NodeJS.Timeout | null = null;
   private lastFireTimes: Map<string, number> = new Map();
+  private onStateChange?: () => void;
+  public waveManager: WaveManager | null = null;
 
-  constructor(io: Server, roomState: RoomNetworkState) {
+  constructor(io: Server, roomState: RoomNetworkState, onStateChange?: () => void) {
     this.io = io;
     this.roomState = roomState;
+    this.onStateChange = onStateChange;
   }
 
   public get roomId(): string {
     return this.roomState.roomId;
   }
 
-  public addPlayer(id: string, name: string, color: string, isHost: boolean): PlayerNetworkState {
-    const spawnIndex = Object.keys(this.roomState.players).length % MAP_SPAWNS.length;
-    const spawn = MAP_SPAWNS[spawnIndex];
+  public addPlayer(
+    id: string,
+    name: string,
+    color: string,
+    isHost: boolean,
+    team: TeamColor = 'none',
+    outfitIndex: number = 0,
+    customization?: CharacterCustomization
+  ): PlayerNetworkState {
+    const is4v4 = this.roomState.mode === '4v4';
+    const isWave = this.roomState.mode === 'wave';
+    let spawn: { x: number; y: number; z: number; yaw: number };
+
+    if ((is4v4 || isWave) && (team === 'blue' || team === 'red')) {
+      const teamPlayers = Object.values(this.roomState.players).filter(p => !p.isBot && p.team === team);
+      spawn = getTeamSpawn(team, teamPlayers.length);
+    } else {
+      const spawns = getMapSpawns(this.roomState.mapName);
+      const spawnIndex = Object.keys(this.roomState.players).length % spawns.length;
+      spawn = spawns[spawnIndex];
+    }
+
+    const assignedColor = (is4v4 || isWave) ? TEAM_COLORS[team] : color;
 
     const player: PlayerNetworkState = {
       id,
       name,
-      color,
+      color: assignedColor,
+      team,
       isHost,
       x: spawn.x,
       y: spawn.y,
@@ -50,6 +82,9 @@ export class GameSession {
       pitch: 0,
       health: 100,
       maxHealth: 100,
+      shieldHp: 0,
+      activePowerup: null,
+      powerupExpiresAt: 0,
       currentWeapon: 'rifle',
       currentWeaponIndex: 0,
       isSliding: false,
@@ -57,7 +92,9 @@ export class GameSession {
       isDead: false,
       score: 0,
       kills: 0,
-      deaths: 0
+      deaths: 0,
+      outfitIndex,
+      customization
     };
 
     this.roomState.players[id] = player;
@@ -101,11 +138,26 @@ export class GameSession {
 
   public startGame(): void {
     this.roomState.status = 'playing';
-    
-    // Reset players for new match
+    if (this.onStateChange) this.onStateChange();
+
+    const is4v4 = this.roomState.mode === '4v4';
+    const isWave = this.roomState.mode === 'wave';
+    if (is4v4) {
+      this.roomState.teamScores = { blue: 0, red: 0 };
+    }
+
+    const spawns = getMapSpawns(this.roomState.mapName);
     let index = 0;
+    let blueIdx = 0;
+    let redIdx = 0;
     for (const p of Object.values(this.roomState.players)) {
-      const spawn = MAP_SPAWNS[index % MAP_SPAWNS.length];
+      if (p.isBot) continue;
+      let spawn: { x: number; y: number; z: number; yaw: number };
+      if ((is4v4 || isWave) && (p.team === 'blue' || p.team === 'red')) {
+        spawn = p.team === 'blue' ? getTeamSpawn('blue', blueIdx++) : getTeamSpawn('red', redIdx++);
+      } else {
+        spawn = spawns[index % spawns.length];
+      }
       p.x = spawn.x;
       p.y = spawn.y;
       p.z = spawn.z;
@@ -115,11 +167,26 @@ export class GameSession {
       p.yaw = spawn.yaw;
       p.pitch = 0;
       p.health = 100;
+      p.shieldHp = 0;
+      p.activePowerup = null;
+      p.powerupExpiresAt = 0;
       p.isDead = false;
       p.score = 0;
       p.kills = 0;
       p.deaths = 0;
       index++;
+    }
+
+    // Start WaveManager if wave mode
+    if (isWave) {
+      this.waveManager = new WaveManager(
+        this.io,
+        this.roomState,
+        this.roomState.mapName,
+        (winner, winningTeam) => this.endGame(winner, winningTeam),
+        this.onStateChange
+      );
+      this.waveManager.start();
     }
 
     this.broadcastRoomState();
@@ -129,6 +196,84 @@ export class GameSession {
     this.intervalId = setInterval(() => {
       this.tick();
     }, NETWORK.TICK_INTERVAL_MS);
+  }
+
+  public handleActivatePowerup(playerId: string, payload: ActivatePowerupPayload): void {
+    const player = this.roomState.players[playerId];
+    if (!player || player.isDead || this.roomState.status !== 'playing') return;
+
+    const def = POWERUPS[payload.powerup];
+    if (!def) return;
+
+    player.activePowerup = payload.powerup;
+    player.powerupExpiresAt = Date.now() + def.durationSec * 1000;
+
+    if (payload.powerup === 'shield') {
+      player.shieldHp = 50;
+    }
+
+    const broadcastPayload: PowerupActivatedPayload = {
+      playerId,
+      powerup: payload.powerup,
+      durationSec: def.durationSec,
+      targetPoint: payload.targetPoint
+    };
+
+    this.io.to(this.roomId).emit('powerup_activated', broadcastPayload);
+
+    // If airstrike, detonate after 1.5s delay
+    if (payload.powerup === 'airstrike' && payload.targetPoint) {
+      setTimeout(() => {
+        if (this.roomState.status !== 'playing') return;
+        this.resolveKineticStrike(player, payload.targetPoint!);
+      }, 1500);
+    }
+  }
+
+  private resolveKineticStrike(caller: PlayerNetworkState, targetPoint: [number, number, number]): void {
+    const [tx, , tz] = targetPoint;
+    const blastRadius = 8.5;
+    const blastDamage = 80;
+
+    this.io.to(this.roomId).emit('kinetic_strike_exploded', {
+      origin: targetPoint,
+      damage: blastDamage,
+      radius: blastRadius
+    });
+
+    for (const target of Object.values(this.roomState.players)) {
+      if (target.isDead) continue;
+      // Friendly fire check
+      if (this.roomState.mode === '4v4' && caller.team !== 'none' && caller.team === target.team) {
+        continue;
+      }
+
+      const dist = Math.hypot(target.x - tx, target.z - tz);
+      if (dist <= blastRadius) {
+        let dmg = Math.round(blastDamage * (1 - dist / (blastRadius * 1.3)));
+        if (target.shieldHp > 0) {
+          const absorbed = Math.min(target.shieldHp, dmg);
+          target.shieldHp -= absorbed;
+          dmg -= absorbed;
+        }
+        target.health = Math.max(0, target.health - dmg);
+
+        const hitNotification: HitNotificationPayload = {
+          attackerId: caller.id,
+          targetId: target.id,
+          damage: dmg,
+          isHeadshot: false,
+          hitPoint: [target.x, target.y + 1, target.z],
+          targetRemainingHp: target.health,
+          targetRemainingShield: target.shieldHp
+        };
+        this.io.to(this.roomId).emit('player_hit', hitNotification);
+
+        if (target.health <= 0 && !target.isDead) {
+          this.handlePlayerElimination(caller, target, 'rifle', false);
+        }
+      }
+    }
   }
 
   public handlePlayerInput(playerId: string, input: PlayerInputPayload): void {
@@ -192,12 +337,34 @@ export class GameSession {
     const target = this.roomState.players[payload.targetPlayerId!];
     if (!target || target.isDead) return;
 
+    // Friendly fire check in 4v4 and wave mode
+    if ((this.roomState.mode === '4v4' || this.roomState.mode === 'wave') && shooter.team !== 'none' && shooter.team === target.team) {
+      return;
+    }
+
     const stats = WEAPONS[payload.weaponType];
     const isHeadshot = Boolean(payload.isHeadshot);
     let damage = stats.damage;
 
     if (isHeadshot) {
       damage = Math.round(damage * stats.headshotMultiplier);
+    }
+
+    // Quad damage powerup multiplier
+    if (shooter.activePowerup === 'quad_damage' && Date.now() < (shooter.powerupExpiresAt || 0)) {
+      damage = Math.round(damage * 2);
+    }
+
+    // Phase shift damage resistance (50% reduction)
+    if (target.activePowerup === 'phase_shift' && Date.now() < (target.powerupExpiresAt || 0)) {
+      damage = Math.round(damage * 0.5);
+    }
+
+    // Overshield absorption
+    if (target.shieldHp > 0) {
+      const absorbed = Math.min(target.shieldHp, damage);
+      target.shieldHp -= absorbed;
+      damage -= absorbed;
     }
 
     target.health = Math.max(0, target.health - damage);
@@ -208,7 +375,8 @@ export class GameSession {
       damage,
       isHeadshot,
       hitPoint: payload.hitPoint || [target.x, target.y + 1, target.z],
-      targetRemainingHp: target.health
+      targetRemainingHp: target.health,
+      targetRemainingShield: target.shieldHp
     };
 
     this.io.to(this.roomId).emit('player_hit', hitNotification);
@@ -241,10 +409,27 @@ export class GameSession {
 
     this.io.to(this.roomId).emit('player_eliminated', payload);
 
-    // Check for match end condition
-    if (killer.score >= this.roomState.fragLimit) {
-      this.endGame(killer);
+    // Wave Mode elimination handling
+    if (this.roomState.mode === 'wave') {
+      if (victim.isBot && this.waveManager) {
+        this.waveManager.onBotEliminated(victim.id, killer);
+      }
       return;
+    }
+
+    // 4v4 Team Scoring check
+    if (this.roomState.mode === '4v4' && this.roomState.teamScores && killer.team !== 'none') {
+      this.roomState.teamScores[killer.team]++;
+      if (this.roomState.teamScores[killer.team] >= this.roomState.fragLimit) {
+        this.endGame(killer, killer.team);
+        return;
+      }
+    } else {
+      // 1v1 / FFA match end condition
+      if (killer.score >= this.roomState.fragLimit) {
+        this.endGame(killer);
+        return;
+      }
     }
 
     // Schedule respawn for victim
@@ -256,24 +441,42 @@ export class GameSession {
   }
 
   private respawnPlayer(player: PlayerNetworkState): void {
-    const randomSpawn = MAP_SPAWNS[Math.floor(Math.random() * MAP_SPAWNS.length)];
-    player.x = randomSpawn.x;
-    player.y = randomSpawn.y;
-    player.z = randomSpawn.z;
+    let spawn: { x: number; y: number; z: number; yaw: number };
+    if (this.roomState.mode === '4v4' && (player.team === 'blue' || player.team === 'red')) {
+      const idx = Math.floor(Math.random() * 4);
+      spawn = getTeamSpawn(player.team, idx);
+    } else {
+      const spawns = getMapSpawns(this.roomState.mapName);
+      spawn = spawns[Math.floor(Math.random() * spawns.length)];
+    }
+
+    player.x = spawn.x;
+    player.y = spawn.y;
+    player.z = spawn.z;
     player.vx = 0;
     player.vy = 0;
     player.vz = 0;
-    player.yaw = randomSpawn.yaw;
+    player.yaw = spawn.yaw;
     player.health = 100;
+    player.shieldHp = 0;
+    player.activePowerup = null;
+    player.powerupExpiresAt = 0;
     player.isDead = false;
 
     this.broadcastRoomState();
   }
 
-  private endGame(winner: PlayerNetworkState): void {
+  private endGame(winner: PlayerNetworkState, winningTeam?: TeamColor): void {
     this.roomState.status = 'game_over';
     this.roomState.winnerName = winner.name;
     this.roomState.winnerScore = winner.score;
+    this.roomState.winningTeam = winningTeam;
+
+    if (this.waveManager) {
+      this.waveManager.dispose();
+    }
+
+    if (this.onStateChange) this.onStateChange();
 
     if (this.intervalId) {
       clearInterval(this.intervalId);
@@ -291,7 +494,8 @@ export class GameSession {
     this.io.to(this.roomId).emit('game_over', {
       winnerId: winner.id,
       winnerName: winner.name,
-      scores
+      scores,
+      winningTeam
     });
 
     this.broadcastRoomState();
@@ -299,6 +503,10 @@ export class GameSession {
 
   private tick(): void {
     if (this.roomState.status !== 'playing') return;
+
+    if (this.waveManager) {
+      this.waveManager.tick(1 / NETWORK.SERVER_TICK_RATE);
+    }
 
     const snapshot: WorldSnapshot = {
       timestamp: Date.now(),
@@ -318,6 +526,9 @@ export class GameSession {
         isSliding: p.isSliding,
         isJumping: p.isJumping,
         health: p.health,
+        shieldHp: p.shieldHp,
+        activePowerup: p.activePowerup,
+        team: p.team,
         isDead: p.isDead,
         currentWeapon: p.currentWeapon
       };
@@ -333,5 +544,6 @@ export class GameSession {
   public stop(): void {
     if (this.intervalId) clearInterval(this.intervalId);
     if (this.countdownTimer) clearInterval(this.countdownTimer);
+    if (this.waveManager) this.waveManager.dispose();
   }
 }

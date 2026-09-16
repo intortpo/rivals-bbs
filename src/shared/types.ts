@@ -1,4 +1,38 @@
-export type GameMode = '1v1' | 'ffa';
+export type GameMode = '1v1' | '4v4' | 'ffa' | 'wave';
+
+export type TeamColor = 'blue' | 'red' | 'none';
+
+export type BotRole = 'scout' | 'rusher' | 'heavy' | 'sniper' | 'boss';
+
+export type PowerupType =
+  | 'shield'      // +50 Temporary Overshield
+  | 'speed'       // +40% Speed & Slide boost (10s)
+  | 'quad_damage' // 2x Weapon damage (8s)
+  | 'rapid_mag'   // Instant mag refill + 0s reload (12s)
+  | 'radar'       // Tactical radar highlighting enemies through walls (10s)
+  | 'phase_shift' // 80% cloak transparency & 50% damage reduction (5s)
+  | 'airstrike';  // Orbital kinetic strike blast at crosshair (3s delay)
+
+export interface PowerupDefinition {
+  id: PowerupType;
+  name: string;
+  tier: 1 | 2 | 3;
+  requiredStreak: number;
+  durationSec: number;
+  icon: string;
+  description: string;
+}
+
+export interface OpenRoomSummary {
+  roomId: string;
+  mode: GameMode;
+  mapName: string;
+  fragLimit: number;
+  playerCount: number;
+  maxPlayers: number;
+  hostName: string;
+  status: RoomStatus;
+}
 
 export type WeaponType = 'rifle' | 'shotgun' | 'sniper' | 'katana';
 
@@ -33,10 +67,25 @@ export interface PlayerInputPayload {
   timestamp: number;
 }
 
+export interface CharacterCustomization {
+  face: string;
+  hair: string;
+  headwear: string;
+  eyewear: string;
+  accessories: string[];
+  top: string;
+  bottom: string;
+  shoes: string;
+  socks: boolean;
+  gloves: string;
+  accentColor: string;
+}
+
 export interface PlayerNetworkState {
   id: string;
   name: string;
   color: string;
+  team: TeamColor;
   isHost: boolean;
   x: number;
   y: number;
@@ -48,6 +97,9 @@ export interface PlayerNetworkState {
   pitch: number;
   health: number;
   maxHealth: number;
+  shieldHp: number; // 0 to 50
+  activePowerup?: PowerupType | null;
+  powerupExpiresAt?: number;
   currentWeapon: WeaponType;
   currentWeaponIndex: number;
   isSliding: boolean;
@@ -57,6 +109,19 @@ export interface PlayerNetworkState {
   kills: number;
   deaths: number;
   respawnTimer?: number;
+  isBot?: boolean;
+  botRole?: BotRole;
+  outfitIndex?: number;
+  customization?: CharacterCustomization;
+}
+
+export interface WaveNetworkState {
+  currentWave: number;
+  maxWaves: number; // 5, 10, or 0 (endless)
+  status: 'preparing' | 'active' | 'cleared' | 'game_over';
+  totalBotsInWave: number;
+  aliveBotsCount: number;
+  intermissionRemaining: number;
 }
 
 export type RoomStatus = 'lobby' | 'countdown' | 'playing' | 'game_over';
@@ -70,8 +135,11 @@ export interface RoomNetworkState {
   status: RoomStatus;
   countdown: number;
   players: Record<string, PlayerNetworkState>;
+  teamScores?: { blue: number; red: number };
+  waveState?: WaveNetworkState;
   winnerName?: string;
   winnerScore?: number;
+  winningTeam?: TeamColor;
 }
 
 export interface WorldSnapshot {
@@ -88,6 +156,9 @@ export interface WorldSnapshot {
     isSliding: boolean;
     isJumping: boolean;
     health: number;
+    shieldHp?: number;
+    activePowerup?: PowerupType | null;
+    team?: TeamColor;
     isDead: boolean;
     currentWeapon: WeaponType;
   }>;
@@ -117,6 +188,7 @@ export interface HitNotificationPayload {
   isHeadshot: boolean;
   hitPoint: [number, number, number];
   targetRemainingHp: number;
+  targetRemainingShield?: number;
 }
 
 export interface EliminationPayload {
@@ -133,4 +205,34 @@ export interface GameOverPayload {
   winnerId: string;
   winnerName: string;
   scores: { id: string; name: string; kills: number; deaths: number; score: number }[];
+  winningTeam?: TeamColor;
+}
+
+export interface ActivatePowerupPayload {
+  powerup: PowerupType;
+  targetPoint?: [number, number, number]; // for kinetic strike
+}
+
+export interface PowerupActivatedPayload {
+  playerId: string;
+  powerup: PowerupType;
+  durationSec: number;
+  targetPoint?: [number, number, number];
+}
+
+export interface KineticStrikeExplosionPayload {
+  origin: [number, number, number];
+  damage: number;
+  radius: number;
+}
+
+export interface WaveClearedPayload {
+  waveNumber: number;
+  nextWaveInSec: number;
+  totalWaves: number;
+}
+
+export interface WaveStartPayload {
+  waveNumber: number;
+  totalBots: number;
 }
