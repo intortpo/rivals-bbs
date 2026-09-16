@@ -161,6 +161,10 @@ async function runWaveTest() {
     });
   });
 
+  // Simulate damaged player before wave completion
+  playerState.health = 45;
+  playerState.shieldHp = 0;
+
   console.log('⚔️ Eliminating remaining Wave 1 bots...');
   for (const bId of botIds) {
     const targetBot = session.roomState.players[bId];
@@ -174,6 +178,12 @@ async function runWaveTest() {
     throw new Error(`Unexpected wave clear data: ${JSON.stringify(waveClearedData)}`);
   }
   console.log(`✓ Wave 1 Cleared successfully! Intermission started.`);
+
+  // Verify surviving human was restored to full health + shield bonus
+  if (playerState.health !== 100 || playerState.shieldHp !== 25) {
+    throw new Error(`Health restoration failed! Health: ${playerState.health}, Shield: ${playerState.shieldHp}`);
+  }
+  console.log(`✓ Post-wave health recovery verified: Human player restored to HP=${playerState.health}, Shield=${playerState.shieldHp}`);
 
   // Step 7: Cleanup
   client.disconnect();

@@ -132,7 +132,7 @@ export class WaveManager {
           health: arch.maxHp,
           maxHealth: arch.maxHp,
           shieldHp: arch.shieldHp,
-          activePowerup: arch.role === 'boss' ? 'quad_damage' : null,
+          activePowerup: null,
           powerupExpiresAt: 0,
           currentWeapon: arch.weapon,
           currentWeaponIndex: 0,
@@ -148,7 +148,8 @@ export class WaveManager {
         this.activeBots.set(botId, {
           bot: botPlayer,
           archetype: arch,
-          lastFireTime: Date.now() + Math.random() * 1000,
+          // Give human players a 2.5-4.0s grace period when a wave spawns before bots open fire
+          lastFireTime: Date.now() + 2500 + Math.random() * 1500,
           seed: Math.random() * 100
         });
       }
@@ -280,6 +281,11 @@ export class WaveManager {
       if (inRange && now - active.lastFireTime >= archetype.fireCooldown * 1000) {
         active.lastFireTime = now;
 
+        // Melee check: Blade Rusher must be in close range to swing katana
+        if (archetype.weapon === 'katana' && dist > 2.6) {
+          continue;
+        }
+
         // Emit visual fire event to room
         this.io.to(this.roomState.roomId).emit('player_fired', {
           shooterId: bot.id,
@@ -289,12 +295,39 @@ export class WaveManager {
           hitPoint: [target.x, target.y + 1.2, target.z]
         });
 
-        // Determine hit registration based on accuracy
+        // Determine hit registration based on accuracy with distance falloff
+        const distFalloff = Math.max(0.35, 1 - (dist / 35));
+        const effectiveAccuracy = archetype.accuracy * distFalloff;
         const hitRoll = Math.random();
-        if (hitRoll < archetype.accuracy) {
-          const isHeadshot = Math.random() < 0.12;
-          let damage = weaponStats.damage;
-          if (isHeadshot) damage = Math.round(damage * weaponStats.headshotMultiplier);
+
+        if (hitRoll < effectiveAccuracy) {
+          // Reduced bot headshot chance (5% instead of 12%) to eliminate random 1-shots
+          const isHeadshot = Math.random() < 0.05;
+
+          // Controlled, fair bot damage per archetype
+          let damage: number;
+          switch (archetype.role) {
+            case 'rusher':
+              damage = 30; // Down from 75 (gives player time to react and escape)
+              break;
+            case 'sniper':
+              damage = 40; // Down from 95 (no instant wipe across map)
+              break;
+            case 'heavy':
+              damage = 22; // Down from 26+
+              break;
+            case 'boss':
+              damage = 24; // Standard rifle damage (no quad damage)
+              break;
+            case 'scout':
+            default:
+              damage = 18; // Down from 24
+              break;
+          }
+
+          if (isHeadshot) {
+            damage = Math.round(damage * 1.35); // Capped multiplier (1.35x instead of 2.0x)
+          }
 
           this.applyDamageToPlayer(target, bot, damage, isHeadshot, archetype.weapon);
         }
@@ -393,10 +426,11 @@ export class WaveManager {
       return;
     }
 
-    // Reward all living human players with ammo bonus and shield boost
+    // Reward all living human players with full health recovery and shield boost
     for (const p of Object.values(this.roomState.players)) {
       if (!p.isBot) {
-        // Boost shield
+        // Full health recovery + bonus shield for completing the wave
+        p.health = 100;
         p.shieldHp = Math.min(50, p.shieldHp + 25);
 
         // Revive dead teammates for next wave

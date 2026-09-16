@@ -233,13 +233,13 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     role: 'scout',
     namePrefix: '🤖 Cyber Scout',
     weapon: 'rifle',
-    maxHp: 75,
+    maxHp: 60,
     shieldHp: 0,
-    speed: 4.8,
+    speed: 4.0,
     preferredRange: 14,
-    fireCooldown: 1.4,
-    burstCount: 3,
-    accuracy: 0.35,
+    fireCooldown: 2.0,
+    burstCount: 2,
+    accuracy: 0.22,
     outfitIndex: 0,
     color: '#ff4466'
   },
@@ -247,13 +247,13 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     role: 'rusher',
     namePrefix: '⚡ Blade Rusher',
     weapon: 'katana',
-    maxHp: 90,
+    maxHp: 65,
     shieldHp: 0,
-    speed: 6.8,
-    preferredRange: 1.8,
-    fireCooldown: 0.9,
+    speed: 4.5,
+    preferredRange: 2.0,
+    fireCooldown: 1.8,
     burstCount: 1,
-    accuracy: 0.9,
+    accuracy: 0.5,
     outfitIndex: 2,
     color: '#ffaa00'
   },
@@ -261,13 +261,13 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     role: 'heavy',
     namePrefix: '🛡️ Enforcer Heavy',
     weapon: 'shotgun',
-    maxHp: 130,
-    shieldHp: 40,
-    speed: 3.6,
+    maxHp: 85,
+    shieldHp: 20,
+    speed: 2.8,
     preferredRange: 6.0,
-    fireCooldown: 1.5,
+    fireCooldown: 2.5,
     burstCount: 1,
-    accuracy: 0.55,
+    accuracy: 0.3,
     outfitIndex: 1,
     color: '#a855f7'
   },
@@ -275,13 +275,13 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     role: 'sniper',
     namePrefix: '🎯 Ghost Sniper',
     weapon: 'sniper',
-    maxHp: 80,
+    maxHp: 50,
     shieldHp: 0,
-    speed: 4.0,
-    preferredRange: 26,
-    fireCooldown: 2.8,
+    speed: 3.0,
+    preferredRange: 24,
+    fireCooldown: 3.8,
     burstCount: 1,
-    accuracy: 0.75,
+    accuracy: 0.35,
     outfitIndex: 3,
     color: '#00ffff'
   },
@@ -289,13 +289,13 @@ export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
     role: 'boss',
     namePrefix: '💀 TITAN BOSS',
     weapon: 'rifle',
-    maxHp: 380,
-    shieldHp: 100,
-    speed: 4.5,
-    preferredRange: 10,
-    fireCooldown: 1.0,
-    burstCount: 4,
-    accuracy: 0.6,
+    maxHp: 200,
+    shieldHp: 50,
+    speed: 3.8,
+    preferredRange: 11,
+    fireCooldown: 2.0,
+    burstCount: 3,
+    accuracy: 0.35,
     outfitIndex: 1,
     color: '#ff0033'
   }
@@ -320,7 +320,7 @@ export function getWaveConfig(waveNum: number): WaveDefinition {
       waveNumber: 2,
       bots: [
         { role: 'scout', count: 3 },
-        { role: 'rusher', count: 2 }
+        { role: 'rusher', count: 1 }
       ]
     };
   }
@@ -328,9 +328,9 @@ export function getWaveConfig(waveNum: number): WaveDefinition {
     return {
       waveNumber: 3,
       bots: [
-        { role: 'scout', count: 3 },
-        { role: 'rusher', count: 2 },
-        { role: 'heavy', count: 2 }
+        { role: 'scout', count: 2 },
+        { role: 'rusher', count: 1 },
+        { role: 'heavy', count: 1 }
       ]
     };
   }
@@ -338,10 +338,10 @@ export function getWaveConfig(waveNum: number): WaveDefinition {
     return {
       waveNumber: 4,
       bots: [
-        { role: 'scout', count: 3 },
-        { role: 'rusher', count: 3 },
-        { role: 'heavy', count: 2 },
-        { role: 'sniper', count: 2 }
+        { role: 'scout', count: 2 },
+        { role: 'rusher', count: 1 },
+        { role: 'heavy', count: 1 },
+        { role: 'sniper', count: 1 }
       ]
     };
   }
@@ -350,22 +350,22 @@ export function getWaveConfig(waveNum: number): WaveDefinition {
       waveNumber: 5,
       bots: [
         { role: 'boss', count: 1 },
-        { role: 'scout', count: 3 },
-        { role: 'heavy', count: 2 }
+        { role: 'scout', count: 2 },
+        { role: 'heavy', count: 1 }
       ]
     };
   }
-  // Wave 6+: dynamically scaled
-  const baseCount = 6 + (waveNum - 5) * 2;
+  // Wave 6+: smoothly scaled
+  const baseCount = 5 + (waveNum - 5);
   const isBossWave = waveNum % 5 === 0;
   return {
     waveNumber: waveNum,
     bots: [
       ...(isBossWave ? [{ role: 'boss' as const, count: 1 }] : []),
-      { role: 'scout' as const, count: Math.ceil(baseCount * 0.4) },
-      { role: 'rusher' as const, count: Math.ceil(baseCount * 0.25) },
-      { role: 'heavy' as const, count: Math.ceil(baseCount * 0.2) },
-      { role: 'sniper' as const, count: Math.ceil(baseCount * 0.15) }
+      { role: 'scout' as const, count: Math.max(2, Math.floor(baseCount * 0.4)) },
+      { role: 'rusher' as const, count: Math.max(1, Math.floor(baseCount * 0.2)) },
+      { role: 'heavy' as const, count: Math.max(1, Math.floor(baseCount * 0.2)) },
+      { role: 'sniper' as const, count: Math.max(1, Math.floor(baseCount * 0.15)) }
     ]
   };
 }
