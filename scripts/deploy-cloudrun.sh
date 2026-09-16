@@ -8,7 +8,7 @@ set -euo pipefail
 
 PROJECT_ID="${1:-$(gcloud config get-value project 2>/dev/null || echo "foxlight-489607")}"
 REGION="${2:-asia-southeast1}"
-SERVICE_NAME="airsoft-bbs"
+SERVICE_NAME="${3:-rivals-bbs}"
 
 echo "=============================================="
 echo "🚀 Deploying Airsoft BBS to Google Cloud Run"

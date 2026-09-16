@@ -1,6 +1,7 @@
 .gcloudignore
-.git/
-node_modules/
-dist/
-.DS_Store
+.git
+.gitignore
+node_modules
+dist
 *.log
+.DS_Store
