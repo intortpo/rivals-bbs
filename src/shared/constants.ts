@@ -57,10 +57,89 @@ export const WEAPONS: Record<WeaponType, WeaponStats> = {
     range: 4.0,
     adsZoomFov: 70,
     icon: '⚔️'
+  },
+  needle_carbine: {
+    type: 'needle_carbine',
+    name: 'Crystalline Needler',
+    damage: 18,
+    headshotMultiplier: 1.5,
+    fireRate: 0.12, // ~500 RPM
+    magazineSize: 28,
+    reloadTime: 1.7,
+    automatic: true,
+    spread: 0.02,
+    range: 90,
+    adsZoomFov: 52,
+    icon: '💎',
+    ricochetCount: 2,
+    supercombineCount: 5,
+    supercombineDamage: 35
+  },
+  plasma_launcher: {
+    type: 'plasma_launcher',
+    name: 'Quantum Plasma Launcher',
+    damage: 70,
+    headshotMultiplier: 1.25,
+    fireRate: 0.65,
+    magazineSize: 8,
+    reloadTime: 2.2,
+    automatic: false,
+    spread: 0.015,
+    range: 110,
+    adsZoomFov: 55,
+    icon: '🔮',
+    splashRadius: 4.5,
+    splashDamage: 40,
+    projectileSpeed: 36
+  },
+  railgun: {
+    type: 'railgun',
+    name: 'Hyper-Velocity Railgun',
+    damage: 110,
+    headshotMultiplier: 2.0, // 220 critical headshot
+    fireRate: 1.35,
+    magazineSize: 4,
+    reloadTime: 2.6,
+    automatic: false,
+    spread: 0.0005,
+    range: 220,
+    adsZoomFov: 22,
+    icon: '⚡',
+    chargeTime: 0.45,
+    piercing: true
+  },
+  arc_disruptor: {
+    type: 'arc_disruptor',
+    name: 'Tesla Arc Disruptor',
+    damage: 16,
+    headshotMultiplier: 1.0,
+    fireRate: 0.10, // continuous channel 600 ticks/min
+    magazineSize: 40,
+    reloadTime: 1.6,
+    automatic: true,
+    spread: 0.04,
+    range: 16,
+    adsZoomFov: 65,
+    icon: '🔌',
+    shieldMultiplier: 1.75
   }
 };
 
-export const WEAPON_ORDER: WeaponType[] = ['rifle', 'shotgun', 'sniper', 'katana'];
+export const WEAPON_CATEGORIES = {
+  tactical: ['rifle', 'shotgun', 'sniper', 'katana'] as WeaponType[],
+  experimental: ['needle_carbine', 'plasma_launcher', 'railgun', 'arc_disruptor'] as WeaponType[]
+};
+
+export const WEAPON_ORDER: WeaponType[] = [
+  'rifle',
+  'shotgun',
+  'sniper',
+  'katana',
+  'needle_carbine',
+  'plasma_launcher',
+  'railgun',
+  'arc_disruptor'
+];
 
 export const MOVEMENT = {
   WALK_SPEED: 12.0,
@@ -105,11 +184,70 @@ export const CITY_SPAWNS = [
   { x: 0, y: 16.5, z: 22, yaw: Math.PI } // Rooftop Sniper Nest
 ];
 
+export const CYBER_SPIRE_SPAWNS = [
+  { x: 0, y: 1.0, z: -4, yaw: 0 },
+  { x: 0, y: 1.0, z: 4, yaw: Math.PI },
+  { x: 0, y: 4.0, z: -22, yaw: 0 }, // North Tower
+  { x: 0, y: 4.0, z: 22, yaw: Math.PI }, // South Tower
+  { x: -22, y: 3.0, z: 0, yaw: Math.PI / 2 }, // West Helipad
+  { x: 22, y: 3.0, z: 0, yaw: -Math.PI / 2 }, // East Deck
+  { x: 0, y: 11.0, z: 0, yaw: 0 } // High Spire
+];
+
+export const QUANTUM_LAB_SPAWNS = [
+  { x: -22, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Lab Bay
+  { x: 22, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Lab Bay
+  { x: 0, y: 1.0, z: -22, yaw: 0 }, // North Access
+  { x: 0, y: 1.0, z: 22, yaw: Math.PI }, // South Access
+  { x: 0, y: 4.5, z: 0, yaw: 0 }, // Observation Deck
+  { x: -14, y: 1.0, z: 12, yaw: -Math.PI / 4 },
+  { x: 14, y: 1.0, z: -12, yaw: 3 * Math.PI / 4 }
+];
+
+export const MAGMA_FOUNDRY_SPAWNS = [
+  { x: 0, y: 1.0, z: -22, yaw: 0 }, // North Furnace
+  { x: 0, y: 1.0, z: 22, yaw: Math.PI }, // South Furnace
+  { x: -22, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Slag Pour
+  { x: 22, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Tank
+  { x: 0, y: 1.0, z: 0, yaw: 0 }, // Central Crucible
+  { x: 0, y: 5.5, z: 6, yaw: Math.PI } // High Crane Gantry
+];
+
+export const SUBZERO_STATION_SPAWNS = [
+  { x: 0, y: 1.0, z: -24, yaw: 0 }, // North Bunker
+  { x: 0, y: 1.0, z: 24, yaw: Math.PI }, // South Depot
+  { x: -20, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Trench
+  { x: 20, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Container Yard
+  { x: 0, y: 5.0, z: 0, yaw: 0 }, // Radar Roof
+  { x: -16, y: 1.0, z: -16, yaw: Math.PI / 4 }
+];
+
+export const SKY_SANCTUARY_SPAWNS = [
+  { x: 0, y: 1.0, z: 0, yaw: 0 }, // Central Shrine
+  { x: 0, y: 1.0, z: -26, yaw: 0 }, // North Cloud Garden
+  { x: 0, y: 1.0, z: 26, yaw: Math.PI }, // South Cloud Garden
+  { x: -26, y: 1.0, z: 0, yaw: Math.PI / 2 }, // West Meditation Terrace
+  { x: 26, y: 1.0, z: 0, yaw: -Math.PI / 2 }, // East Bell Tower
+  { x: 0, y: 4.5, z: 0, yaw: Math.PI } // Shrine Pavilion Terrace
+];
+
 export function getMapSpawns(mapName?: string) {
-  if (mapName === 'Cartoon City') {
-    return CITY_SPAWNS;
+  switch (mapName) {
+    case 'Cartoon City':
+      return CITY_SPAWNS;
+    case 'Cyber Spire':
+      return CYBER_SPIRE_SPAWNS;
+    case 'Quantum Lab':
+      return QUANTUM_LAB_SPAWNS;
+    case 'Magma Foundry':
+      return MAGMA_FOUNDRY_SPAWNS;
+    case 'Subzero Station':
+      return SUBZERO_STATION_SPAWNS;
+    case 'Sky Sanctuary':
+      return SKY_SANCTUARY_SPAWNS;
+    default:
+      return MAP_SPAWNS;
   }
-  return MAP_SPAWNS;
 }
 
 export const PLAYER_COLORS = [
@@ -142,7 +280,38 @@ export const TEAM_SPAWNS: Record<'blue' | 'red', { x: number; y: number; z: numb
   ]
 };
 
-export function getTeamSpawn(team: 'blue' | 'red', index: number) {
+export function getTeamSpawn(team: 'blue' | 'red', index: number, mapName?: string) {
+  if (mapName === 'Cyber Spire') {
+    const list = team === 'blue'
+      ? [{ x: -3, y: 4.0, z: 22, yaw: Math.PI }, { x: 3, y: 4.0, z: 22, yaw: Math.PI }, { x: 0, y: 4.0, z: 20, yaw: Math.PI }]
+      : [{ x: -3, y: 4.0, z: -22, yaw: 0 }, { x: 3, y: 4.0, z: -22, yaw: 0 }, { x: 0, y: 4.0, z: -20, yaw: 0 }];
+    return list[index % list.length];
+  }
+  if (mapName === 'Quantum Lab') {
+    const list = team === 'blue'
+      ? [{ x: -22, y: 1.0, z: -3, yaw: Math.PI / 2 }, { x: -22, y: 1.0, z: 3, yaw: Math.PI / 2 }]
+      : [{ x: 22, y: 1.0, z: -3, yaw: -Math.PI / 2 }, { x: 22, y: 1.0, z: 3, yaw: -Math.PI / 2 }];
+    return list[index % list.length];
+  }
+  if (mapName === 'Magma Foundry') {
+    const list = team === 'blue'
+      ? [{ x: -3, y: 1.0, z: 22, yaw: Math.PI }, { x: 3, y: 1.0, z: 22, yaw: Math.PI }]
+      : [{ x: -3, y: 1.0, z: -22, yaw: 0 }, { x: 3, y: 1.0, z: -22, yaw: 0 }];
+    return list[index % list.length];
+  }
+  if (mapName === 'Subzero Station') {
+    const list = team === 'blue'
+      ? [{ x: -4, y: 1.0, z: 24, yaw: Math.PI }, { x: 4, y: 1.0, z: 24, yaw: Math.PI }]
+      : [{ x: -4, y: 1.0, z: -24, yaw: 0 }, { x: 4, y: 1.0, z: -24, yaw: 0 }];
+    return list[index % list.length];
+  }
+  if (mapName === 'Sky Sanctuary') {
+    const list = team === 'blue'
+      ? [{ x: -3, y: 1.0, z: 26, yaw: Math.PI }, { x: 3, y: 1.0, z: 26, yaw: Math.PI }]
+      : [{ x: -3, y: 1.0, z: -26, yaw: 0 }, { x: 3, y: 1.0, z: -26, yaw: 0 }];
+    return list[index % list.length];
+  }
+
   const list = TEAM_SPAWNS[team];
   return list[index % list.length];
 }

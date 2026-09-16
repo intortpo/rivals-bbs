@@ -1,5 +1,5 @@
 import { GameOverPayload, PowerupType, WeaponStats, WeaponType } from '../../shared/types.js';
-import { POWERUPS } from '../../shared/constants.js';
+import { POWERUPS, WEAPONS } from '../../shared/constants.js';
 
 export class TouchHUD {
   private container: HTMLElement;
@@ -11,6 +11,7 @@ export class TouchHUD {
   private crosshairEl!: HTMLElement;
   private adsScopeOverlay!: HTMLElement;
   private damageVignetteEl!: HTMLElement;
+  private teleportVignetteEl!: HTMLElement;
   private killfeedEl!: HTMLElement;
   private countdownEl!: HTMLElement;
   private gameOverModalEl!: HTMLElement;
@@ -116,6 +117,8 @@ export class TouchHUD {
 
       <!-- Damage Vignette (Flashes red when hurt) -->
       <div id="hud-damage-vignette" style="position: absolute; inset: 0; box-shadow: inset 0 0 70px rgba(255, 42, 85, 0.7); opacity: 0; transition: opacity 0.1s ease; pointer-events: none;"></div>
+      <!-- Teleport Warp Screen Flash -->
+      <div id="hud-teleport-vignette" style="position: absolute; inset: 0; box-shadow: inset 0 0 90px rgba(0, 210, 255, 0.85); background: radial-gradient(circle, transparent 40%, rgba(0, 210, 255, 0.35) 90%); opacity: 0; transition: opacity 0.3s ease-out; pointer-events: none;"></div>
 
       <!-- Health & Shield Bar (Bottom Left) -->
       <div style="position: absolute; bottom: 22px; left: 20px; display: flex; flex-direction: column; gap: 6px; pointer-events: auto;">
@@ -188,6 +191,7 @@ export class TouchHUD {
     this.crosshairEl = hud.querySelector('#hud-crosshair') as HTMLElement;
     this.adsScopeOverlay = hud.querySelector('#hud-ads-scope') as HTMLElement;
     this.damageVignetteEl = hud.querySelector('#hud-damage-vignette') as HTMLElement;
+    this.teleportVignetteEl = hud.querySelector('#hud-teleport-vignette') as HTMLElement;
     this.killfeedEl = hud.querySelector('#hud-killfeed') as HTMLElement;
     this.countdownEl = hud.querySelector('#hud-countdown') as HTMLElement;
     this.gameOverModalEl = hud.querySelector('#hud-game-over') as HTMLElement;
@@ -258,6 +262,16 @@ export class TouchHUD {
     }, 200);
   }
 
+  public showTeleportEffect(): void {
+    if (!this.teleportVignetteEl) return;
+    this.teleportVignetteEl.style.transition = 'none';
+    this.teleportVignetteEl.style.opacity = '1';
+    requestAnimationFrame(() => {
+      this.teleportVignetteEl.style.transition = 'opacity 0.4s ease-out';
+      this.teleportVignetteEl.style.opacity = '0';
+    });
+  }
+
   public updateAmmo(
     current: number,
     stats: WeaponStats,
@@ -311,7 +325,7 @@ export class TouchHUD {
     this.lastAdsActive = active;
     this.lastAdsWeaponType = weaponType;
     this.adsScopeOverlay.style.display = active ? 'block' : 'none';
-    this.crosshairEl.style.display = active && weaponType === 'sniper' ? 'none' : 'block';
+    this.crosshairEl.style.display = active && (weaponType === 'sniper' || weaponType === 'railgun') ? 'none' : 'block';
   }
 
   public updateCrosshairSpread(moving: boolean, sliding: boolean): void {
@@ -352,15 +366,22 @@ export class TouchHUD {
       animation: fadeIn 0.15s ease-out;
     `;
 
-    const icon = weapon === 'sniper' ? '🎯' : weapon === 'shotgun' ? '💥' : weapon === 'katana' ? '⚔️' : '🔫';
+    const icon = WEAPONS[weapon as WeaponType]?.icon || (weapon === 'void' ? '💀' : '🔫');
     const hs = isHeadshot ? '<span style="color: #ff2a55; font-size: 10px;">[HEADSHOT]</span>' : '';
 
-    item.innerHTML = `
-      <span style="color: #00d2ff;">${killerName}</span>
-      <span>${icon}</span>
-      ${hs}
-      <span style="color: #ff5577;">${victimName}</span>
-    `;
+    if (weapon === 'void' || killerName === victimName) {
+      item.innerHTML = `
+        <span style="color: #ff5577;">💀 ${victimName}</span>
+        <span style="color: #8da2c0; font-size: 11px;">fell into the void</span>
+      `;
+    } else {
+      item.innerHTML = `
+        <span style="color: #00d2ff;">${killerName}</span>
+        <span>${icon}</span>
+        ${hs}
+        <span style="color: #ff5577;">${victimName}</span>
+      `;
+    }
 
     this.killfeedEl.appendChild(item);
     setTimeout(() => {

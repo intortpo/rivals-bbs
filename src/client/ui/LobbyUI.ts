@@ -178,6 +178,11 @@ export class LobbyUI {
                 <option value="Cartoon City" selected>🏙️ Cartoon City</option>
                 <option value="Arena Classic">🏟️ Arena Classic</option>
                 <option value="Neon Warehouse">📦 Neon Warehouse</option>
+                <option value="Cyber Spire">🌆 Cyber Spire</option>
+                <option value="Quantum Lab">🔬 Quantum Lab</option>
+                <option value="Magma Foundry">🌋 Magma Foundry</option>
+                <option value="Subzero Station">❄️ Subzero Station</option>
+                <option value="Sky Sanctuary">⛩️ Sky Sanctuary</option>
               </select>
             </div>
           </div>

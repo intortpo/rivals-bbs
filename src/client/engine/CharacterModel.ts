@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { WeaponType, CharacterCustomization } from '../../shared/types.js';
+import { WEAPON_ORDER } from '../../shared/constants.js';
 import { WeaponManager } from './WeaponManager.js';
 
 interface BrickDebris {
@@ -513,8 +514,7 @@ export class CharacterModel {
   }
 
   private setupWeaponsInSocket(): void {
-    const types: WeaponType[] = ['rifle', 'shotgun', 'sniper', 'katana'];
-    for (const t of types) {
+    for (const t of WEAPON_ORDER) {
       const cached = WeaponManager.cachedWeaponModels.get(t);
       if (cached) {
         const wClone = cached.clone(true);

@@ -56,6 +56,7 @@ class GameApp {
   private jumpBufferTimer: number = 0;
   private coyoteTimer: number = 0;
   private hasJumpedThisAirtime: boolean = false;
+  private lastTeleportTime: number = 0;
 
   // Camera & viewmodel feel
   private cameraRoll: number = 0;
@@ -92,7 +93,7 @@ class GameApp {
     this.audio = new AudioManager();
     this.fx = new FXManager(this.renderer.scene);
     this.powerupManager = new PowerupManager(this.renderer.scene, this.audio);
-    this.weaponManager = new WeaponManager(this.renderer.scene, this.renderer.camera);
+    this.weaponManager = new WeaponManager(this.renderer.scene, this.renderer.camera, this.fx, this.audio);
     this.input = new InputManager(this.appContainer);
     this.hud = new TouchHUD(this.appContainer);
     this.settingsUI = new SettingsUI(this.appContainer, (settings) => {
@@ -263,6 +264,19 @@ class GameApp {
         this.lobbyUI.hideLobby();
         this.hud.setVisible(true);
         this.updateHUDMatchStats(state);
+
+        const myState = state.players[this.networkClient.myId];
+        if (myState && this.isDead && !myState.isDead) {
+          // Local player respawned!
+          this.isDead = false;
+          this.currentHp = myState.health;
+          this.currentShield = myState.shieldHp;
+          this.playerPos.set(myState.x, myState.y, myState.z);
+          this.playerYaw = myState.yaw;
+          this.playerVel.set(0, 0, 0);
+          this.hud.updateHealth(myState.health);
+          this.hud.updateShield(myState.shieldHp);
+        }
       }
     };
 
@@ -463,7 +477,7 @@ class GameApp {
       this.powerupManager.remainingActiveSec
     );
     this.networkClient.update(delta);
-    this.weaponManager.update(delta);
+    this.weaponManager.update(delta, this.input.isFiring());
     this.fx.update(delta);
     CharacterModel.updateDebris(delta);
 
@@ -583,12 +597,36 @@ class GameApp {
       this.isGrounded = true;
     }
 
-    // Check jump pads
-    const padImpulse = this.mapBuilder.checkJumpPads(this.playerPos);
-    if (padImpulse !== null && this.playerVel.y <= 0) {
-      this.playerVel.y = padImpulse;
+    // Check jump pads (Vertical Launchers and Directional Aerial Boosters)
+    const pad = this.mapBuilder.checkJumpPads(this.playerPos);
+    if (pad !== null && this.playerVel.y <= 0) {
+      this.playerVel.y = pad.impulseY;
+      if (pad.impulseX !== 0) this.playerVel.x = pad.impulseX;
+      if (pad.impulseZ !== 0) this.playerVel.z = pad.impulseZ;
       this.isGrounded = false;
       this.audio.playJump();
+    }
+
+    // Check teleporters (Bidirectional paired portals with 1.5s cooldown)
+    const hitPort = this.mapBuilder.checkTeleportPorts(this.playerPos, this.lastTeleportTime);
+    if (hitPort) {
+      this.lastTeleportTime = performance.now();
+      this.playerPos.copy(hitPort.exitPos);
+      this.playerYaw = hitPort.exitYaw;
+      this.playerVel.set(0, 0, 0); // Cancel exit velocity
+      this.audio.playTeleport();
+      this.hud.showTeleportEffect();
+    }
+
+    // Environmental Void / Lava hazard check
+    if (this.playerPos.y < -3.0 && this.networkClient.isInGame && !this.isDead) {
+      this.isDead = true;
+      this.currentHp = 0;
+      this.currentShield = 0;
+      this.hud.updateHealth(0);
+      this.audio.playOofDeath();
+      this.networkClient.sendVoidFall();
+      this.playerVel.set(0, 0, 0);
     }
 
     // Boundary & obstacle collision clamping
@@ -714,7 +752,7 @@ class GameApp {
           ...this.networkClient.getTargetableMeshes(),
           this.mapBuilder.group
         ];
-        const fireRes = this.weaponManager.fire(this.renderer.camera, targetMeshes);
+        const fireRes = this.weaponManager.fire(this.renderer.camera, targetMeshes, this.input.isFiring());
 
         if (fireRes.fired) {
           this.audio.playShoot(this.weaponManager.currentWeaponType);
@@ -723,8 +761,10 @@ class GameApp {
           this.renderer.camera.getWorldDirection(this._scratchCamDir);
 
           // Subtle visceral camera recoil punch on fire
-          const recoilKick = this.weaponManager.currentWeaponType === 'sniper' ? 0.032
-            : this.weaponManager.currentWeaponType === 'shotgun' ? 0.024 : 0.012;
+          const currentW = this.weaponManager.currentWeaponType;
+          const recoilKick = currentW === 'sniper' || currentW === 'railgun' ? 0.034
+            : currentW === 'plasma_launcher' ? 0.026
+            : currentW === 'shotgun' ? 0.024 : 0.012;
           this.playerPitch = Math.min(1.4, this.playerPitch + recoilKick);
 
           this.networkClient.sendFire({

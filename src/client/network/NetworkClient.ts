@@ -260,6 +260,10 @@ export class NetworkClient {
     this.socket.emit('switch_weapon', { weaponIndex: index });
   }
 
+  public sendVoidFall(): void {
+    this.socket.emit('player_void_fall');
+  }
+
   private syncRemotePlayerModels(state: RoomNetworkState): void {
     const activePlayerIds = new Set(Object.keys(state.players));
 

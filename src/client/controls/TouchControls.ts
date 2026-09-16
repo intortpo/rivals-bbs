@@ -30,6 +30,23 @@ export class TouchControls {
 
   public sensitivity: number = 1.0;
   public autoFireEnabled: boolean = false;
+  public currentCategory: 'tactical' | 'experimental' = 'tactical';
+  public currentActiveGlobalIndex: number = 0;
+
+  private static readonly LOADOUT_SLOTS = {
+    tactical: [
+      { index: 0, icon: '🔫', label: 'RIFLE' },
+      { index: 1, icon: '💥', label: 'SHOTGUN' },
+      { index: 2, icon: '🎯', label: 'SNIPER' },
+      { index: 3, icon: '⚔️', label: 'KATANA' }
+    ],
+    experimental: [
+      { index: 4, icon: '💎', label: 'NEEDLER' },
+      { index: 5, icon: '🔮', label: 'PLASMA' },
+      { index: 6, icon: '⚡', label: 'RAILGUN' },
+      { index: 7, icon: '🔌', label: 'TESLA' }
+    ]
+  };
 
   private container: HTMLElement;
   private joystickBaseEl!: HTMLElement;
@@ -125,11 +142,14 @@ export class TouchControls {
       </div>
 
       <!-- Quick Weapon Bar (Bottom Center) -->
-      <div id="weapon-switcher-bar" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; pointer-events: auto;">
-        <div class="weapon-slot active" data-index="0"><span>🔫</span><small>RIFLE</small></div>
-        <div class="weapon-slot" data-index="1"><span>💥</span><small>SHOTGUN</small></div>
-        <div class="weapon-slot" data-index="2"><span>🎯</span><small>SNIPER</small></div>
-        <div class="weapon-slot" data-index="3"><span>⚔️</span><small>KATANA</small></div>
+      <div id="weapon-switcher-bar" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; pointer-events: auto;">
+        <button id="btn-loadout-toggle" class="icon-btn" style="width: auto; padding: 0 10px; height: 48px; border-radius: 12px; font-size: 11px; font-weight: 900; background: rgba(168, 85, 247, 0.25); border: 1.5px solid #a855f7; color: #e9d5ff; box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);" title="Toggle Arsenal">⚡ EXP</button>
+        <div id="weapon-slot-dock" style="display: flex; gap: 8px;">
+          <div class="weapon-slot active" data-slot="0" data-index="0"><span>🔫</span><small>RIFLE</small></div>
+          <div class="weapon-slot" data-slot="1" data-index="1"><span>💥</span><small>SHOTGUN</small></div>
+          <div class="weapon-slot" data-slot="2" data-index="2"><span>🎯</span><small>SNIPER</small></div>
+          <div class="weapon-slot" data-slot="3" data-index="3"><span>⚔️</span><small>KATANA</small></div>
+        </div>
       </div>
 
       <!-- Settings & Fullscreen buttons (Top Right) -->
@@ -294,16 +314,30 @@ export class TouchControls {
       });
     }
 
-    // Weapon slots
-    const slots = document.querySelectorAll('.weapon-slot');
-    slots.forEach(slot => {
-      slot.addEventListener('touchstart', (e) => {
+    // Loadout toggle button
+    const toggleBtn = document.getElementById('btn-loadout-toggle');
+    if (toggleBtn) {
+      const handleToggle = (e: Event) => {
         e.preventDefault();
         e.stopPropagation();
-        const index = parseInt(slot.getAttribute('data-index') || '0', 10);
-        this.setActiveWeaponUI(index);
-        this.state.switchWeaponIndex = index;
-      });
+        this.toggleLoadoutCategory();
+      };
+      toggleBtn.addEventListener('touchstart', handleToggle);
+      toggleBtn.addEventListener('click', handleToggle);
+    }
+
+    // Weapon slots
+    const slots = document.querySelectorAll('.weapon-slot');
+    slots.forEach((slot, slotIdx) => {
+      const handleSlot = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const globalIndex = this.getGlobalIndexForSlot(slotIdx);
+        this.setActiveWeaponUI(globalIndex);
+        this.state.switchWeaponIndex = globalIndex;
+      };
+      slot.addEventListener('touchstart', handleSlot);
+      slot.addEventListener('click', handleSlot);
     });
 
     // Fullscreen toggle
@@ -319,9 +353,72 @@ export class TouchControls {
     }
   }
 
-  public setActiveWeaponUI(index: number): void {
+  public getGlobalIndexForSlot(slot: number): number {
+    return this.currentCategory === 'tactical' ? slot : slot + 4;
+  }
+
+  public setLoadoutCategory(cat: 'tactical' | 'experimental'): void {
+    this.currentCategory = cat;
+    const toggleBtn = document.getElementById('btn-loadout-toggle');
+    if (toggleBtn) {
+      if (cat === 'tactical') {
+        toggleBtn.textContent = '⚡ EXP';
+        toggleBtn.style.borderColor = '#a855f7';
+        toggleBtn.style.color = '#e9d5ff';
+        toggleBtn.style.background = 'rgba(168, 85, 247, 0.25)';
+      } else {
+        toggleBtn.textContent = '🔫 TAC';
+        toggleBtn.style.borderColor = '#00d2ff';
+        toggleBtn.style.color = '#00d2ff';
+        toggleBtn.style.background = 'rgba(0, 210, 255, 0.25)';
+      }
+    }
+
     const slots = document.querySelectorAll('.weapon-slot');
-    slots.forEach((s, i) => s.classList.toggle('active', i === index));
+    const defs = TouchControls.LOADOUT_SLOTS[cat];
+    slots.forEach((s, idx) => {
+      if (defs[idx]) {
+        s.setAttribute('data-index', `${defs[idx].index}`);
+        s.innerHTML = `<span>${defs[idx].icon}</span><small>${defs[idx].label}</small>`;
+      }
+    });
+
+    this.updateActiveSlotHighlight();
+  }
+
+  public toggleLoadoutCategory(): void {
+    const nextCat = this.currentCategory === 'tactical' ? 'experimental' : 'tactical';
+    this.setLoadoutCategory(nextCat);
+    // Switch to first weapon of newly selected category
+    const targetIndex = nextCat === 'tactical' ? 0 : 4;
+    this.setActiveWeaponUI(targetIndex);
+    this.state.switchWeaponIndex = targetIndex;
+  }
+
+  public setActiveWeaponUI(globalIndex: number): void {
+    this.currentActiveGlobalIndex = globalIndex;
+    const expectedCat = globalIndex >= 4 ? 'experimental' : 'tactical';
+    if (this.currentCategory !== expectedCat) {
+      this.setLoadoutCategory(expectedCat);
+    } else {
+      this.updateActiveSlotHighlight();
+    }
+  }
+
+  private updateActiveSlotHighlight(): void {
+    const slots = document.querySelectorAll('.weapon-slot');
+    const slotIdx = this.currentActiveGlobalIndex % 4;
+    const isMatchingCategory = (this.currentActiveGlobalIndex >= 4 && this.currentCategory === 'experimental') ||
+                               (this.currentActiveGlobalIndex < 4 && this.currentCategory === 'tactical');
+    slots.forEach((s, i) => {
+      s.classList.toggle('active', isMatchingCategory && i === slotIdx);
+    });
+  }
+
+  public cycleWeapon(direction: 1 | -1): void {
+    const nextIndex = (this.currentActiveGlobalIndex + direction + 8) % 8;
+    this.setActiveWeaponUI(nextIndex);
+    this.state.switchWeaponIndex = nextIndex;
   }
 
   private onTouchStart(e: TouchEvent): void {

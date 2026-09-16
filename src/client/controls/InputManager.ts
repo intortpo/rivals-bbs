@@ -21,18 +21,34 @@ export class InputManager {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
       if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
-        const index = parseInt(e.code.replace('Digit', ''), 10) - 1;
-        this.touch.state.switchWeaponIndex = index;
-        this.touch.setActiveWeaponUI(index);
+        const slot = parseInt(e.code.replace('Digit', ''), 10) - 1;
+        const globalIndex = this.touch.getGlobalIndexForSlot(slot);
+        this.touch.state.switchWeaponIndex = globalIndex;
+        this.touch.setActiveWeaponUI(globalIndex);
+      }
+      if (['Digit5', 'Digit6', 'Digit7', 'Digit8'].includes(e.code)) {
+        const expIndex = parseInt(e.code.replace('Digit', ''), 10) - 1;
+        this.touch.state.switchWeaponIndex = expIndex;
+        this.touch.setActiveWeaponUI(expIndex);
+      }
+      if (e.code === 'KeyT' || e.code === 'KeyX') {
+        this.touch.toggleLoadoutCategory();
       }
       if (e.code === 'KeyR') {
         this.touch.state.reloadRequested = true;
       }
-      if (['KeyQ', 'KeyE', 'Digit5'].includes(e.code)) {
+      if (['KeyQ', 'KeyE'].includes(e.code)) {
         this.powerupRequested = true;
       }
       if (e.code === 'Escape' || e.code === 'KeyP') {
         this.unlockCursor();
+      }
+    });
+
+    window.addEventListener('wheel', (e) => {
+      if (this.isAnyModalOpen()) return;
+      if (e.deltaY !== 0) {
+        this.touch.cycleWeapon(e.deltaY > 0 ? 1 : -1);
       }
     });
 

@@ -20,6 +20,33 @@ interface DustParticle {
   life: number;
 }
 
+interface SparkParticle {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  vx: number;
+  vy: number;
+  vz: number;
+  life: number;
+  maxLife: number;
+}
+
+interface ExpandingRing {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  scale: number;
+  maxScale: number;
+  growthRate: number;
+  life: number;
+  maxLife: number;
+}
+
+interface FadingLine {
+  line: THREE.Line | THREE.LineSegments;
+  mat: THREE.LineBasicMaterial;
+  life: number;
+  maxLife: number;
+}
+
 export class FXManager {
   private scene: THREE.Scene;
   
@@ -32,6 +59,20 @@ export class FXManager {
   private dustPool: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
   private static readonly dustGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
   private static readonly MAX_ACTIVE_DUST = 24;
+
+  // Pooled spark particles (for plasma, ricochet, supercombine)
+  private sparkParticles: SparkParticle[] = [];
+  private sparkPool: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
+  private static readonly sparkGeometry = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+  private static readonly MAX_ACTIVE_SPARKS = 48;
+
+  // Pooled expanding shockwave rings
+  private expandingRings: ExpandingRing[] = [];
+  private ringPool: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
+  private static readonly ringGeometry = new THREE.RingGeometry(0.3, 0.6, 24);
+
+  // Fading energy lines (railgun spiral, tesla lightning)
+  private fadingLines: FadingLine[] = [];
 
   // Hitmarker UI elements
   private hitmarkerEl: HTMLElement | null = null;
@@ -178,6 +219,201 @@ export class FXManager {
     });
   }
 
+  public spawnPlasmaExplosion(pos: THREE.Vector3 | [number, number, number]): void {
+    const px = Array.isArray(pos) ? pos[0] : pos.x;
+    const py = Array.isArray(pos) ? pos[1] : pos.y;
+    const pz = Array.isArray(pos) ? pos[2] : pos.z;
+
+    // Expanding purple shockwave ring
+    this.spawnExpandingRing(new THREE.Vector3(px, py + 0.1, pz), '#b537f2', 8.0, 0.45);
+
+    // 16 outward plasma sparks
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2 + Math.random() * 0.2;
+      const speed = 4.0 + Math.random() * 6.0;
+      this.spawnSpark(
+        new THREE.Vector3(px, py + 0.2, pz),
+        Math.cos(angle) * speed,
+        2.0 + Math.random() * 5.0,
+        Math.sin(angle) * speed,
+        '#d946ef',
+        0.5
+      );
+    }
+  }
+
+  public spawnRailgunTracer(from: THREE.Vector3, to: THREE.Vector3): void {
+    // 1. Core high-intensity supersonic beam
+    const coreMat = new THREE.LineBasicMaterial({
+      color: '#00ffff',
+      linewidth: 3,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending
+    });
+    const coreGeo = new THREE.BufferGeometry().setFromPoints([from, to]);
+    const coreLine = new THREE.Line(coreGeo, coreMat);
+    this.scene.add(coreLine);
+    this.fadingLines.push({ line: coreLine, mat: coreMat, life: 0.35, maxLife: 0.35 });
+
+    // 2. Outer spiral / ionized particles
+    const dir = new THREE.Vector3().subVectors(to, from);
+    const len = dir.length();
+    if (len > 1) {
+      const spiralPoints: THREE.Vector3[] = [];
+      const steps = Math.min(60, Math.floor(len * 2));
+      const up = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
+      const perpUp = new THREE.Vector3().crossVectors(right, dir).normalize();
+
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const angle = t * Math.PI * 12; // 6 rotations
+        const radius = 0.25;
+        const p = from.clone().lerp(to, t);
+        p.addScaledVector(right, Math.cos(angle) * radius);
+        p.addScaledVector(perpUp, Math.sin(angle) * radius);
+        spiralPoints.push(p);
+      }
+
+      const spiralMat = new THREE.LineBasicMaterial({
+        color: '#38bdf8',
+        linewidth: 1.5,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      });
+      const spiralGeo = new THREE.BufferGeometry().setFromPoints(spiralPoints);
+      const spiralLine = new THREE.Line(spiralGeo, spiralMat);
+      this.scene.add(spiralLine);
+      this.fadingLines.push({ line: spiralLine, mat: spiralMat, life: 0.28, maxLife: 0.28 });
+    }
+  }
+
+  public spawnTeslaArc(from: THREE.Vector3, to: THREE.Vector3): void {
+    const points: THREE.Vector3[] = [from.clone()];
+    const segments = 6;
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      const pt = from.clone().lerp(to, t);
+      pt.x += (Math.random() - 0.5) * 0.45;
+      pt.y += (Math.random() - 0.5) * 0.45;
+      pt.z += (Math.random() - 0.5) * 0.45;
+      points.push(pt);
+    }
+    points.push(to.clone());
+
+    const arcMat = new THREE.LineBasicMaterial({
+      color: '#00d2ff',
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending
+    });
+    const arcGeo = new THREE.BufferGeometry().setFromPoints(points);
+    const arcLine = new THREE.Line(arcGeo, arcMat);
+    this.scene.add(arcLine);
+    this.fadingLines.push({ line: arcLine, mat: arcMat, life: 0.12, maxLife: 0.12 });
+  }
+
+  public spawnNeedleRicochet(pos: THREE.Vector3, normal?: THREE.Vector3): void {
+    for (let i = 0; i < 6; i++) {
+      const vx = (Math.random() - 0.5) * 3 + (normal ? normal.x * 2 : 0);
+      const vy = 1.0 + Math.random() * 2.5 + (normal ? normal.y * 2 : 0);
+      const vz = (Math.random() - 0.5) * 3 + (normal ? normal.z * 2 : 0);
+      this.spawnSpark(pos, vx, vy, vz, '#ff00aa', 0.35);
+    }
+  }
+
+  public spawnSupercombineExplosion(pos: THREE.Vector3 | [number, number, number]): void {
+    const px = Array.isArray(pos) ? pos[0] : pos.x;
+    const py = Array.isArray(pos) ? pos[1] : pos.y;
+    const pz = Array.isArray(pos) ? pos[2] : pos.z;
+
+    // Glowing magenta blast ring
+    this.spawnExpandingRing(new THREE.Vector3(px, py + 0.1, pz), '#ff00aa', 6.0, 0.4);
+
+    // 20 crystalline shards flying in all directions
+    for (let i = 0; i < 20; i++) {
+      const angle = (i / 20) * Math.PI * 2;
+      const speed = 3.5 + Math.random() * 5.0;
+      this.spawnSpark(
+        new THREE.Vector3(px, py + 0.5, pz),
+        Math.cos(angle) * speed,
+        1.5 + Math.random() * 4.0,
+        Math.sin(angle) * speed,
+        i % 2 === 0 ? '#ff00aa' : '#ff77e1',
+        0.55
+      );
+    }
+  }
+
+  private spawnSpark(pos: THREE.Vector3, vx: number, vy: number, vz: number, color: string, life: number): void {
+    if (this.sparkParticles.length >= FXManager.MAX_ACTIVE_SPARKS) return;
+
+    let item = this.sparkPool.pop();
+    if (!item) {
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending
+      });
+      const mesh = new THREE.Mesh(FXManager.sparkGeometry, mat);
+      item = { mesh, mat };
+    }
+
+    const { mesh, mat } = item;
+    mat.color.set(color);
+    mat.opacity = 0.9;
+    mesh.scale.set(1, 1, 1);
+    mesh.position.copy(pos);
+
+    this.scene.add(mesh);
+    this.sparkParticles.push({
+      mesh,
+      mat,
+      vx,
+      vy,
+      vz,
+      life,
+      maxLife: life
+    });
+  }
+
+  private spawnExpandingRing(pos: THREE.Vector3, color: string, maxScale: number, life: number): void {
+    let item = this.ringPool.pop();
+    if (!item) {
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+      });
+      const mesh = new THREE.Mesh(FXManager.ringGeometry, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      item = { mesh, mat };
+    }
+
+    const { mesh, mat } = item;
+    mat.color.set(color);
+    mat.opacity = 0.85;
+    mesh.scale.set(1, 1, 1);
+    mesh.position.copy(pos);
+
+    this.scene.add(mesh);
+    this.expandingRings.push({
+      mesh,
+      mat,
+      scale: 1,
+      maxScale,
+      growthRate: maxScale / life,
+      life,
+      maxLife: life
+    });
+  }
+
   public update(delta: number): void {
     // Hitmarker timer
     if (this.hitmarkerTimer > 0) {
@@ -221,6 +457,51 @@ export class FXManager {
         this.dustParticles.splice(i, 1);
       }
     }
+
+    // Expanding rings
+    for (let i = this.expandingRings.length - 1; i >= 0; i--) {
+      const ring = this.expandingRings[i];
+      ring.life -= delta;
+      ring.scale += ring.growthRate * delta;
+      ring.mesh.scale.set(ring.scale, ring.scale, ring.scale);
+      ring.mat.opacity = Math.max(0, (ring.life / ring.maxLife) * 0.85);
+
+      if (ring.life <= 0) {
+        this.scene.remove(ring.mesh);
+        this.ringPool.push({ mesh: ring.mesh, mat: ring.mat });
+        this.expandingRings.splice(i, 1);
+      }
+    }
+
+    // Spark particles
+    for (let i = this.sparkParticles.length - 1; i >= 0; i--) {
+      const sp = this.sparkParticles[i];
+      sp.life -= delta;
+      sp.vy -= 9.8 * delta; // Gravity
+      sp.mesh.position.x += sp.vx * delta;
+      sp.mesh.position.y += sp.vy * delta;
+      sp.mesh.position.z += sp.vz * delta;
+      sp.mat.opacity = Math.max(0, (sp.life / sp.maxLife) * 0.9);
+
+      if (sp.life <= 0) {
+        this.scene.remove(sp.mesh);
+        this.sparkPool.push({ mesh: sp.mesh, mat: sp.mat });
+        this.sparkParticles.splice(i, 1);
+      }
+    }
+
+    // Fading energy lines
+    for (let i = this.fadingLines.length - 1; i >= 0; i--) {
+      const fl = this.fadingLines[i];
+      fl.life -= delta;
+      fl.mat.opacity = Math.max(0, fl.life / fl.maxLife);
+      if (fl.life <= 0) {
+        this.scene.remove(fl.line);
+        fl.line.geometry.dispose();
+        fl.mat.dispose();
+        this.fadingLines.splice(i, 1);
+      }
+    }
   }
 
   public dispose(): void {
@@ -238,6 +519,25 @@ export class FXManager {
     }
     for (const item of this.dustPool) {
       item.mat.dispose();
+    }
+    for (const r of this.expandingRings) {
+      this.scene.remove(r.mesh);
+      r.mat.dispose();
+    }
+    for (const item of this.ringPool) {
+      item.mat.dispose();
+    }
+    for (const s of this.sparkParticles) {
+      this.scene.remove(s.mesh);
+      s.mat.dispose();
+    }
+    for (const item of this.sparkPool) {
+      item.mat.dispose();
+    }
+    for (const fl of this.fadingLines) {
+      this.scene.remove(fl.line);
+      fl.line.geometry.dispose();
+      fl.mat.dispose();
     }
   }
 }

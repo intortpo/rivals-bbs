@@ -286,6 +286,13 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('player_void_fall', () => {
+    const session = roomManager.getSessionBySocketId(socket.id);
+    if (session) {
+      session.handlePlayerVoidFall(socket.id);
+    }
+  });
+
   socket.on('leave_room', () => {
     roomManager.leaveRoom(socket);
   });

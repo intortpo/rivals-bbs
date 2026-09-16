@@ -34,7 +34,15 @@ export interface OpenRoomSummary {
   status: RoomStatus;
 }
 
-export type WeaponType = 'rifle' | 'shotgun' | 'sniper' | 'katana';
+export type WeaponType =
+  | 'rifle'
+  | 'shotgun'
+  | 'sniper'
+  | 'katana'
+  | 'plasma_launcher'
+  | 'railgun'
+  | 'arc_disruptor'
+  | 'needle_carbine';
 
 export interface WeaponStats {
   type: WeaponType;
@@ -50,6 +58,15 @@ export interface WeaponStats {
   range: number; // max distance
   adsZoomFov: number; // target FOV in degrees
   icon: string;
+  splashRadius?: number; // for explosive plasma
+  splashDamage?: number;
+  projectileSpeed?: number;
+  chargeTime?: number; // for railgun
+  piercing?: boolean; // for railgun penetrating line
+  shieldMultiplier?: number; // for arc disruptor vs overshields
+  ricochetCount?: number; // for needle carbine
+  supercombineCount?: number; // hits to detonate
+  supercombineDamage?: number;
 }
 
 export interface PlayerInputPayload {

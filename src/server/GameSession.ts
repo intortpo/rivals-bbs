@@ -18,6 +18,7 @@ import {
   POWERUPS,
   TEAM_COLORS,
   WEAPONS,
+  WEAPON_ORDER,
   getMapSpawns,
   getTeamSpawn
 } from '../shared/constants.js';
@@ -34,6 +35,7 @@ export class GameSession {
   private intervalId: NodeJS.Timeout | null = null;
   private countdownTimer: NodeJS.Timeout | null = null;
   private lastFireTimes: Map<string, number> = new Map();
+  private needleHits: Map<string, { count: number; lastHitTime: number; attackerId: string }> = new Map();
   private onStateChange?: () => void;
   public waveManager: WaveManager | null = null;
   private mapObstacles: BoundingBox[] = [];
@@ -303,10 +305,9 @@ export class GameSession {
     const player = this.roomState.players[playerId];
     if (!player || player.isDead) return;
 
-    const weapons: WeaponType[] = ['rifle', 'shotgun', 'sniper', 'katana'];
-    if (weaponIndex >= 0 && weaponIndex < weapons.length) {
+    if (weaponIndex >= 0 && weaponIndex < WEAPON_ORDER.length) {
       player.currentWeaponIndex = weaponIndex;
-      player.currentWeapon = weapons[weaponIndex];
+      player.currentWeapon = WEAPON_ORDER[weaponIndex];
     }
   }
 
@@ -334,9 +335,141 @@ export class GameSession {
       hitPoint: payload.hitPoint
     });
 
-    // Check hit registration if a target was designated
+    // Special Resolution 1: Hyper-Velocity Railgun (Supersonic piercing beam)
+    if (payload.weaponType === 'railgun') {
+      this.resolveRailgunShot(shooter, payload);
+      return;
+    }
+
+    // Special Resolution 2: Quantum Plasma Launcher (Direct hit + Splash explosion)
+    if (payload.weaponType === 'plasma_launcher') {
+      this.resolvePlasmaShot(shooter, payload);
+      return;
+    }
+
+    // Default Hit Resolution (Rifle, Shotgun, Sniper, Katana, Arc Disruptor, Needler)
     if (payload.targetPlayerId) {
       this.resolveHit(shooter, payload);
+    }
+  }
+
+  private applyDirectDamage(
+    shooter: PlayerNetworkState,
+    target: PlayerNetworkState,
+    rawDamage: number,
+    weapon: WeaponType,
+    isHeadshot: boolean,
+    _isSupercombine: boolean = false
+  ): void {
+    let damage = rawDamage;
+
+    if (shooter.activePowerup === 'quad_damage' && Date.now() < (shooter.powerupExpiresAt || 0)) {
+      damage = Math.round(damage * 2);
+    }
+    if (target.activePowerup === 'phase_shift' && Date.now() < (target.powerupExpiresAt || 0)) {
+      damage = Math.round(damage * 0.5);
+    }
+
+    if (target.shieldHp > 0) {
+      const absorbed = Math.min(target.shieldHp, damage);
+      target.shieldHp -= absorbed;
+      damage -= absorbed;
+    }
+
+    target.health = Math.max(0, target.health - damage);
+
+    const hitNotification: HitNotificationPayload = {
+      attackerId: shooter.id,
+      targetId: target.id,
+      damage,
+      isHeadshot,
+      hitPoint: [target.x, target.y + 1, target.z],
+      targetRemainingHp: target.health,
+      targetRemainingShield: target.shieldHp
+    };
+
+    this.io.to(this.roomId).emit('player_hit', hitNotification);
+
+    if (target.health <= 0 && !target.isDead) {
+      this.handlePlayerElimination(shooter, target, weapon, isHeadshot);
+    }
+  }
+
+  private resolvePlasmaShot(shooter: PlayerNetworkState, payload: FireWeaponPayload): void {
+    const stats = WEAPONS.plasma_launcher;
+    let center: [number, number, number];
+
+    // Direct hit
+    if (payload.targetPlayerId && this.roomState.players[payload.targetPlayerId]) {
+      const directTarget = this.roomState.players[payload.targetPlayerId];
+      center = [directTarget.x, directTarget.y + 1.0, directTarget.z];
+      this.resolveHit(shooter, payload);
+    } else if (payload.hitPoint) {
+      center = payload.hitPoint;
+    } else {
+      return;
+    }
+
+    // Splash damage
+    const splashRadius = stats.splashRadius || 4.5;
+    const baseSplash = stats.splashDamage || 40;
+    const [cx, , cz] = center;
+
+    for (const target of Object.values(this.roomState.players)) {
+      if (target.isDead || target.id === shooter.id) continue;
+      if (target.id === payload.targetPlayerId) continue; // Direct target already processed
+      if ((this.roomState.mode === '4v4' || this.roomState.mode === 'wave') && shooter.team !== 'none' && shooter.team === target.team) {
+        continue;
+      }
+
+      const dist = Math.hypot(target.x - cx, target.z - cz);
+      if (dist <= splashRadius) {
+        if (!hasLineOfSight(center, [target.x, target.y + 1.0, target.z], this.mapObstacles)) {
+          continue;
+        }
+        const splashDmg = Math.max(5, Math.round(baseSplash * (1 - dist / splashRadius)));
+        this.applyDirectDamage(shooter, target, splashDmg, 'plasma_launcher', false);
+      }
+    }
+  }
+
+  private resolveRailgunShot(shooter: PlayerNetworkState, payload: FireWeaponPayload): void {
+    const stats = WEAPONS.railgun;
+    const origin: [number, number, number] = payload.origin || [shooter.x, shooter.y + 1.2, shooter.z];
+    const dir = payload.direction || [0, 0, -1];
+    const dirLen = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+    const ndx = dir[0] / dirLen;
+    const ndy = dir[1] / dirLen;
+    const ndz = dir[2] / dirLen;
+    const range = stats.range;
+
+    for (const target of Object.values(this.roomState.players)) {
+      if (target.isDead || target.id === shooter.id) continue;
+      if ((this.roomState.mode === '4v4' || this.roomState.mode === 'wave') && shooter.team !== 'none' && shooter.team === target.team) {
+        continue;
+      }
+
+      const vx = target.x - origin[0];
+      const vy = (target.y + 0.9) - origin[1];
+      const vz = target.z - origin[2];
+
+      const t = vx * ndx + vy * ndy + vz * ndz;
+      if (t < 0.5 || t > range) continue;
+
+      const px = origin[0] + ndx * t;
+      const py = origin[1] + ndy * t;
+      const pz = origin[2] + ndz * t;
+
+      const distSq = (target.x - px) ** 2 + (target.y + 0.9 - py) ** 2 + (target.z - pz) ** 2;
+      const hitboxRadius = 1.0;
+
+      if (distSq <= hitboxRadius * hitboxRadius) {
+        if (hasLineOfSight(origin, [target.x, target.y + 0.9, target.z], this.mapObstacles)) {
+          const isHeadshot = Math.abs((target.y + 1.25) - py) < 0.35;
+          const damage = isHeadshot ? Math.round(stats.damage * stats.headshotMultiplier) : stats.damage;
+          this.applyDirectDamage(shooter, target, damage, 'railgun', isHeadshot);
+        }
+      }
     }
   }
 
@@ -374,8 +507,13 @@ export class GameSession {
       damage = Math.round(damage * 0.5);
     }
 
-    // Overshield absorption
-    if (target.shieldHp > 0) {
+    // Arc Disruptor bonus damage against overshields (1.75x)
+    if (payload.weaponType === 'arc_disruptor' && target.shieldHp > 0 && stats.shieldMultiplier) {
+      const shieldDamage = Math.round(damage * stats.shieldMultiplier);
+      const absorbed = Math.min(target.shieldHp, shieldDamage);
+      target.shieldHp -= absorbed;
+      damage = Math.max(0, damage - Math.round(absorbed / stats.shieldMultiplier));
+    } else if (target.shieldHp > 0) {
       const absorbed = Math.min(target.shieldHp, damage);
       target.shieldHp -= absorbed;
       damage -= absorbed;
@@ -397,7 +535,30 @@ export class GameSession {
 
     if (target.health <= 0 && !target.isDead) {
       this.handlePlayerElimination(shooter, target, payload.weaponType, isHeadshot);
+    } else if (payload.weaponType === 'needle_carbine' && !target.isDead) {
+      // Needler Supercombine tracking (5 hits within 2s triggers +35 bonus detonation)
+      const now = Date.now();
+      const existing = this.needleHits.get(target.id);
+      if (existing && existing.attackerId === shooter.id && (now - existing.lastHitTime < 2000)) {
+        existing.count++;
+        existing.lastHitTime = now;
+        if (existing.count >= (stats.supercombineCount || 5)) {
+          this.needleHits.delete(target.id);
+          const comboDmg = stats.supercombineDamage || 35;
+          this.applyDirectDamage(shooter, target, comboDmg, 'needle_carbine', false, true);
+        }
+      } else {
+        this.needleHits.set(target.id, { count: 1, lastHitTime: now, attackerId: shooter.id });
+      }
     }
+  }
+
+  public handlePlayerVoidFall(playerId: string): void {
+    const player = this.roomState.players[playerId];
+    if (!player || player.isDead || this.roomState.status !== 'playing') return;
+    player.health = 0;
+    player.shieldHp = 0;
+    this.handlePlayerElimination(player, player, 'void' as WeaponType, false);
   }
 
   private handlePlayerElimination(
@@ -408,8 +569,10 @@ export class GameSession {
   ): void {
     victim.isDead = true;
     victim.deaths++;
-    killer.kills++;
-    killer.score++;
+    if (killer.id !== victim.id) {
+      killer.kills++;
+      killer.score++;
+    }
 
     const payload: EliminationPayload = {
       killerId: killer.id,
@@ -432,7 +595,7 @@ export class GameSession {
     }
 
     // 4v4 Team Scoring check
-    if (this.roomState.mode === '4v4' && this.roomState.teamScores && killer.team !== 'none') {
+    if (this.roomState.mode === '4v4' && this.roomState.teamScores && killer.team !== 'none' && killer.id !== victim.id) {
       this.roomState.teamScores[killer.team]++;
       if (this.roomState.teamScores[killer.team] >= this.roomState.fragLimit) {
         this.endGame(killer, killer.team);
@@ -440,7 +603,7 @@ export class GameSession {
       }
     } else {
       // 1v1 / FFA match end condition
-      if (killer.score >= this.roomState.fragLimit) {
+      if (killer.id !== victim.id && killer.score >= this.roomState.fragLimit) {
         this.endGame(killer);
         return;
       }
@@ -458,7 +621,7 @@ export class GameSession {
     let spawn: { x: number; y: number; z: number; yaw: number };
     if (this.roomState.mode === '4v4' && (player.team === 'blue' || player.team === 'red')) {
       const idx = Math.floor(Math.random() * 4);
-      spawn = getTeamSpawn(player.team, idx);
+      spawn = getTeamSpawn(player.team, idx, this.roomState.mapName);
     } else {
       const spawns = getMapSpawns(this.roomState.mapName);
       spawn = spawns[Math.floor(Math.random() * spawns.length)];
@@ -520,6 +683,13 @@ export class GameSession {
 
     if (this.waveManager) {
       this.waveManager.tick(1 / NETWORK.SERVER_TICK_RATE);
+    }
+
+    // Authoritative check for void falls
+    for (const [id, p] of Object.entries(this.roomState.players)) {
+      if (!p.isDead && p.y < -3.0) {
+        this.handlePlayerVoidFall(id);
+      }
     }
 
     const snapshot: WorldSnapshot = {

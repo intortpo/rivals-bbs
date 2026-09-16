@@ -125,9 +125,26 @@ export class WaveManager {
         const botHp = (arch.role === 'boss' && waveNum < 10) ? 150 : arch.maxHp;
         const botShield = (arch.role === 'boss' && waveNum < 10) ? 25 : arch.shieldHp;
 
+        let botWeapon: WeaponType = arch.weapon;
+        let botNamePrefix = arch.namePrefix;
+
+        if (waveNum >= 5 && arch.role === 'sniper' && i % 2 === 1) {
+          botWeapon = 'railgun';
+          botNamePrefix = '⚡ Railgun Sniper';
+        } else if (waveNum >= 6 && arch.role === 'rusher' && i % 2 === 1) {
+          botWeapon = 'arc_disruptor';
+          botNamePrefix = '🔌 Tesla Stalker';
+        } else if (waveNum >= 7 && arch.role === 'heavy' && i % 2 === 0) {
+          botWeapon = 'plasma_launcher';
+          botNamePrefix = '🔮 Plasma Juggernaut';
+        } else if (waveNum >= 8 && arch.role === 'scout' && i % 2 === 1) {
+          botWeapon = 'needle_carbine';
+          botNamePrefix = '💎 Crystalline Merc';
+        }
+
         const botPlayer: PlayerNetworkState = {
           id: botId,
-          name: `${arch.namePrefix} #${i + 1}`,
+          name: `${botNamePrefix} #${i + 1}`,
           color: arch.color,
           team: 'red',
           isHost: false,
@@ -146,7 +163,7 @@ export class WaveManager {
           shieldHp: botShield,
           activePowerup: null,
           powerupExpiresAt: 0,
-          currentWeapon: arch.weapon,
+          currentWeapon: botWeapon,
           currentWeaponIndex: 0,
           isSliding: false,
           isJumping: false,
@@ -203,13 +220,41 @@ export class WaveManager {
 
     const now = Date.now();
     const isCity = this.mapName === 'Cartoon City';
-    const boundX = isCity ? 50 : 25;
-    const boundZ = isCity ? 62 : 25;
+    let boundX = 25;
+    let boundZ = 25;
+    if (isCity) {
+      boundX = 50;
+      boundZ = 62;
+    } else if (this.mapName === 'Neon Warehouse') {
+      boundX = 30;
+      boundZ = 30;
+    } else if (this.mapName === 'Cyber Spire') {
+      boundX = 32;
+      boundZ = 32;
+    } else if (this.mapName === 'Quantum Lab') {
+      boundX = 29;
+      boundZ = 29;
+    } else if (this.mapName === 'Magma Foundry') {
+      boundX = 31;
+      boundZ = 31;
+    } else if (this.mapName === 'Subzero Station') {
+      boundX = 30;
+      boundZ = 30;
+    } else if (this.mapName === 'Sky Sanctuary') {
+      boundX = 36;
+      boundZ = 36;
+    }
 
     // Process AI for each active bot
     for (const active of this.activeBots.values()) {
       const { bot, archetype, seed } = active;
       if (bot.isDead) continue;
+      if (bot.y < -3.0) {
+        // Bot fell into void
+        this.applyDamageToPlayer(bot, bot, 999, false, 'katana');
+        this.onBotEliminated(bot.id, bot);
+        continue;
+      }
 
       // 1. Target selection: nearest living human player
       let target: PlayerNetworkState | null = null;
@@ -362,7 +407,7 @@ export class WaveManager {
         // Emit visual fire event to room
         this.io.to(this.roomState.roomId).emit('player_fired', {
           shooterId: bot.id,
-          weaponType: archetype.weapon,
+          weaponType: bot.currentWeapon,
           origin: [bot.x, bot.y + 1.2, bot.z],
           direction: [Math.sin(-bot.yaw), 0, Math.cos(bot.yaw)],
           hitPoint: [target.x, target.y + 1.2, target.z]
@@ -377,32 +422,42 @@ export class WaveManager {
           // Reduced bot headshot chance (5% instead of 12%) to eliminate random 1-shots
           const isHeadshot = Math.random() < 0.05;
 
-          // Controlled, fair bot damage per archetype
+          // Controlled, fair bot damage per weapon / archetype
           let damage: number;
-          switch (archetype.role) {
-            case 'rusher':
-              damage = 30; // Down from 75 (gives player time to react and escape)
-              break;
-            case 'sniper':
-              damage = 40; // Down from 95 (no instant wipe across map)
-              break;
-            case 'heavy':
-              damage = 22; // Down from 26+
-              break;
-            case 'boss':
-              damage = 24; // Standard rifle damage (no quad damage)
-              break;
-            case 'scout':
-            default:
-              damage = 18; // Down from 24
-              break;
+          if (bot.currentWeapon === 'railgun') {
+            damage = 45;
+          } else if (bot.currentWeapon === 'plasma_launcher') {
+            damage = 35;
+          } else if (bot.currentWeapon === 'arc_disruptor') {
+            damage = 16;
+          } else if (bot.currentWeapon === 'needle_carbine') {
+            damage = 18;
+          } else {
+            switch (archetype.role) {
+              case 'rusher':
+                damage = 30; // Down from 75 (gives player time to react and escape)
+                break;
+              case 'sniper':
+                damage = 40; // Down from 95 (no instant wipe across map)
+                break;
+              case 'heavy':
+                damage = 22; // Down from 26+
+                break;
+              case 'boss':
+                damage = 24; // Standard rifle damage (no quad damage)
+                break;
+              case 'scout':
+              default:
+                damage = 18; // Down from 24
+                break;
+            }
           }
 
           if (isHeadshot) {
             damage = Math.round(damage * 1.35); // Capped multiplier (1.35x instead of 2.0x)
           }
 
-          this.applyDamageToPlayer(target, bot, damage, isHeadshot, archetype.weapon);
+          this.applyDamageToPlayer(target, bot, damage, isHeadshot, bot.currentWeapon);
         }
       }
     }
@@ -417,8 +472,13 @@ export class WaveManager {
   ): void {
     if (target.isDead) return;
 
-    // Shield absorption
-    if (target.shieldHp > 0) {
+    // Arc Disruptor bonus damage against player overshields (1.75x)
+    if (weaponType === 'arc_disruptor' && target.shieldHp > 0) {
+      const shieldDmg = Math.round(damage * 1.75);
+      const absorbed = Math.min(target.shieldHp, shieldDmg);
+      target.shieldHp -= absorbed;
+      damage = Math.max(0, damage - Math.round(absorbed / 1.75));
+    } else if (target.shieldHp > 0) {
       const absorbed = Math.min(target.shieldHp, damage);
       target.shieldHp -= absorbed;
       damage -= absorbed;
@@ -441,8 +501,10 @@ export class WaveManager {
     if (target.health <= 0 && !target.isDead) {
       target.isDead = true;
       target.deaths++;
-      shooter.kills++;
-      shooter.score++;
+      if (shooter.id !== target.id) {
+        shooter.kills++;
+        shooter.score++;
+      }
 
       const elimPayload: EliminationPayload = {
         killerId: shooter.id,
