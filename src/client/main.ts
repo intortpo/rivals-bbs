@@ -101,7 +101,9 @@ class GameApp {
       this.audio.setVoiceVolume(settings.voiceVolume);
       this.audio.setMuted(settings.isMuted);
       this.input.touch.sensitivity = settings.touchSensitivity;
+      this.renderer.applyGraphicsQuality(settings.graphicsQuality);
     });
+    this.renderer.applyGraphicsQuality(this.settingsUI.settings.graphicsQuality);
     this.dashboardUI = new DashboardUI(this.appContainer);
     this.qrManager = new QRManager();
     this.mapBuilder = new MapBuilder(this.renderer.scene, 'Cartoon City', 'twilight');
@@ -625,6 +627,16 @@ class GameApp {
     const playerHead = this.playerPos.y + (this.isSliding ? MOVEMENT.PLAYER_SLIDE_HEIGHT : MOVEMENT.PLAYER_HEIGHT);
 
     for (const box of this.mapBuilder.collisionBoxes) {
+      // Spatial broadphase: discard boxes more than 6m away from player
+      if (
+        this.playerPos.x < box.min.x - 6 ||
+        this.playerPos.x > box.max.x + 6 ||
+        this.playerPos.z < box.min.z - 6 ||
+        this.playerPos.z > box.max.z + 6
+      ) {
+        continue;
+      }
+
       // If player's feet are above the obstacle surface, they are standing or landing on top
       if (playerFeet >= box.max.y - 0.2) {
         continue;

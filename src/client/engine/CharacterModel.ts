@@ -284,6 +284,9 @@ export class CharacterModel {
     new THREE.MeshStandardMaterial({ color: '#ff2a55', roughness: 0.3 }),
     new THREE.MeshStandardMaterial({ color: '#222233', roughness: 0.3 })
   ];
+  private static readonly _axisZ = new THREE.Vector3(0, 0, 1);
+  private static readonly _axisX = new THREE.Vector3(1, 0, 0);
+  private static readonly _deltaQ = new THREE.Quaternion();
 
   constructor(
     scene: THREE.Scene,
@@ -586,8 +589,8 @@ export class CharacterModel {
   public triggerRecoil(): void {
     const qRightArm = this.initialBoneRotations.get('RightArm');
     if (this.rightArmBone && qRightArm) {
-      const recoilQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0, 0));
-      this.rightArmBone.quaternion.multiply(recoilQ);
+      CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, -0.15);
+      this.rightArmBone.quaternion.multiply(CharacterModel._deltaQ);
     }
   }
 
@@ -605,28 +608,28 @@ export class CharacterModel {
     const qSpineInit = this.initialBoneRotations.get('Spine');
     const qHeadInit = this.initialBoneRotations.get('Head');
 
-    // Running leg swing animation along local Z axis (preserving glTF bind pose)
+    // Running leg swing animation along local Z axis (zero-allocation bone deformation)
     if (isMoving && !isSliding) {
       this.animTime += delta * 11;
       const legAngle = Math.sin(this.animTime) * 0.45;
 
       if (this.leftLegBone && qLeftLegInit) {
-        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), legAngle);
-        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, deltaQ);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, legAngle);
+        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, CharacterModel._deltaQ);
       }
       if (this.rightLegBone && qRightLegInit) {
-        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -legAngle);
-        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, deltaQ);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -legAngle);
+        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, CharacterModel._deltaQ);
       }
     } else if (isJumping) {
       // Jumping posture
       if (this.leftLegBone && qLeftLegInit) {
-        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.28);
-        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, deltaQ);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, 0.28);
+        this.leftLegBone.quaternion.multiplyQuaternions(qLeftLegInit, CharacterModel._deltaQ);
       }
       if (this.rightLegBone && qRightLegInit) {
-        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.22);
-        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, deltaQ);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -0.22);
+        this.rightLegBone.quaternion.multiplyQuaternions(qRightLegInit, CharacterModel._deltaQ);
       }
     } else {
       // Idle recovery to rest pose
@@ -644,8 +647,8 @@ export class CharacterModel {
         this.hipsBone.position.y = this.initialHipsPos.y - 0.35;
       }
       if (this.spineBone && qSpineInit) {
-        const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.35);
-        this.spineBone.quaternion.multiplyQuaternions(qSpineInit, deltaQ);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, 0.35);
+        this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
       }
     } else {
       if (this.hipsBone) {
@@ -659,8 +662,8 @@ export class CharacterModel {
     // Head pitch tracking
     if (this.headBone && qHeadInit) {
       const clampedPitch = THREE.MathUtils.clamp(-pitch, -0.6, 0.6);
-      const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), clampedPitch);
-      this.headBone.quaternion.multiplyQuaternions(qHeadInit, deltaQ);
+      CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, clampedPitch);
+      this.headBone.quaternion.multiplyQuaternions(qHeadInit, CharacterModel._deltaQ);
     }
   }
 

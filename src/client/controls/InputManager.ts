@@ -9,6 +9,8 @@ export class InputManager {
   private isMouseDown: boolean = false;
   private isRightMouseDown: boolean = false;
   private isPointerLocked: boolean = false;
+  private _moveVector = { forward: 0, right: 0 };
+  private _lookDeltas = { yaw: 0, pitch: 0 };
 
   constructor(container: HTMLElement) {
     this.touch = new TouchControls(container);
@@ -139,7 +141,9 @@ export class InputManager {
   public getMoveVector(): { forward: number; right: number } {
     // Touch joystick takes precedence if active
     if (this.touch.state.forward !== 0 || this.touch.state.right !== 0) {
-      return { forward: this.touch.state.forward, right: this.touch.state.right };
+      this._moveVector.forward = this.touch.state.forward;
+      this._moveVector.right = this.touch.state.right;
+      return this._moveVector;
     }
 
     // Keyboard WASD / Arrow keys: W/Up = forward (+1), S/Down = backward (-1), D/Right = right (+1), A/Left = left (-1)
@@ -156,18 +160,20 @@ export class InputManager {
       right /= len;
     }
 
-    return { forward, right };
+    this._moveVector.forward = forward;
+    this._moveVector.right = right;
+    return this._moveVector;
   }
 
   public getLookDeltas(): { yaw: number; pitch: number } {
     const touchDeltas = this.touch.consumeLookDeltas();
-    const yaw = touchDeltas.yaw + this.mouseDeltaX;
-    const pitch = touchDeltas.pitch + this.mouseDeltaY;
+    this._lookDeltas.yaw = touchDeltas.yaw + this.mouseDeltaX;
+    this._lookDeltas.pitch = touchDeltas.pitch + this.mouseDeltaY;
 
     this.mouseDeltaX = 0;
     this.mouseDeltaY = 0;
 
-    return { yaw, pitch };
+    return this._lookDeltas;
   }
 
   public isFiring(): boolean {

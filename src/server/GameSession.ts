@@ -529,14 +529,14 @@ export class GameSession {
 
     for (const [id, p] of Object.entries(this.roomState.players)) {
       snapshot.players[id] = {
-        x: p.x,
-        y: p.y,
-        z: p.z,
-        vx: p.vx,
-        vy: p.vy,
-        vz: p.vz,
-        yaw: p.yaw,
-        pitch: p.pitch,
+        x: Math.round(p.x * 100) / 100,
+        y: Math.round(p.y * 100) / 100,
+        z: Math.round(p.z * 100) / 100,
+        vx: Math.round(p.vx * 10) / 10,
+        vy: Math.round(p.vy * 10) / 10,
+        vz: Math.round(p.vz * 10) / 10,
+        yaw: Math.round(p.yaw * 100) / 100,
+        pitch: Math.round(p.pitch * 100) / 100,
         isSliding: p.isSliding,
         isJumping: p.isJumping,
         health: p.health,

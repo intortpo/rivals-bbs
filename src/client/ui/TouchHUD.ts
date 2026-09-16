@@ -26,6 +26,35 @@ export class TouchHUD {
   private btnSettingsEl!: HTMLElement;
   private waveBannerEl!: HTMLElement;
   private waveBannerTextEl!: HTMLElement;
+  private modeEl: HTMLElement | null = null;
+  private scoreEl: HTMLElement | null = null;
+  private fragEl: HTMLElement | null = null;
+
+  // Dirty checking state caches to eliminate DOM layout and style thrashing
+  private lastHp: number = -1;
+  private lastMaxHp: number = -1;
+  private lastAmmoCurrent: number = -1;
+  private lastAmmoReserve: number = -1;
+  private lastWeaponType: WeaponType | '' = '';
+  private lastIsReloading: boolean = false;
+  private lastReloadPercent: number = -1;
+  private lastCrosshairScale: number = -1;
+  private lastAdsActive: boolean = false;
+  private lastAdsWeaponType: WeaponType | '' = '';
+  private lastShieldHp: number = -1;
+  private lastMaxShield: number = -1;
+  private lastPowerupType: PowerupType | null | undefined = undefined;
+  private lastPowerupActive: boolean | undefined = undefined;
+  private lastPowerupRemainingSec: number = -1;
+  private lastPowerupPct: number = -1;
+  private lastMatchMode: string = '';
+  private lastScoreA: number = -1;
+  private lastScoreB: number = -1;
+  private lastGoal: number = -1;
+  private lastTeamBlue: number = -1;
+  private lastTeamRed: number = -1;
+  private lastWaveNum: number = -1;
+  private lastAliveBots: number = -1;
 
   public onPowerupClick?: () => void;
   public onOpenDashboard?: () => void;
@@ -174,6 +203,9 @@ export class TouchHUD {
     this.btnSettingsEl = hud.querySelector('#btn-hud-settings') as HTMLElement;
     this.waveBannerEl = hud.querySelector('#hud-wave-banner') as HTMLElement;
     this.waveBannerTextEl = hud.querySelector('#hud-wave-banner-text') as HTMLElement;
+    this.modeEl = hud.querySelector('#hud-match-mode');
+    this.scoreEl = hud.querySelector('#hud-match-score');
+    this.fragEl = hud.querySelector('#hud-frag-limit');
 
     const bindAction = (el: HTMLElement, action: () => void) => {
       const handler = (e: Event) => {
@@ -202,6 +234,10 @@ export class TouchHUD {
   }
 
   public updateHealth(hp: number, maxHp: number = 100): void {
+    if (hp === this.lastHp && maxHp === this.lastMaxHp) return;
+    this.lastHp = hp;
+    this.lastMaxHp = maxHp;
+
     const percent = Math.max(0, Math.min(100, (hp / maxHp) * 100));
     this.hpFillEl.style.width = `${percent}%`;
     this.hpTextEl.textContent = `${Math.round(hp)}`;
@@ -229,34 +265,59 @@ export class TouchHUD {
     reloadProgress: number,
     reserve: number = 0
   ): void {
-    if (stats.type === 'katana') {
-      this.ammoCurrentEl.textContent = '∞';
-      this.ammoMaxEl.textContent = '∞';
-      this.reloadRingEl.setAttribute('stroke-dasharray', '100, 100');
+    const isKatana = stats.type === 'katana';
+    if (isKatana) {
+      if (this.lastWeaponType !== 'katana') {
+        this.lastWeaponType = 'katana';
+        this.ammoCurrentEl.textContent = '∞';
+        this.ammoMaxEl.textContent = '∞';
+        this.reloadRingEl.setAttribute('stroke-dasharray', '100, 100');
+        this.reloadRingEl.setAttribute('stroke', '#00d2ff');
+      }
       return;
     }
+    this.lastWeaponType = stats.type;
 
-    this.ammoCurrentEl.textContent = `${current}`;
-    this.ammoMaxEl.textContent = `${reserve}`;
+    if (current !== this.lastAmmoCurrent) {
+      this.lastAmmoCurrent = current;
+      this.ammoCurrentEl.textContent = `${current}`;
+    }
+    if (reserve !== this.lastAmmoReserve) {
+      this.lastAmmoReserve = reserve;
+      this.ammoMaxEl.textContent = `${reserve}`;
+    }
 
     if (isReloading) {
       const p = Math.round(reloadProgress * 100);
-      this.reloadRingEl.setAttribute('stroke-dasharray', `${p}, 100`);
-      this.reloadRingEl.setAttribute('stroke', '#ffbb00');
+      if (!this.lastIsReloading || p !== this.lastReloadPercent) {
+        this.lastIsReloading = true;
+        this.lastReloadPercent = p;
+        this.reloadRingEl.setAttribute('stroke-dasharray', `${p}, 100`);
+        this.reloadRingEl.setAttribute('stroke', '#ffbb00');
+      }
     } else {
-      const magPercent = (current / stats.magazineSize) * 100;
-      this.reloadRingEl.setAttribute('stroke-dasharray', `${magPercent}, 100`);
-      this.reloadRingEl.setAttribute('stroke', current <= 3 ? '#ff2a55' : '#00d2ff');
+      const magPercent = Math.round((current / stats.magazineSize) * 100);
+      if (this.lastIsReloading || magPercent !== this.lastReloadPercent) {
+        this.lastIsReloading = false;
+        this.lastReloadPercent = magPercent;
+        this.reloadRingEl.setAttribute('stroke-dasharray', `${magPercent}, 100`);
+        this.reloadRingEl.setAttribute('stroke', current <= 3 ? '#ff2a55' : '#00d2ff');
+      }
     }
   }
 
   public setAdsScope(active: boolean, weaponType: WeaponType): void {
+    if (active === this.lastAdsActive && weaponType === this.lastAdsWeaponType) return;
+    this.lastAdsActive = active;
+    this.lastAdsWeaponType = weaponType;
     this.adsScopeOverlay.style.display = active ? 'block' : 'none';
     this.crosshairEl.style.display = active && weaponType === 'sniper' ? 'none' : 'block';
   }
 
   public updateCrosshairSpread(moving: boolean, sliding: boolean): void {
     const scale = sliding ? 1.6 : moving ? 1.3 : 1.0;
+    if (scale === this.lastCrosshairScale) return;
+    this.lastCrosshairScale = scale;
     this.crosshairEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
   }
 
@@ -311,39 +372,63 @@ export class TouchHUD {
     if (!this.powerupBtnEl) return;
 
     if (!type) {
-      this.powerupBtnEl.style.display = 'none';
+      if (this.lastPowerupType !== null) {
+        this.lastPowerupType = null;
+        this.lastPowerupActive = false;
+        this.powerupBtnEl.style.display = 'none';
+      }
       return;
     }
 
-    this.powerupBtnEl.style.display = 'flex';
-    const def = POWERUPS[type];
-    if (this.powerupIconEl && def) {
-      this.powerupIconEl.textContent = def.icon;
+    if (this.lastPowerupType !== type) {
+      this.lastPowerupType = type;
+      this.powerupBtnEl.style.display = 'flex';
+      const def = POWERUPS[type];
+      if (this.powerupIconEl && def) {
+        this.powerupIconEl.textContent = def.icon;
+      }
     }
 
+    const def = POWERUPS[type];
     if (active) {
-      if (this.powerupLabelEl) {
-        this.powerupLabelEl.textContent = `${Math.ceil(remainingSec)}s`;
-        this.powerupLabelEl.style.color = '#00ff88';
+      const roundedSec = Math.ceil(remainingSec);
+      if (!this.lastPowerupActive || roundedSec !== this.lastPowerupRemainingSec) {
+        this.lastPowerupActive = true;
+        this.lastPowerupRemainingSec = roundedSec;
+        if (this.powerupLabelEl) {
+          this.powerupLabelEl.textContent = `${roundedSec}s`;
+          this.powerupLabelEl.style.color = '#00ff88';
+        }
       }
-      if (this.powerupTimerBarEl && def) {
-        this.powerupTimerBarEl.style.display = 'block';
-        const pct = Math.max(0, Math.min(100, (remainingSec / def.durationSec) * 100));
-        this.powerupTimerBarEl.style.width = `${pct}%`;
+      if (def) {
+        const pct = Math.round(Math.max(0, Math.min(100, (remainingSec / def.durationSec) * 100)));
+        if (pct !== this.lastPowerupPct) {
+          this.lastPowerupPct = pct;
+          if (this.powerupTimerBarEl) {
+            this.powerupTimerBarEl.style.display = 'block';
+            this.powerupTimerBarEl.style.width = `${pct}%`;
+          }
+        }
       }
     } else {
-      if (this.powerupLabelEl) {
-        this.powerupLabelEl.textContent = 'USE [Q]';
-        this.powerupLabelEl.style.color = '#ffbb00';
-      }
-      if (this.powerupTimerBarEl) {
-        this.powerupTimerBarEl.style.display = 'none';
+      if (this.lastPowerupActive !== false) {
+        this.lastPowerupActive = false;
+        if (this.powerupLabelEl) {
+          this.powerupLabelEl.textContent = 'USE [Q]';
+          this.powerupLabelEl.style.color = '#ffbb00';
+        }
+        if (this.powerupTimerBarEl) {
+          this.powerupTimerBarEl.style.display = 'none';
+        }
       }
     }
   }
 
   public updateShield(shieldHp: number, maxShield: number = 50): void {
     if (!this.shieldContainerEl) return;
+    if (shieldHp === this.lastShieldHp && maxShield === this.lastMaxShield) return;
+    this.lastShieldHp = shieldHp;
+    this.lastMaxShield = maxShield;
 
     if (shieldHp <= 0) {
       this.shieldContainerEl.style.display = 'none';
@@ -368,28 +453,57 @@ export class TouchHUD {
     teamScores?: { blue: number; red: number },
     waveState?: any
   ): void {
-    const modeEl = document.getElementById('hud-match-mode');
-    const scoreEl = document.getElementById('hud-match-score');
-    const fragEl = document.getElementById('hud-frag-limit');
+    const modeEl = this.modeEl || document.getElementById('hud-match-mode');
+    const scoreEl = this.scoreEl || document.getElementById('hud-match-score');
+    const fragEl = this.fragEl || document.getElementById('hud-frag-limit');
 
     if (mode === 'wave') {
-      if (modeEl) modeEl.textContent = '🧟 WAVE SURVIVAL';
-      if (scoreEl) scoreEl.textContent = `WAVE ${waveState?.currentWave || 1}`;
-      if (fragEl) fragEl.textContent = `🤖 BOTS: ${waveState?.aliveBotsCount ?? 0}`;
+      const waveNum = waveState?.currentWave || 1;
+      const aliveBots = waveState?.aliveBotsCount ?? 0;
+      if (
+        this.lastMatchMode !== 'wave' ||
+        this.lastWaveNum !== waveNum ||
+        this.lastAliveBots !== aliveBots
+      ) {
+        this.lastMatchMode = 'wave';
+        this.lastWaveNum = waveNum;
+        this.lastAliveBots = aliveBots;
+        if (modeEl) modeEl.textContent = '🧟 WAVE SURVIVAL';
+        if (scoreEl) scoreEl.textContent = `WAVE ${waveNum}`;
+        if (fragEl) fragEl.textContent = `🤖 BOTS: ${aliveBots}`;
+      }
       return;
     }
 
-    if (modeEl) modeEl.textContent = mode.toUpperCase();
+    const teamBlue = teamScores?.blue ?? -1;
+    const teamRed = teamScores?.red ?? -1;
 
-    if (mode === '4v4' && teamScores) {
-      if (scoreEl) {
-        scoreEl.innerHTML = `<span style="color: #00d2ff;">BLU ${teamScores.blue}</span> - <span style="color: #ff2a55;">RED ${teamScores.red}</span>`;
+    if (
+      this.lastMatchMode !== mode ||
+      this.lastScoreA !== scoreA ||
+      this.lastScoreB !== scoreB ||
+      this.lastGoal !== goal ||
+      this.lastTeamBlue !== teamBlue ||
+      this.lastTeamRed !== teamRed
+    ) {
+      this.lastMatchMode = mode;
+      this.lastScoreA = scoreA;
+      this.lastScoreB = scoreB;
+      this.lastGoal = goal;
+      this.lastTeamBlue = teamBlue;
+      this.lastTeamRed = teamRed;
+
+      if (modeEl) modeEl.textContent = mode.toUpperCase();
+      if (fragEl) fragEl.textContent = `GOAL: ${goal}`;
+
+      if (mode === '4v4' && teamScores) {
+        if (scoreEl) {
+          scoreEl.innerHTML = `<span style="color: #00d2ff;">BLU ${teamScores.blue}</span> - <span style="color: #ff2a55;">RED ${teamScores.red}</span>`;
+        }
+      } else {
+        if (scoreEl) scoreEl.textContent = `${scoreA} - ${scoreB}`;
       }
-    } else {
-      if (scoreEl) scoreEl.textContent = `${scoreA} - ${scoreB}`;
     }
-
-    if (fragEl) fragEl.textContent = `GOAL: ${goal}`;
   }
 
   public showWaveCleared(waveNum: number, nextInSec: number): void {

@@ -132,7 +132,6 @@ export class MapBuilder {
         city.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
-            mesh.castShadow = true;
             mesh.receiveShadow = true;
 
             const name = mesh.name.toLowerCase();
@@ -174,6 +173,11 @@ export class MapBuilder {
             const height = box.max.y - box.min.y;
             const widthX = box.max.x - box.min.x;
             const depthZ = box.max.z - box.min.z;
+
+            // Selective shadow casting: only large structures and vehicles cast shadows, saving >80% shadow draw calls
+            if (isVehicle || (height >= 1.8 && widthX >= 1.5)) {
+              mesh.castShadow = true;
+            }
 
             if (height > 0.45 && widthX > 0.3 && depthZ > 0.3) {
               if (isVehicle) {

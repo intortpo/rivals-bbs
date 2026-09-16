@@ -42,6 +42,7 @@ export class TouchControls {
 
   private lookTouchId: number | null = null;
   private lookLastPos = { x: 0, y: 0 };
+  private _lookDeltas = { yaw: 0, pitch: 0 };
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -413,12 +414,10 @@ export class TouchControls {
   }
 
   public consumeLookDeltas(): { yaw: number; pitch: number } {
-    const deltas = {
-      yaw: this.state.lookDeltaYaw,
-      pitch: this.state.lookDeltaPitch
-    };
+    this._lookDeltas.yaw = this.state.lookDeltaYaw;
+    this._lookDeltas.pitch = this.state.lookDeltaPitch;
     this.state.lookDeltaYaw = 0;
     this.state.lookDeltaPitch = 0;
-    return deltas;
+    return this._lookDeltas;
   }
 }
