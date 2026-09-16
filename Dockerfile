@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Rivals BBS (Google Cloud Run)
+# Multi-stage Dockerfile for Airsoft BBS (Google Cloud Run)
 # Stage 1: Build client assets & typecheck
 FROM node:20-alpine AS builder
 

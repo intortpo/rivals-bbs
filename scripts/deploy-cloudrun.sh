@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -e
 
-# Rivals BBS - Google Cloud Run Deployment Script
-PROJECT_ID=$(gcloud config get-value project 2>/dev/null || echo "foxlight-489607")
-REGION="${GCP_REGION:-asia-southeast1}"
-SERVICE_NAME="rivals-bbs"
+# Airsoft BBS - Google Cloud Run Deployment Script
+# Usage: ./scripts/deploy-cloudrun.sh <PROJECT_ID> [REGION]
+
+set -euo pipefail
+
+PROJECT_ID="${1:-$(gcloud config get-value project 2>/dev/null || echo "foxlight-489607")}"
+REGION="${2:-asia-southeast1}"
+SERVICE_NAME="airsoft-bbs"
 
 echo "=============================================="
-echo "🚀 Deploying Rivals BBS to Google Cloud Run"
+echo "🚀 Deploying Airsoft BBS to Google Cloud Run"
 echo "Project: $PROJECT_ID"
 echo "Region:  $REGION"
 echo "Service: $SERVICE_NAME"
