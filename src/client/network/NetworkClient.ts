@@ -55,6 +55,7 @@ export class NetworkClient {
   public onOpenRoomsList?: (rooms: OpenRoomSummary[]) => void;
   public onWaveCleared?: (payload: { waveNumber: number; nextWaveInSec: number; totalWaves: number }) => void;
   public onWaveStart?: (payload: { waveNumber: number; totalBots: number }) => void;
+  public onRoomDeleted?: (payload: { roomId: string; reason?: string }) => void;
 
   constructor(
     scene: THREE.Scene,
@@ -97,6 +98,17 @@ export class NetworkClient {
       this.isInGame = true;
       this.audio.playCountdownTick(0);
       this.onGameStart?.();
+    });
+
+    this.socket.on('room_deleted', (payload: { roomId: string; reason?: string }) => {
+      console.log('[NetworkClient] Room was deleted by host:', payload);
+      this.isInGame = false;
+      this.currentRoomState = null;
+      for (const remote of this.remotePlayers.values()) {
+        remote.model.dispose();
+      }
+      this.remotePlayers.clear();
+      this.onRoomDeleted?.(payload);
     });
 
     this.socket.on('sync_snapshot', (snapshot: WorldSnapshot) => {
@@ -207,12 +219,75 @@ export class NetworkClient {
           if (response?.success) {
             this.currentRoomState = response.roomState;
             this.myId = response.playerId || this.socket.id || '';
+            if (response.roomId && response.hostSecret) {
+              this.saveHostedRoom(response.roomId, response.hostSecret);
+            }
             resolve({ success: true, roomId: response.roomId });
           } else {
             resolve({ success: false, error: response?.error || 'Create room failed' });
           }
         }
       );
+    });
+  }
+
+  public saveHostedRoom(roomId: string, hostSecret: string): void {
+    try {
+      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      const records = raw ? JSON.parse(raw) : {};
+      records[roomId.toUpperCase()] = { hostSecret, createdAt: Date.now() };
+      localStorage.setItem('airsoft_hosted_rooms', JSON.stringify(records));
+    } catch (e) {
+      console.warn('Failed to save hosted room:', e);
+    }
+  }
+
+  public getHostSecret(roomId: string): string | undefined {
+    try {
+      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      if (!raw) return undefined;
+      const records = JSON.parse(raw);
+      return records[roomId.toUpperCase()]?.hostSecret;
+    } catch {
+      return undefined;
+    }
+  }
+
+  public removeHostedRoom(roomId: string): void {
+    try {
+      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      if (!raw) return;
+      const records = JSON.parse(raw);
+      delete records[roomId.toUpperCase()];
+      localStorage.setItem('airsoft_hosted_rooms', JSON.stringify(records));
+    } catch {}
+  }
+
+  public isHostOf(roomId: string): boolean {
+    const norm = (roomId || '').toUpperCase();
+    if (this.currentRoomState?.roomId.toUpperCase() === norm) {
+      const myPlayer = this.currentRoomState.players[this.myId];
+      if (myPlayer?.isHost) return true;
+    }
+    return Boolean(this.getHostSecret(norm));
+  }
+
+  public deleteRoom(roomId: string, explicitSecret?: string): Promise<{ success: boolean; error?: string }> {
+    const norm = (roomId || '').toUpperCase();
+    const secret = explicitSecret || this.getHostSecret(norm);
+    return new Promise((resolve) => {
+      this.socket.emit('delete_room', { roomId: norm, hostSecret: secret }, (res: any) => {
+        if (res?.success) {
+          this.removeHostedRoom(norm);
+          if (this.currentRoomState?.roomId.toUpperCase() === norm) {
+            this.currentRoomState = null;
+            this.isInGame = false;
+          }
+          resolve({ success: true });
+        } else {
+          resolve({ success: false, error: res?.error || 'Failed to delete room.' });
+        }
+      });
     });
   }
 
@@ -246,6 +321,10 @@ export class NetworkClient {
 
   public startCountdown(): void {
     this.socket.emit('start_countdown');
+  }
+
+  public requestRooms(): void {
+    this.socket.emit('request_rooms');
   }
 
   public sendInput(input: PlayerInputPayload): void {

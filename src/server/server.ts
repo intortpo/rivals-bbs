@@ -146,6 +146,28 @@ app.post('/api/stats/match', (req, res) => {
   res.json({ success: true, user: updated });
 });
 
+app.post('/api/stats/match/delete', (req, res) => {
+  const token = getAuthToken(req);
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return;
+  }
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    res.status(401).json({ error: 'Invalid token.' });
+    return;
+  }
+
+  const { matchIndex, clearAll } = req.body || {};
+  let updated;
+  if (clearAll) {
+    updated = userManager.clearMatchHistory(user.id);
+  } else {
+    updated = userManager.deleteMatchHistoryEntry(user.id, Number(matchIndex));
+  }
+  res.json({ success: true, user: updated });
+});
+
 // Provide public open rooms list for lobby browser
 app.get('/api/rooms', (_req, res) => {
   res.json({ rooms: roomManager.getOpenRoomsList() });
@@ -198,7 +220,7 @@ io.on('connection', (socket) => {
   socket.on('create_room', (data, callback) => {
     try {
       const { playerName, mode, fragLimit, mapName, outfitIndex, customization } = data || {};
-      const { roomId, session } = roomManager.createRoom(
+      const { roomId, session, hostSecret } = roomManager.createRoom(
         socket,
         playerName,
         mode,
@@ -213,7 +235,8 @@ io.on('connection', (socket) => {
           success: true,
           roomId,
           roomState: session.roomState,
-          playerId: socket.id
+          playerId: socket.id,
+          hostSecret
         });
       }
       session.broadcastRoomState();
@@ -290,6 +313,21 @@ io.on('connection', (socket) => {
     const session = roomManager.getSessionBySocketId(socket.id);
     if (session) {
       session.handlePlayerVoidFall(socket.id);
+    }
+  });
+
+  socket.on('delete_room', (data, callback) => {
+    try {
+      const { roomId, hostSecret } = data || {};
+      if (!roomId) {
+        if (callback) callback({ success: false, error: 'Room ID required.' });
+        return;
+      }
+      const result = roomManager.deleteRoom(roomId, socket.id, hostSecret);
+      if (callback) callback(result);
+    } catch (err: any) {
+      console.error('[Socket] delete_room error:', err);
+      if (callback) callback({ success: false, error: err?.message || 'Failed to delete room.' });
     }
   });
 

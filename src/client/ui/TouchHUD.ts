@@ -177,6 +177,7 @@ export class TouchHUD {
           <div id="hud-scoreboard-table" style="width: 100%; margin-bottom: 24px;"></div>
 
           <button id="btn-return-lobby" class="btn btn-primary" style="width: 100%; pointer-events: auto !important; cursor: pointer;">Return to Lobby</button>
+          <button id="btn-delete-match-end" class="btn" style="width: 100%; margin-top: 10px; padding: 12px; font-size: 14px; font-weight: 800; background: rgba(255, 42, 85, 0.25); border: 1px solid #ff2a55; color: #ff2a55; border-radius: 10px; display: none; cursor: pointer; pointer-events: auto !important;">🗑️ Delete Room & Close Match</button>
         </div>
       </div>
     `;
@@ -554,7 +555,9 @@ export class TouchHUD {
     myId: string,
     onReturnToLobby: () => void,
     mode?: string,
-    currentWave?: number
+    currentWave?: number,
+    isHost?: boolean,
+    onDeleteRoom?: () => void
   ): void {
     const titleEl = document.getElementById('hud-winner-title');
     const descEl = document.getElementById('hud-winner-desc');
@@ -621,6 +624,21 @@ export class TouchHUD {
         this.gameOverModalEl.style.display = 'none';
         onReturnToLobby();
       };
+    }
+
+    const deleteBtn = document.getElementById('btn-delete-match-end');
+    if (deleteBtn) {
+      if (isHost && onDeleteRoom) {
+        deleteBtn.style.display = 'block';
+        deleteBtn.onclick = () => {
+          if (confirm('Delete this game room? All players will be returned to the lobby.')) {
+            this.gameOverModalEl.style.display = 'none';
+            onDeleteRoom();
+          }
+        };
+      } else {
+        deleteBtn.style.display = 'none';
+      }
     }
 
     if (document.pointerLockElement) {

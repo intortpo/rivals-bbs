@@ -14,9 +14,14 @@ async function runTest() {
 
   io.on('connection', (socket) => {
     socket.on('create_room', (data, cb) => {
-      const { roomId, session } = roomManager.createRoom(socket, data.playerName, data.mode, data.fragLimit);
-      if (cb) cb({ success: true, roomId, roomState: session.roomState, playerId: socket.id });
+      const { roomId, session, hostSecret } = roomManager.createRoom(socket, data.playerName, data.mode, data.fragLimit);
+      if (cb) cb({ success: true, roomId, roomState: session.roomState, playerId: socket.id, hostSecret });
       session.broadcastRoomState();
+    });
+
+    socket.on('delete_room', (data, cb) => {
+      const res = roomManager.deleteRoom(data.roomId, socket.id, data.hostSecret);
+      if (cb) cb(res);
     });
 
     socket.on('join_room', (data, cb) => {
@@ -213,10 +218,79 @@ async function runTest() {
   }
   console.log(`✓ Shield absorbed damage cleanly: PlayerB Health=${targetPlayer.health}, Shield=${targetPlayer.shieldHp}`);
 
+  // Step 10: Test Host Game Deletion & Security Authorization
+  console.log('🧪 Testing Host Game Deletion & Security Authorization...');
+  const createDeleteRes = await new Promise<any>((res) => {
+    clientA.emit('create_room', { playerName: 'HostBoss', mode: '1v1', fragLimit: 5 }, (response: any) => {
+      res(response);
+    });
+  });
+  const deleteRoomId = createDeleteRes.roomId;
+  const hostSecret = createDeleteRes.hostSecret;
+
+  if (!hostSecret || typeof hostSecret !== 'string') {
+    throw new Error('Expected hostSecret to be returned on room creation');
+  }
+  console.log(`✓ Room created with cryptographic hostSecret: ${deleteRoomId}`);
+
+  // Client B joins the room
+  await new Promise<any>((res) => {
+    clientB.emit('join_room', { roomId: deleteRoomId, playerName: 'GuestB' }, (response: any) => {
+      res(response);
+    });
+  });
+  console.log(`✓ Guest joined ${deleteRoomId}`);
+
+  // Unauthorized deletion attempt by Client B (without hostSecret)
+  const unauthDeleteRes = await new Promise<any>((res) => {
+    clientB.emit('delete_room', { roomId: deleteRoomId }, (response: any) => {
+      res(response);
+    });
+  });
+  if (unauthDeleteRes.success) {
+    throw new Error('Unauthorized deletion by non-host should have failed');
+  }
+  console.log('✓ Unauthorized deletion attempt by guest was correctly rejected');
+
+  // Set up listener for room_deleted on guest Client B
+  const guestDeletedPromise = new Promise<any>((resolve) => {
+    clientB.once('room_deleted', (payload: any) => {
+      resolve(payload);
+    });
+  });
+
+  // Host Client A deletes room using hostSecret
+  const authDeleteRes = await new Promise<any>((res) => {
+    clientA.emit('delete_room', { roomId: deleteRoomId, hostSecret }, (response: any) => {
+      res(response);
+    });
+  });
+  if (!authDeleteRes.success) {
+    throw new Error(`Authorized room deletion failed: ${JSON.stringify(authDeleteRes)}`);
+  }
+  console.log(`✓ Host successfully deleted room ${deleteRoomId}`);
+
+  const guestPayload = await guestDeletedPromise;
+  if (guestPayload.roomId !== deleteRoomId) {
+    throw new Error(`Guest received wrong room_deleted payload: ${JSON.stringify(guestPayload)}`);
+  }
+  console.log(`✓ Guest received room_deleted notification: "${guestPayload.reason}"`);
+
+  // Verify room is removed from open rooms list and getSession is undefined
+  const openRoomsAfterDelete = roomManager.getOpenRoomsList();
+  if (openRoomsAfterDelete.some(r => r.roomId === deleteRoomId)) {
+    throw new Error(`Deleted room ${deleteRoomId} still exists in open rooms list`);
+  }
+  if (roomManager.getSession(deleteRoomId)) {
+    throw new Error(`Deleted room ${deleteRoomId} session still exists in roomManager`);
+  }
+  console.log('✓ Verified deleted room is completely removed from RoomManager');
+
   // Cleanup
   clientA.disconnect();
+  clientB.disconnect();
   io.close();
-  console.log('🎉 ALL SERVER, 4v4 & POWERUP TESTS PASSED CLEANLY!\n');
+  console.log('🎉 ALL SERVER, 4v4, POWERUP & ROOM DELETION TESTS PASSED CLEANLY!\n');
   process.exit(0);
 }
 

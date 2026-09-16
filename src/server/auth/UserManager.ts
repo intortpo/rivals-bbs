@@ -316,6 +316,34 @@ export class UserManager {
     return this.toPublic(u);
   }
 
+  public deleteMatchHistoryEntry(userId: string, matchIndex: number): PublicUserProfile | null {
+    const u = this.usersById.get(userId);
+    if (!u || !u.stats.matchHistory) return null;
+    if (matchIndex < 0 || matchIndex >= u.stats.matchHistory.length) return this.toPublic(u);
+
+    const [removed] = u.stats.matchHistory.splice(matchIndex, 1);
+    if (removed) {
+      u.stats.gamesPlayed = Math.max(0, u.stats.gamesPlayed - 1);
+      if (removed.won) u.stats.wins = Math.max(0, u.stats.wins - 1);
+      u.stats.kills = Math.max(0, u.stats.kills - (removed.kills || 0));
+      u.stats.deaths = Math.max(0, (u.stats.deaths || 0) - (removed.deaths || 0));
+      this.saveUsers();
+    }
+    return this.toPublic(u);
+  }
+
+  public clearMatchHistory(userId: string): PublicUserProfile | null {
+    const u = this.usersById.get(userId);
+    if (!u) return null;
+    u.stats.matchHistory = [];
+    u.stats.gamesPlayed = 0;
+    u.stats.wins = 0;
+    u.stats.kills = 0;
+    u.stats.deaths = 0;
+    this.saveUsers();
+    return this.toPublic(u);
+  }
+
   public recordPowerupUsage(userId: string, count: number = 1): PublicUserProfile | null {
     const u = this.usersById.get(userId);
     if (!u) return null;

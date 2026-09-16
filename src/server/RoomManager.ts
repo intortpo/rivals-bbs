@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Server, Socket } from 'socket.io';
 import { GameSession } from './GameSession.js';
 import { GameMode, OpenRoomSummary, RoomNetworkState, TeamColor, CharacterCustomization } from '../shared/types.js';
@@ -30,7 +31,7 @@ export class RoomManager {
     mapName: string = 'Cartoon City',
     outfitIndex: number = 0,
     customization?: CharacterCustomization
-  ): { roomId: string; session: GameSession } {
+  ): { roomId: string; session: GameSession; hostSecret: string } {
     const roomId = this.generateRoomId();
     const color = PLAYER_COLORS[0];
     const defaultFrag = mode === '4v4' ? 20 : mode === 'wave' ? (fragLimit || 10) : (fragLimit || NETWORK.DEFAULT_FRAG_LIMIT);
@@ -47,7 +48,14 @@ export class RoomManager {
       teamScores: mode === '4v4' ? { blue: 0, red: 0 } : undefined
     };
 
-    const session = new GameSession(this.io, initialRoomState, () => this.broadcastOpenRooms());
+    const hostSecret = crypto.randomBytes(16).toString('hex');
+    const session = new GameSession(
+      this.io,
+      initialRoomState,
+      () => this.broadcastOpenRooms(),
+      hostSecret,
+      playerName || 'Host Rival'
+    );
     const hostTeam: TeamColor = (mode === '4v4' || mode === 'wave') ? 'blue' : 'none';
     session.addPlayer(hostSocket.id, playerName || 'Host Rival', color, true, hostTeam, outfitIndex, customization);
 
@@ -56,7 +64,7 @@ export class RoomManager {
     hostSocket.join(roomId);
 
     this.broadcastOpenRooms();
-    return { roomId, session };
+    return { roomId, session, hostSecret };
   }
 
   public joinRoom(
@@ -114,6 +122,49 @@ export class RoomManager {
     return { success: true, session };
   }
 
+  public deleteRoom(
+    roomId: string,
+    requesterSocketId: string,
+    hostSecret?: string
+  ): { success: boolean; error?: string } {
+    const normRoomId = (roomId || '').trim().toUpperCase();
+    const session = this.rooms.get(normRoomId);
+    if (!session) {
+      return { success: false, error: 'Room not found.' };
+    }
+
+    // Verify ownership: socket is current hostId OR hostSecret matches
+    const isHostSocket = session.roomState.hostId === requesterSocketId;
+    const isSecretMatch = Boolean(hostSecret && session.hostSecret && session.hostSecret === hostSecret);
+
+    if (!isHostSocket && !isSecretMatch) {
+      return { success: false, error: 'Unauthorized: Only the game host can delete this room.' };
+    }
+
+    console.log(`[RoomManager] Room ${normRoomId} deleted by host (socket: ${requesterSocketId}, secretMatch: ${isSecretMatch})`);
+
+    // Notify all players in room
+    this.io.to(normRoomId).emit('room_deleted', {
+      roomId: normRoomId,
+      reason: 'The game host cancelled and deleted this room.'
+    });
+
+    // Make all sockets leave this socket.io room and clear mappings
+    for (const [sockId, rId] of this.socketToRoom.entries()) {
+      if (rId === normRoomId) {
+        this.socketToRoom.delete(sockId);
+        const s = this.io.sockets.sockets?.get(sockId);
+        s?.leave(normRoomId);
+      }
+    }
+
+    session.stop();
+    this.rooms.delete(normRoomId);
+    this.broadcastOpenRooms();
+
+    return { success: true };
+  }
+
   public leaveRoom(socket: Socket): void {
     const roomId = this.socketToRoom.get(socket.id);
     if (!roomId) return;
@@ -124,14 +175,22 @@ export class RoomManager {
     const session = this.rooms.get(roomId);
     if (!session) return;
 
+    const wasHost = session.roomState.hostId === socket.id;
     session.removePlayer(socket.id);
 
-    // If no players remain or game has ended, clean up room
-    const remainingCount = Object.keys(session.roomState.players).length;
-    if (remainingCount === 0 || session.roomState.status === 'game_over') {
+    // Filter out bots to check if any real human players remain
+    const remainingHumans = Object.values(session.roomState.players).filter(p => !p.isBot);
+
+    if (remainingHumans.length === 0 || session.roomState.status === 'game_over') {
       session.stop();
       this.rooms.delete(roomId);
       console.log(`[RoomManager] Room ${roomId} cleaned up. Active rooms: ${this.rooms.size}`);
+    } else if (wasHost && session.roomState.status === 'lobby') {
+      const nextHost = remainingHumans[0];
+      session.roomState.hostId = nextHost.id;
+      nextHost.isHost = true;
+      session.broadcastRoomState();
+      console.log(`[RoomManager] Host migrated in room ${roomId} to ${nextHost.name} (${nextHost.id})`);
     }
 
     this.broadcastOpenRooms();
@@ -145,14 +204,22 @@ export class RoomManager {
     const session = this.rooms.get(roomId);
     if (!session) return;
 
+    const wasHost = session.roomState.hostId === socket.id;
     session.removePlayer(socket.id);
 
-    // If no players remain, clean up room
-    const remainingCount = Object.keys(session.roomState.players).length;
-    if (remainingCount === 0 || session.roomState.status === 'game_over') {
+    // Filter out bots to check if any real human players remain
+    const remainingHumans = Object.values(session.roomState.players).filter(p => !p.isBot);
+
+    if (remainingHumans.length === 0 || session.roomState.status === 'game_over') {
       session.stop();
       this.rooms.delete(roomId);
       console.log(`[RoomManager] Room ${roomId} closed (empty/finished). Active rooms: ${this.rooms.size}`);
+    } else if (wasHost && session.roomState.status === 'lobby') {
+      const nextHost = remainingHumans[0];
+      session.roomState.hostId = nextHost.id;
+      nextHost.isHost = true;
+      session.broadcastRoomState();
+      console.log(`[RoomManager] Host migrated on disconnect in room ${roomId} to ${nextHost.name}`);
     }
 
     this.broadcastOpenRooms();

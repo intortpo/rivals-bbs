@@ -169,6 +169,20 @@ class GameApp {
       },
       onLeaveRoom: () => {
         this.networkClient.leaveRoom();
+        this.lobbyUI.showMainMenu();
+      },
+      onDeleteRoom: async (roomId: string) => {
+        const res = await this.networkClient.deleteRoom(roomId);
+        if (res.success) {
+          this.lobbyUI.showToast(`Room ${roomId} deleted.`, false);
+          this.lobbyUI.showMainMenu();
+          this.networkClient.requestRooms();
+        } else {
+          this.lobbyUI.showToast(res.error || 'Failed to delete room.', true);
+        }
+      },
+      isHostOfRoom: (roomId: string) => {
+        return this.networkClient.isHostOf(roomId);
       },
       onOpenQRScanner: () => {
         this.audio.touchUnlock();
@@ -321,6 +335,17 @@ class GameApp {
       this.lobbyUI.updateOpenRooms(rooms);
     };
 
+    this.networkClient.onRoomDeleted = (payload) => {
+      this.isDead = false;
+      this.hud.setVisible(false);
+      this.hud.hideWaveBanner();
+      this.lobbyUI.showMainMenu();
+      this.lobbyUI.showToast(payload.reason || `Room ${payload.roomId} was cancelled and deleted.`, true);
+      if (document.pointerLockElement) {
+        document.exitPointerLock?.();
+      }
+    };
+
     this.networkClient.onWaveCleared = (payload) => {
       this.audio.playWaveClear();
       this.hud.showWaveCleared(payload.waveNumber, payload.nextWaveInSec);
@@ -377,6 +402,8 @@ class GameApp {
     this.networkClient.onGameOver = async (payload) => {
       const mode = this.networkClient.currentRoomState?.mode;
       const currentWave = this.networkClient.currentRoomState?.waveState?.currentWave;
+      const roomId = this.networkClient.currentRoomState?.roomId;
+      const isHost = roomId ? this.networkClient.isHostOf(roomId) : false;
 
       this.hud.showGameOver(
         payload,
@@ -387,7 +414,16 @@ class GameApp {
           this.hud.setVisible(false);
         },
         mode,
-        currentWave
+        currentWave,
+        isHost,
+        roomId ? async () => {
+          const res = await this.networkClient.deleteRoom(roomId);
+          if (res.success) {
+            this.lobbyUI.showToast(`Room ${roomId} closed and deleted.`, false);
+          }
+          this.lobbyUI.showMainMenu();
+          this.hud.setVisible(false);
+        } : undefined
       );
 
       // Record match result to dashboard if logged in

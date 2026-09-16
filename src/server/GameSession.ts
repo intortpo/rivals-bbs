@@ -39,12 +39,18 @@ export class GameSession {
   private onStateChange?: () => void;
   public waveManager: WaveManager | null = null;
   private mapObstacles: BoundingBox[] = [];
+  public hostSecret: string = '';
+  public hostName: string = '';
+  public createdAt: number = Date.now();
 
-  constructor(io: Server, roomState: RoomNetworkState, onStateChange?: () => void) {
+  constructor(io: Server, roomState: RoomNetworkState, onStateChange?: () => void, hostSecret: string = '', hostName: string = '') {
     this.io = io;
     this.roomState = roomState;
     this.onStateChange = onStateChange;
     this.mapObstacles = getMapObstacles(roomState.mapName);
+    this.hostSecret = hostSecret;
+    this.hostName = hostName;
+    this.createdAt = Date.now();
   }
 
   public get roomId(): string {

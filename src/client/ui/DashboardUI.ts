@@ -155,8 +155,13 @@ export class DashboardUI {
 
         <!-- Recent Match History Table -->
         <div style="background: #0e1220; border: 1px solid #252e4d; border-radius: 14px; padding: 14px;">
-          <div style="font-size: 13px; font-weight: 800; color: #8da2c0; margin-bottom: 8px;">
-            🕒 RECENT MATCH HISTORY
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="font-size: 13px; font-weight: 800; color: #8da2c0;">
+              🕒 RECENT MATCH HISTORY
+            </div>
+            <button id="btn-clear-match-history" style="background: transparent; border: 1px solid rgba(255, 42, 85, 0.4); color: #ff2a55; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 800; cursor: pointer; display: none;">
+              Clear All
+            </button>
           </div>
           <div id="dash-match-history-table" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
             <div style="color: #61738d; font-size: 12px; text-align: center; padding: 16px;">
@@ -266,9 +271,18 @@ export class DashboardUI {
       }
 
       // Render Match History Table
+      const clearBtn = document.getElementById('btn-clear-match-history');
       if (historyTable && stats?.matchHistory && stats.matchHistory.length > 0) {
+        if (clearBtn) {
+          clearBtn.style.display = 'block';
+          clearBtn.onclick = () => {
+            if (confirm('Clear all match history?')) {
+              this.deleteMatchHistory(undefined, true);
+            }
+          };
+        }
         let rows = '';
-        for (const m of stats.matchHistory) {
+        stats.matchHistory.forEach((m, idx) => {
           const outcomeColor = m.won ? '#00ff88' : '#ff2a55';
           const outcomeText = m.won ? 'VICTORY' : 'DEFEAT';
           const dateStr = new Date(m.date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -279,14 +293,34 @@ export class DashboardUI {
                 <span style="color: #00d2ff; font-weight: bold;">${m.mode.toUpperCase()}</span>
                 <span style="color: #8da2c0;">${m.map}</span>
               </div>
-              <div style="display: flex; align-items: center; gap: 12px; font-weight: bold;">
+              <div style="display: flex; align-items: center; gap: 10px; font-weight: bold;">
                 <span style="color: white;">⚡ ${m.kills} K / ${m.deaths} D</span>
                 <span style="color: #8da2c0; font-size: 10px;">${dateStr}</span>
+                <button class="btn-delete-match" data-index="${idx}" title="Delete match record" style="background: transparent; border: none; color: #ff2a55; cursor: pointer; font-size: 13px; padding: 2px 4px; opacity: 0.8; transition: opacity 0.15s;">🗑️</button>
               </div>
             </div>
           `;
-        }
+        });
         historyTable.innerHTML = rows;
+
+        historyTable.querySelectorAll('.btn-delete-match').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idxStr = btn.getAttribute('data-index');
+            if (idxStr !== null) {
+              this.deleteMatchHistory(parseInt(idxStr, 10), false);
+            }
+          });
+        });
+      } else {
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (historyTable) {
+          historyTable.innerHTML = `
+            <div style="color: #61738d; font-size: 12px; text-align: center; padding: 16px;">
+              No match history recorded yet. Complete a 1v1 or 4v4 match!
+            </div>
+          `;
+        }
       }
     } else {
       if (userEl) userEl.textContent = '👤 Guest Pilot';
@@ -301,6 +335,29 @@ export class DashboardUI {
       if (streakEl) streakEl.textContent = '0';
       if (solvedEl) solvedEl.textContent = '0';
       if (ammoEl) ammoEl.textContent = '+0';
+    }
+  }
+
+  private async deleteMatchHistory(matchIndex?: number, clearAll?: boolean): Promise<void> {
+    const token = localStorage.getItem('rivals_auth_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/stats/match/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ matchIndex, clearAll })
+      });
+      const data = await res.json();
+      if (data?.success && data?.user) {
+        this.currentUser = data.user;
+        this.renderData();
+      }
+    } catch (err) {
+      console.error('Failed to delete match history:', err);
     }
   }
 

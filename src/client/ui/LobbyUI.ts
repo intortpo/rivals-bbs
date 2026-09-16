@@ -26,6 +26,8 @@ export interface LobbyCallbacks {
   onOpenCharacterBuilder?: () => void;
   onRefreshRooms?: () => void;
   onLeaveRoom?: () => void;
+  onDeleteRoom?: (roomId: string) => void;
+  isHostOfRoom?: (roomId: string) => boolean;
 }
 
 export class LobbyUI {
@@ -269,6 +271,9 @@ export class LobbyUI {
           </div>
           <button id="btn-leave-room" class="btn btn-secondary" style="width: 100%; margin-top: 10px; padding: 10px; font-size: 14px;">
             ← Leave Room
+          </button>
+          <button id="btn-delete-room" class="btn" style="width: 100%; margin-top: 10px; padding: 11px; font-size: 14px; background: rgba(255, 42, 85, 0.2); border: 1px solid #ff2a55; color: #ff2a55; border-radius: 10px; font-weight: 800; cursor: pointer; display: none; transition: all 0.15s ease;">
+            🗑️ Cancel & Delete Game
           </button>
         </div>
       </div>
@@ -518,6 +523,17 @@ export class LobbyUI {
         this.callbacks.onLeaveRoom();
       }
     });
+
+    // Delete room button (Host)
+    document.getElementById('btn-delete-room')?.addEventListener('click', () => {
+      const roomBadge = document.getElementById('in-room-code-badge');
+      const roomId = roomBadge?.textContent?.trim();
+      if (roomId && this.callbacks.onDeleteRoom) {
+        if (confirm(`Are you sure you want to delete room ${roomId}? This will close the match for all players.`)) {
+          this.callbacks.onDeleteRoom(roomId);
+        }
+      }
+    });
   }
 
   public updateOpenRooms(rooms: OpenRoomSummary[]): void {
@@ -545,27 +561,34 @@ export class LobbyUI {
 
     container.innerHTML = this.currentOpenRooms.map(r => {
       const isFull = r.playerCount >= r.maxPlayers;
+      const isHostedByMe = this.callbacks.isHostOfRoom ? this.callbacks.isHostOfRoom(r.roomId) : false;
       const modeLabel = r.mode === '4v4' ? '🛡️ 4v4 Team DM' : r.mode === 'wave' ? '🧟 Wave Survival' : '⚔️ 1v1 Duel';
       const statusColor = r.status === 'playing' ? '#ffbb00' : '#00ff88';
       const statusLabel = r.status === 'playing' ? 'In Match' : 'In Lobby';
 
       return `
-        <div class="room-browser-card">
+        <div class="room-browser-card" style="${isHostedByMe ? 'border: 1px solid rgba(255, 42, 85, 0.45); box-shadow: 0 0 10px rgba(255, 42, 85, 0.15);' : ''}">
           <div style="text-align: left;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 16px; font-weight: 900; color: #00d2ff; letter-spacing: 1px;">${r.roomId}</span>
               <span style="font-size: 11px; background: #1c243a; padding: 2px 6px; border-radius: 6px; color: white;">${modeLabel}</span>
+              ${isHostedByMe ? `<span style="font-size: 9px; background: rgba(255, 42, 85, 0.25); border: 1px solid #ff2a55; color: #ff2a55; padding: 2px 6px; border-radius: 5px; font-weight: 900;">👑 YOUR GAME</span>` : ''}
             </div>
             <div style="font-size: 11px; color: #8da2c0; margin-top: 3px;">
               Host: <strong>${r.hostName}</strong> • ${r.mapName}
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
             <div style="text-align: right;">
               <div style="font-size: 13px; font-weight: 900; color: white;">${r.playerCount}/${r.maxPlayers}</div>
               <div style="font-size: 10px; color: ${statusColor}; font-weight: bold;">● ${statusLabel}</div>
             </div>
+            ${isHostedByMe ? `
+              <button class="btn btn-delete-room-card" data-room="${r.roomId}" title="Delete hosted game" style="background: rgba(255, 42, 85, 0.25); border: 1px solid #ff2a55; color: #ff2a55; padding: 8px 10px; font-size: 12px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                🗑️
+              </button>
+            ` : ''}
             <button class="btn ${isFull ? 'btn-secondary' : 'btn-primary'} btn-join-room-card" data-room="${r.roomId}" ${isFull ? 'disabled' : ''} style="padding: 8px 14px; font-size: 12px;">
               ${isFull ? 'Full' : 'Join'}
             </button>
@@ -573,6 +596,19 @@ export class LobbyUI {
         </div>
       `;
     }).join('');
+
+    // Attach delete listeners to room cards
+    container.querySelectorAll('.btn-delete-room-card').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const roomId = btn.getAttribute('data-room');
+        if (roomId && this.callbacks.onDeleteRoom) {
+          if (confirm(`Delete your game room ${roomId}? This will close the match for all players.`)) {
+            this.callbacks.onDeleteRoom(roomId);
+          }
+        }
+      });
+    });
 
     // Attach join listeners to room cards
     container.querySelectorAll('.btn-join-room-card').forEach(btn => {
@@ -708,15 +744,60 @@ export class LobbyUI {
       }
     }
 
+    const deleteBtn = document.getElementById('btn-delete-room') as HTMLButtonElement;
+    const leaveBtn = document.getElementById('btn-leave-room') as HTMLButtonElement;
+
     if (startBtn && waitMsg) {
       if (isHost) {
         startBtn.style.display = 'block';
+        if (deleteBtn) deleteBtn.style.display = 'block';
+        if (leaveBtn) leaveBtn.style.display = 'none';
         waitMsg.style.display = 'none';
       } else {
         startBtn.style.display = 'none';
+        if (deleteBtn) deleteBtn.style.display = 'none';
+        if (leaveBtn) leaveBtn.style.display = 'block';
         waitMsg.style.display = 'block';
       }
     }
+  }
+
+  public showToast(message: string, isError: boolean = false): void {
+    let toast = document.getElementById('lobby-toast-notification');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'lobby-toast-notification';
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        padding: 10px 22px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.75);
+        pointer-events: none;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      `;
+      document.body.appendChild(toast);
+    }
+
+    toast.style.background = isError ? 'rgba(255, 42, 85, 0.95)' : 'rgba(0, 210, 255, 0.95)';
+    toast.style.border = isError ? '1px solid #ff2a55' : '1px solid #00d2ff';
+    toast.style.color = isError ? '#ffffff' : '#080c18';
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+
+    setTimeout(() => {
+      if (toast) {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(-10px)';
+      }
+    }, 3500);
   }
 
   public hideLobby(): void {
