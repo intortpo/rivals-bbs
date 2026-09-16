@@ -54,6 +54,7 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
 export class MapBuilder {
   public collisionBoxes: THREE.Box3[] = [];
   public rooftopBoxes: THREE.Box3[] = [];
+  public ladderBoxes: THREE.Box3[] = [];
   public jumpPads: JumpPad[] = [];
   public teleportPorts: TeleportPort[] = [];
   public hasGroundPlane: boolean = true;
@@ -115,43 +116,43 @@ export class MapBuilder {
     this.buildSkydropHorizon(this.skyTheme);
 
     if (mapName === 'Cartoon City') {
-      this.bounds = { minX: -56, maxX: 56, minZ: -70, maxZ: 70 };
+      this.bounds = { minX: -80, maxX: 80, minZ: -100, maxZ: 100 };
       this.hasGroundPlane = true;
       this.buildCartoonCity();
     } else if (mapName === 'Neon Warehouse') {
-      this.bounds = { minX: -33, maxX: 33, minZ: -33, maxZ: 33 };
+      this.bounds = { minX: -50, maxX: 50, minZ: -50, maxZ: 50 };
       this.hasGroundPlane = true;
       this.buildWarehouseMap();
     } else if (mapName === 'Cyber Spire') {
-      this.bounds = { minX: -35, maxX: 35, minZ: -35, maxZ: 35 };
+      this.bounds = { minX: -55, maxX: 55, minZ: -55, maxZ: 55 };
       this.hasGroundPlane = false;
       this.buildCyberSpire();
     } else if (mapName === 'Quantum Lab') {
-      this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
+      this.bounds = { minX: -52, maxX: 52, minZ: -52, maxZ: 52 };
       this.hasGroundPlane = true;
       this.buildQuantumLab();
     } else if (mapName === 'Magma Foundry') {
-      this.bounds = { minX: -34, maxX: 34, minZ: -34, maxZ: 34 };
+      this.bounds = { minX: -54, maxX: 54, minZ: -54, maxZ: 54 };
       this.hasGroundPlane = false;
       this.buildMagmaFoundry();
     } else if (mapName === 'Subzero Station') {
-      this.bounds = { minX: -33, maxX: 33, minZ: -33, maxZ: 33 };
+      this.bounds = { minX: -52, maxX: 52, minZ: -52, maxZ: 52 };
       this.hasGroundPlane = true;
       this.buildSubzeroStation();
     } else if (mapName === 'Sky Sanctuary') {
-      this.bounds = { minX: -40, maxX: 40, minZ: -40, maxZ: 40 };
+      this.bounds = { minX: -65, maxX: 65, minZ: -65, maxZ: 65 };
       this.hasGroundPlane = false;
       this.buildSkySanctuary();
     } else {
-      this.bounds = { minX: -28, maxX: 28, minZ: -28, maxZ: 28 };
+      this.bounds = { minX: -45, maxX: 45, minZ: -45, maxZ: 45 };
       this.hasGroundPlane = true;
       this.buildClassicArena();
     }
   }
 
   private buildCartoonCity(): void {
-    // 1. Base ground plane to ensure complete ground coverage
-    const floorGeo = new THREE.PlaneGeometry(120, 150);
+    // 1. Base ground plane to ensure complete ground coverage across expanded arena
+    const floorGeo = new THREE.PlaneGeometry(180, 220);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({
       color: '#1a1d28',
@@ -163,100 +164,144 @@ export class MapBuilder {
     this.group.add(floor);
 
     // 2. Load 3D Cartoon City GLB
-    const loader = new GLTFLoader();
-    loader.load(
-      '/models/maps/cartoon_city.glb',
-      (gltf) => {
-        const city = gltf.scene;
-        this.group.add(city);
+    if (typeof window !== 'undefined') {
+      const loader = new GLTFLoader();
+      loader.load(
+        '/models/maps/cartoon_city.glb',
+        (gltf) => {
+          const city = gltf.scene;
+          this.group.add(city);
 
-        city.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            mesh.receiveShadow = true;
+          city.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              mesh.receiveShadow = true;
 
-            const name = mesh.name.toLowerCase();
-            const mat = mesh.material as THREE.Material | THREE.Material[];
-            const matName = Array.isArray(mat)
-              ? mat.map((m) => m.name.toLowerCase()).join(' ')
-              : mat?.name?.toLowerCase() || '';
+              const name = mesh.name.toLowerCase();
+              const mat = mesh.material as THREE.Material | THREE.Material[];
+              const matName = Array.isArray(mat)
+                ? mat.map((m) => m.name.toLowerCase()).join(' ')
+                : mat?.name?.toLowerCase() || '';
 
-            // 1. Skip walkable ground and road meshes
-            const isGround =
-              name.includes('road') ||
-              name.includes('asphalt') ||
-              name.includes('tile') ||
-              name.includes('grass') ||
-              matName.includes('road') ||
-              matName.includes('asphalt') ||
-              matName.includes('tile') ||
-              matName.includes('grass');
+              // 1. Skip walkable ground and road meshes
+              const isGround =
+                name.includes('road') ||
+                name.includes('asphalt') ||
+                name.includes('tile') ||
+                name.includes('grass') ||
+                matName.includes('road') ||
+                matName.includes('asphalt') ||
+                matName.includes('tile') ||
+                matName.includes('grass');
 
-            if (isGround) return;
+              if (isGround) return;
 
-            // 2. Exclude wheels, spoilers, and non-blocking decorative props
-            const isExcluded =
-              name.includes('wheel') ||
-              name.includes('spoiler') ||
-              name.includes('bush') ||
-              name.includes('trash') ||
-              name.includes('graffiti') ||
-              name.includes('billboard') ||
-              name.includes('signboard') ||
-              name.includes('spotlight') ||
-              name.includes('palm');
+              // 2. Exclude wheels, spoilers, and non-blocking decorative props
+              const isExcluded =
+                name.includes('wheel') ||
+                name.includes('spoiler') ||
+                name.includes('bush') ||
+                name.includes('trash') ||
+                name.includes('graffiti') ||
+                name.includes('billboard') ||
+                name.includes('signboard') ||
+                name.includes('spotlight') ||
+                name.includes('palm');
 
-            if (isExcluded) return;
+              if (isExcluded) return;
 
-            // 3. Process vehicle and building obstacles
-            const isVehicle = name.includes('car') || name.includes('van') || name.includes('futuristic');
-            const box = new THREE.Box3().setFromObject(mesh);
-            const height = box.max.y - box.min.y;
-            const widthX = box.max.x - box.min.x;
-            const depthZ = box.max.z - box.min.z;
+              // 3. Process vehicle and building obstacles
+              const isVehicle = name.includes('car') || name.includes('van') || name.includes('futuristic');
+              const box = new THREE.Box3().setFromObject(mesh);
+              const height = box.max.y - box.min.y;
+              const widthX = box.max.x - box.min.x;
+              const depthZ = box.max.z - box.min.z;
 
-            // Selective shadow casting: only large structures and vehicles cast shadows, saving >80% shadow draw calls
-            if (isVehicle || (height >= 1.8 && widthX >= 1.5)) {
-              mesh.castShadow = true;
-            }
+              // Selective shadow casting: only large structures and vehicles cast shadows, saving >80% shadow draw calls
+              if (isVehicle || (height >= 1.8 && widthX >= 1.5)) {
+                mesh.castShadow = true;
+              }
 
-            if (height > 0.45 && widthX > 0.3 && depthZ > 0.3) {
-              if (isVehicle) {
-                // Inset vehicle horizontal bounds slightly (0.12m) to hug visible chassis
-                box.min.x += 0.12;
-                box.max.x -= 0.12;
-                box.min.z += 0.12;
-                box.max.z -= 0.12;
-                this.collisionBoxes.push(box);
+              if (height > 0.45 && widthX > 0.3 && depthZ > 0.3) {
+                if (isVehicle) {
+                  // Inset vehicle horizontal bounds slightly (0.12m) to hug visible chassis
+                  box.min.x += 0.12;
+                  box.max.x -= 0.12;
+                  box.min.z += 0.12;
+                  box.max.z -= 0.12;
+                  this.collisionBoxes.push(box);
 
-                // Register vehicle roofs (height >= 1.2m) as walkable platforms
-                if (box.max.y >= 1.2 && widthX >= 1.0 && depthZ >= 1.5) {
-                  this.rooftopBoxes.push(box);
-                }
-              } else {
-                this.collisionBoxes.push(box);
+                  // Register vehicle roofs (height >= 1.2m) as walkable platforms
+                  if (box.max.y >= 1.2 && widthX >= 1.0 && depthZ >= 1.5) {
+                    this.rooftopBoxes.push(box);
+                  }
+                } else {
+                  this.collisionBoxes.push(box);
 
-                // Register building roofs, terraces, and bus stop roofs as walkable platforms
-                if (box.max.y >= 2.2 && widthX >= 1.8 && depthZ >= 1.8) {
-                  this.rooftopBoxes.push(box);
+                  // Register building roofs, terraces, and bus stop roofs as walkable platforms
+                  if (box.max.y >= 2.2 && widthX >= 1.8 && depthZ >= 1.8) {
+                    this.rooftopBoxes.push(box);
+                  }
                 }
               }
             }
-          }
-        });
+          });
 
-        console.log(
-          `[MapBuilder] Cartoon City loaded: ${this.collisionBoxes.length} colliders, ${this.rooftopBoxes.length} walkable roofs/vehicles`
-        );
-      },
-      undefined,
-      (err) => {
-        console.warn('[MapBuilder] Failed to load cartoon_city.glb, using fallback arena:', err);
-        this.buildClassicArena();
-      }
-    );
+          console.log(
+            `[MapBuilder] Cartoon City loaded: ${this.collisionBoxes.length} colliders, ${this.rooftopBoxes.length} walkable roofs/vehicles`
+          );
+        },
+        undefined,
+        (err) => {
+          console.warn('[MapBuilder] Failed to load cartoon_city.glb, using fallback arena:', err);
+          this.buildClassicArena();
+        }
+      );
+    }
 
-    // 3. Jump Pads in Cartoon City
+    // 3. Climbable Fire Escapes, Wall Ladders & Aerial Skybridges
+    // West Mid-Avenue Building (x = -6.2, z = 8.0)
+    this.addPlatform(-6.2, 3.5 - 0.125, 8.0, 3.2, 0.25, 3.2, '#1f2536', true); // Tier 1 (y = 3.5)
+    this.createLadder(-6.2, 6.6, 0, 3.5, 'north');
+    this.addPlatform(-6.2, 7.0 - 0.125, 8.0, 3.2, 0.25, 3.2, '#1f2536', true); // Tier 2 (y = 7.0)
+    this.createLadder(-6.2, 9.4, 3.5, 7.0, 'south');
+    this.addPlatform(-6.2, 10.5 - 0.125, 8.0, 3.2, 0.25, 3.2, '#1f2536', true); // Tier 3 (y = 10.5)
+    this.createLadder(-6.2, 6.6, 7.0, 10.5, 'north');
+    this.addPlatform(-6.2, 14.0 - 0.125, 8.0, 5.0, 0.25, 5.0, '#242b44', true); // Roof Terrace (y = 14.0)
+    this.createLadder(-6.2, 9.4, 10.5, 14.0, 'south');
+
+    // East Mid-Avenue Building (x = 22.0, z = 8.0)
+    this.addPlatform(22.0, 3.5 - 0.125, 8.0, 3.2, 0.25, 3.2, '#1f2536', true); // Tier 1 (y = 3.5)
+    this.createLadder(22.0, 6.6, 0, 3.5, 'north');
+    this.addPlatform(22.0, 7.0 - 0.125, 8.0, 3.2, 0.25, 3.2, '#1f2536', true); // Tier 2 (y = 7.0)
+    this.createLadder(22.0, 9.4, 3.5, 7.0, 'south');
+    this.addPlatform(22.0, 10.5 - 0.125, 8.0, 3.2, 0.25, 3.2, '#1f2536', true); // Tier 3 (y = 10.5)
+    this.createLadder(22.0, 6.6, 7.0, 10.5, 'north');
+    this.addPlatform(22.0, 14.0 - 0.125, 8.0, 5.0, 0.25, 5.0, '#242b44', true); // Roof Terrace (y = 14.0)
+    this.createLadder(22.0, 9.4, 10.5, 14.0, 'south');
+
+    // Aerial High Skybridge spanning across the avenue (x = -6.2 to 22.0 at y = 14.0m)
+    this.addPlatform(7.9, 14.0 - 0.15, 8.0, 28.2, 0.3, 3.2, '#00d2ff', true);
+    this.addBox(7.9, 14.0 + 0.5, 8.0 - 1.5, 28.2, 1.0, 0.1, '#384260'); // North glass railing
+    this.addBox(7.9, 14.0 + 0.5, 8.0 + 1.5, 28.2, 1.0, 0.1, '#384260'); // South glass railing
+
+    // Northwest Skyscraper Facade Ladder & Terraces (x = -6.3, z = 48.0)
+    this.addPlatform(-6.3, 4.0 - 0.125, 48.0, 3.2, 0.25, 3.2, '#1f2536', true);
+    this.createLadder(-6.3, 46.6, 0, 4.0, 'north');
+    this.addPlatform(-6.3, 8.0 - 0.125, 48.0, 3.2, 0.25, 3.2, '#1f2536', true);
+    this.createLadder(-6.3, 49.4, 4.0, 8.0, 'south');
+    this.addPlatform(-6.3, 12.0 - 0.125, 48.0, 4.0, 0.25, 4.0, '#242b44', true);
+    this.createLadder(-6.3, 46.6, 8.0, 12.0, 'north');
+
+    // Southwest Skyscraper Facade Ladder & Terraces (x = -6.0, z = -36.0)
+    this.addPlatform(-6.0, 4.0 - 0.125, -36.0, 3.2, 0.25, 3.2, '#1f2536', true);
+    this.createLadder(-6.0, -34.6, 0, 4.0, 'north');
+    this.addPlatform(-6.0, 8.0 - 0.125, -36.0, 3.2, 0.25, 3.2, '#1f2536', true);
+    this.createLadder(-6.0, -37.4, 4.0, 8.0, 'south');
+    this.addPlatform(-6.0, 12.0 - 0.125, -36.0, 4.0, 0.25, 4.0, '#242b44', true);
+    this.createLadder(-6.0, -34.6, 8.0, 12.0, 'north');
+
+    // 4. Jump Pads in Cartoon City
     // Central Plaza Mega Jump Pad: launches player 22m to reach building terraces!
     this.createJumpPad(0, 0, 6, 23.0);
 
@@ -272,8 +317,8 @@ export class MapBuilder {
     // East Twisted Tower Flank Jump Pad
     this.createJumpPad(22, 0, -4, 18.0);
 
-    // 4. Glowing Neon Cyber Boundary Walls (120m x 150m)
-    const wallHeight = 25;
+    // 5. Glowing Neon Cyber Boundary Walls (170m x 210m)
+    const wallHeight = 28;
     const borderMat = new THREE.MeshBasicMaterial({
       color: '#00d2ff',
       wireframe: true,
@@ -282,10 +327,10 @@ export class MapBuilder {
     });
 
     const borders = [
-      { x: 0, y: wallHeight / 2, z: -75, w: 120, h: wallHeight, d: 2 },
-      { x: 0, y: wallHeight / 2, z: 75, w: 120, h: wallHeight, d: 2 },
-      { x: -60, y: wallHeight / 2, z: 0, w: 2, h: wallHeight, d: 150 },
-      { x: 60, y: wallHeight / 2, z: 0, w: 2, h: wallHeight, d: 150 }
+      { x: 0, y: wallHeight / 2, z: -105, w: 170, h: wallHeight, d: 2 },
+      { x: 0, y: wallHeight / 2, z: 105, w: 170, h: wallHeight, d: 2 },
+      { x: -85, y: wallHeight / 2, z: 0, w: 2, h: wallHeight, d: 215 },
+      { x: 85, y: wallHeight / 2, z: 0, w: 2, h: wallHeight, d: 215 }
     ];
 
     borders.forEach((b) => {
@@ -299,7 +344,7 @@ export class MapBuilder {
 
   private buildClassicArena(): void {
     // Floor
-    const floorGeo = new THREE.PlaneGeometry(60, 60, 30, 30);
+    const floorGeo = new THREE.PlaneGeometry(100, 100, 50, 50);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({
       color: '#1a1d2e',
@@ -311,7 +356,7 @@ export class MapBuilder {
     this.group.add(floor);
 
     // Floor grid lines
-    const grid = new THREE.GridHelper(60, 30, '#00d2ff', '#2a3352');
+    const grid = new THREE.GridHelper(100, 50, '#00d2ff', '#2a3352');
     grid.position.y = 0.02;
     this.group.add(grid);
 
@@ -322,8 +367,8 @@ export class MapBuilder {
     });
 
     const wallThickness = 2;
-    const wallHeight = 7;
-    const arenaSize = 60;
+    const wallHeight = 8;
+    const arenaSize = 96;
 
     const wallsData = [
       { x: 0, y: wallHeight / 2, z: -arenaSize / 2, w: arenaSize, h: wallHeight, d: wallThickness },
@@ -361,36 +406,60 @@ export class MapBuilder {
     this.addBox(0, 1.5, -22, 10, 3, 4, '#384260');
     this.addBox(0, 1.5, 22, 10, 3, 4, '#384260');
 
-    // 4 High-Velocity Jump Pads
+    // 4 High-Velocity Central Jump Pads
     this.createJumpPad(-12, 0, 0, 19.0);
     this.createJumpPad(12, 0, 0, 19.0);
     this.createJumpPad(0, 0, -12, 19.0);
     this.createJumpPad(0, 0, 12, 19.0);
+
+    // 4 Elevated Corner Sniper Bastions (y = 3.0m)
+    [-36, 36].forEach((bx) => {
+      [-36, 36].forEach((bz) => {
+        this.addPlatform(bx, 1.5, bz, 10, 3.0, 10, '#242b44', true);
+        // Parapet walls on bastions
+        this.addBox(bx, 3.5, bz + (bz > 0 ? 4.5 : -4.5), 10, 1.0, 0.8, '#ff2a55');
+        this.addBox(bx + (bx > 0 ? 4.5 : -4.5), 3.5, bz, 0.8, 1.0, 10, '#384260');
+      });
+    });
+
+    // 4 Corner Jump Pads launching onto Bastions
+    this.createJumpPad(28, 0, 28, 17.0, 6, 6);
+    this.createJumpPad(-28, 0, 28, 17.0, -6, 6);
+    this.createJumpPad(28, 0, -28, 17.0, 6, -6);
+    this.createJumpPad(-28, 0, -28, 17.0, -6, -6);
+
+    // Outer Colonnade Pillars
+    [-28, 28].forEach((cx) => {
+      [-14, 0, 14].forEach((cz) => {
+        this.addBox(cx, 3.0, cz, 2, 6, 2, '#384260');
+        this.addBox(cz, 3.0, cx, 2, 6, 2, '#384260');
+      });
+    });
   }
 
   private buildWarehouseMap(): void {
     // Floor
-    const floorGeo = new THREE.PlaneGeometry(70, 70, 35, 35);
+    const floorGeo = new THREE.PlaneGeometry(110, 110, 55, 55);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({ color: '#161922', roughness: 0.7 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
     this.group.add(floor);
 
-    const grid = new THREE.GridHelper(70, 35, '#ffaa00', '#252936');
+    const grid = new THREE.GridHelper(110, 55, '#ffaa00', '#252936');
     grid.position.y = 0.02;
     this.group.add(grid);
 
     // Boundary walls
     const wallThickness = 2;
-    const wallHeight = 8;
-    const arenaSize = 70;
+    const wallHeight = 9;
+    const arenaSize = 106;
 
     const wallsData = [
-      { x: 0, y: 4, z: -arenaSize / 2, w: arenaSize, h: wallHeight, d: wallThickness },
-      { x: 0, y: 4, z: arenaSize / 2, w: arenaSize, h: wallHeight, d: wallThickness },
-      { x: -arenaSize / 2, y: 4, z: 0, w: wallThickness, h: wallHeight, d: arenaSize },
-      { x: arenaSize / 2, y: 4, z: 0, w: wallThickness, h: wallHeight, d: arenaSize }
+      { x: 0, y: 4.5, z: -arenaSize / 2, w: arenaSize, h: wallHeight, d: wallThickness },
+      { x: 0, y: 4.5, z: arenaSize / 2, w: arenaSize, h: wallHeight, d: wallThickness },
+      { x: -arenaSize / 2, y: 4.5, z: 0, w: wallThickness, h: wallHeight, d: arenaSize },
+      { x: arenaSize / 2, y: 4.5, z: 0, w: wallThickness, h: wallHeight, d: arenaSize }
     ];
 
     const wallMat = new THREE.MeshStandardMaterial({ color: '#0d1017' });
@@ -402,27 +471,51 @@ export class MapBuilder {
       this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
     });
 
-    // Stacked shipping containers
+    // Inner & Outer Stacked shipping containers
     const colors = ['#e63946', '#457b9d', '#2a9d8f', '#e76f51', '#f4a261'];
     for (let i = 0; i < 14; i++) {
       const x = Math.sin(i * 1.3) * 22;
       const z = Math.cos(i * 1.3) * 22;
       const c = colors[i % colors.length];
-      this.addBox(x, 1.5, z, 6, 3, 3, c);
+      this.addPlatform(x, 1.5, z, 6, 3, 3, c, true);
       if (i % 3 === 0) {
-        this.addBox(x, 4.5, z, 5, 3, 3, colors[(i + 1) % colors.length]);
+        this.addPlatform(x, 4.5, z, 5, 3, 3, colors[(i + 1) % colors.length], true);
       }
     }
 
-    // Elevated Catwalks
-    this.addBox(0, 3.5, 0, 4, 0.4, 28, '#3a445d');
-    this.addBox(0, 3.5, 0, 28, 0.4, 4, '#3a445d');
+    // Outer perimeter container depot (radius 34m - 40m)
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const ox = Math.cos(angle) * 36;
+      const oz = Math.sin(angle) * 36;
+      const c = colors[(i + 2) % colors.length];
+      this.addPlatform(ox, 1.5, oz, 6, 3, 3, c, true);
+      if (i % 2 === 0) {
+        this.addPlatform(ox, 4.5, oz, 5, 3, 3, colors[(i + 3) % colors.length], true);
+      }
+    }
 
-    // Jump pads
+    // Outer Cargo Loading Docks
+    this.addPlatform(38, 1.0, 0, 8, 2.0, 16, '#28314e', true);
+    this.addPlatform(-38, 1.0, 0, 8, 2.0, 16, '#28314e', true);
+
+    // Extended High Catwalks (registered in rooftopBoxes)
+    this.addPlatform(0, 3.5, 0, 4, 0.4, 44, '#3a445d', true);
+    this.addPlatform(0, 3.5, 0, 44, 0.4, 4, '#3a445d', true);
+
+    // Perimeter Catwalk Galleries
+    this.addPlatform(0, 3.5, -36, 28, 0.4, 4, '#3a445d', true);
+    this.addPlatform(0, 3.5, 36, 28, 0.4, 4, '#3a445d', true);
+
+    // Central & Perimeter Jump pads
     this.createJumpPad(-8, 0, -8, 21.0);
     this.createJumpPad(8, 0, 8, 21.0);
     this.createJumpPad(-8, 0, 8, 21.0);
     this.createJumpPad(8, 0, -8, 21.0);
+    this.createJumpPad(32, 0, 32, 18.0, -10, -10);
+    this.createJumpPad(-32, 0, 32, 18.0, 10, -10);
+    this.createJumpPad(32, 0, -32, 18.0, -10, 10);
+    this.createJumpPad(-32, 0, -32, 18.0, 10, 10);
   }
 
   private buildCyberSpire(): void {
@@ -479,25 +572,43 @@ export class MapBuilder {
       -Math.PI / 2, // Facing West
       '#00d2ff'
     );
+
+    // 4 Outer Satellite Helipads across expanded perimeter (y = 2.0m)
+    this.addPlatform(42, 1.0, 42, 12, 2.0, 12, '#1c2236', true);
+    this.addPlatform(-42, 1.0, 42, 12, 2.0, 12, '#1c2236', true);
+    this.addPlatform(42, 1.0, -42, 12, 2.0, 12, '#1c2236', true);
+    this.addPlatform(-42, 1.0, -42, 12, 2.0, 12, '#1c2236', true);
+
+    // Diagonal skybridges connecting to outer helipads
+    this.addPlatform(32, 0.5, 32, 14, 1.0, 3.2, '#2c3553', true);
+    this.addPlatform(-32, 0.5, 32, 14, 1.0, 3.2, '#2c3553', true);
+    this.addPlatform(32, 0.5, -32, 14, 1.0, 3.2, '#2c3553', true);
+    this.addPlatform(-32, 0.5, -32, 14, 1.0, 3.2, '#2c3553', true);
+
+    // Tactical covers on outer helipads
+    this.addBox(42, 3.0, 42, 3, 2, 3, '#00d2ff');
+    this.addBox(-42, 3.0, 42, 3, 2, 3, '#ff2a55');
+    this.addBox(42, 3.0, -42, 3, 2, 3, '#ffaa00');
+    this.addBox(-42, 3.0, -42, 3, 2, 3, '#00ff88');
   }
 
   private buildQuantumLab(): void {
     // Quantum Lab - Symmetrical Particle Collider Facility
-    const floorGeo = new THREE.PlaneGeometry(64, 64, 32, 32);
+    const floorGeo = new THREE.PlaneGeometry(110, 110, 55, 55);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({ color: '#131722', roughness: 0.6, metalness: 0.2 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
     this.group.add(floor);
 
-    const grid = new THREE.GridHelper(64, 32, '#a855f7', '#1f273d');
+    const grid = new THREE.GridHelper(110, 55, '#a855f7', '#1f273d');
     grid.position.y = 0.02;
     this.group.add(grid);
 
-    // Outer high-tech bunker walls (64m x 64m)
+    // Outer high-tech bunker walls (108m x 108m)
     const wallMat = new THREE.MeshStandardMaterial({ color: '#0d1017', roughness: 0.8 });
-    const wallHeight = 7;
-    const arenaSize = 64;
+    const wallHeight = 8;
+    const arenaSize = 108;
     const wallsData = [
       { x: 0, y: wallHeight / 2, z: -arenaSize / 2, w: arenaSize, h: wallHeight, d: 2 },
       { x: 0, y: wallHeight / 2, z: arenaSize / 2, w: arenaSize, h: wallHeight, d: 2 },
@@ -548,12 +659,21 @@ export class MapBuilder {
       -Math.PI / 2, // Facing West
       '#a855f7'
     );
+
+    // 4 Outer Cryogenic Cleanroom Bays across expanded perimeter
+    [-38, 38].forEach((cx) => {
+      [-38, 38].forEach((cz) => {
+        this.addPlatform(cx, 1.75, cz, 12, 3.5, 12, '#20263b', true);
+        this.addBox(cx, 4.5, cz, 2, 4, 2, '#00d2ff'); // Secondary energy coil
+        this.addPlatform(cx > 0 ? 30 : -30, 1.75, cz, 8, 3.5, 3, '#2a3352', true); // Connecting catwalk
+      });
+    });
   }
 
   private buildMagmaFoundry(): void {
     // Magma Foundry - Industrial smelting gantries suspended over open molten lava
     // 1. Glowing Lava Lake Plane below
-    const lavaGeo = new THREE.PlaneGeometry(80, 80);
+    const lavaGeo = new THREE.PlaneGeometry(120, 120);
     lavaGeo.rotateX(-Math.PI / 2);
     const lavaMat = new THREE.MeshStandardMaterial({
       color: '#ff3700',
@@ -565,10 +685,10 @@ export class MapBuilder {
     lava.position.y = -0.8;
     this.group.add(lava);
 
-    // 2. Perimeter foundry containment rock walls (68m x 68m)
+    // 2. Perimeter foundry containment rock walls (112m x 112m)
     const wallMat = new THREE.MeshStandardMaterial({ color: '#181210', roughness: 0.9 });
-    const wallHeight = 8;
-    const arenaSize = 68;
+    const wallHeight = 9;
+    const arenaSize = 112;
     const wallsData = [
       { x: 0, y: wallHeight / 2, z: -arenaSize / 2, w: arenaSize, h: wallHeight, d: 2 },
       { x: 0, y: wallHeight / 2, z: arenaSize / 2, w: arenaSize, h: wallHeight, d: 2 },
@@ -626,25 +746,35 @@ export class MapBuilder {
       0, // Facing North
       '#ff5500'
     );
+
+    // 11. 4 Outer Slag Processing Yards across expanded perimeter
+    [-42, 42].forEach((sx) => {
+      [-42, 42].forEach((sz) => {
+        this.addPlatform(sx, -0.5, sz, 12, 1, 12, '#282c37', true);
+        this.addBox(sx, 2.0, sz, 4, 4, 4, '#e63946'); // Cooling tower
+        // Connecting catwalk to blast furnace
+        this.addPlatform(sx > 0 ? 32 : -32, -0.5, sz > 0 ? 22 : -22, 10, 1, 3.2, '#3a4050', true);
+      });
+    });
   }
 
   private buildSubzeroStation(): void {
     // Subzero Station - Arctic Polar Outpost with snowdrifts & radar dome
-    const floorGeo = new THREE.PlaneGeometry(66, 66, 33, 33);
+    const floorGeo = new THREE.PlaneGeometry(115, 115, 50, 50);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({ color: '#dce8f5', roughness: 0.35, metalness: 0.1 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
     this.group.add(floor);
 
-    const grid = new THREE.GridHelper(66, 33, '#00ffee', '#a4b8cc');
+    const grid = new THREE.GridHelper(115, 50, '#00ffee', '#a4b8cc');
     grid.position.y = 0.02;
     this.group.add(grid);
 
-    // Perimeter reinforced arctic bunker walls (66m x 66m)
+    // Perimeter reinforced arctic bunker walls (110m x 110m)
     const wallMat = new THREE.MeshStandardMaterial({ color: '#253040', roughness: 0.7 });
-    const wallHeight = 7;
-    const arenaSize = 66;
+    const wallHeight = 8;
+    const arenaSize = 110;
     const wallsData = [
       { x: 0, y: wallHeight / 2, z: -arenaSize / 2, w: arenaSize, h: wallHeight, d: 2 },
       { x: 0, y: wallHeight / 2, z: arenaSize / 2, w: arenaSize, h: wallHeight, d: 2 },
@@ -691,6 +821,15 @@ export class MapBuilder {
       -3 * Math.PI / 4,
       '#00ffee'
     );
+
+    // 4 Outer Satellite Radar Outposts across expanded perimeter
+    [-40, 40].forEach((rx) => {
+      [-40, 40].forEach((rz) => {
+        this.addPlatform(rx, 1.5, rz, 10, 3.0, 10, '#2c3848', true); // roof at y = 3.0m
+        this.addBox(rx, 3.8, rz, 3, 1.6, 3, '#eef5ff'); // Satellite dish
+        this.addBox(rx > 0 ? rx - 8 : rx + 8, 1.5, rz, 6, 3, 4, '#3d5a80'); // Depot container
+      });
+    });
   }
 
   private buildSkySanctuary(): void {
@@ -738,6 +877,16 @@ export class MapBuilder {
       0, // Facing North
       '#ffcc00'
     );
+
+    // 4 Outer Floating Spirit Islands across expanded perimeter
+    [-50, 50].forEach((ix) => {
+      [-50, 50].forEach((iz) => {
+        this.addPlatform(ix, -1.5, iz, 14, 3, 14, '#2e333d', true);
+        this.addBox(ix, 2.0, iz, 3, 4, 3, ix > 0 ? '#ff2a55' : '#00d2ff'); // Shrine spire
+        // Stepping stone bridge
+        this.addPlatform(ix > 0 ? 38 : -38, -1, iz > 0 ? 38 : -38, 4, 2, 4, '#444d60', true);
+      });
+    });
   }
 
   public addPlatform(
@@ -931,6 +1080,91 @@ export class MapBuilder {
     makePort(idB, idA, posB, posA, yawA, yawB);
   }
 
+  public createLadder(
+    x: number,
+    z: number,
+    bottomY: number,
+    topY: number,
+    facing: 'north' | 'south' | 'east' | 'west' = 'north'
+  ): THREE.Box3 {
+    const height = topY - bottomY;
+    const ladderGroup = new THREE.Group();
+    ladderGroup.position.set(x, bottomY, z);
+
+    const railMat = new THREE.MeshStandardMaterial({ color: '#252936', metalness: 0.8, roughness: 0.3 });
+    const rungMat = new THREE.MeshStandardMaterial({
+      color: '#ffbb00',
+      emissive: '#ff9900',
+      emissiveIntensity: 0.4,
+      metalness: 0.5,
+      roughness: 0.4
+    });
+
+    const isZAxis = facing === 'north' || facing === 'south';
+    const railWidth = 0.6;
+    const railRadius = 0.035;
+    const rungRadius = 0.025;
+
+    // 2 Vertical Side Rails
+    const railGeo = new THREE.CylinderGeometry(railRadius, railRadius, height, 8);
+    const railL = new THREE.Mesh(railGeo, railMat);
+    const railR = new THREE.Mesh(railGeo, railMat);
+
+    if (isZAxis) {
+      railL.position.set(-railWidth / 2, height / 2, 0);
+      railR.position.set(railWidth / 2, height / 2, 0);
+    } else {
+      railL.position.set(0, height / 2, -railWidth / 2);
+      railR.position.set(0, height / 2, railWidth / 2);
+    }
+    ladderGroup.add(railL);
+    ladderGroup.add(railR);
+
+    // Horizontal Rungs every 0.35m
+    const rungStep = 0.35;
+    const numRungs = Math.floor(height / rungStep);
+    const rungGeo = new THREE.CylinderGeometry(rungRadius, rungRadius, railWidth, 8);
+    if (isZAxis) {
+      rungGeo.rotateZ(Math.PI / 2);
+    } else {
+      rungGeo.rotateX(Math.PI / 2);
+    }
+
+    for (let i = 1; i <= numRungs; i++) {
+      const rungMesh = new THREE.Mesh(rungGeo, rungMat);
+      rungMesh.position.y = i * rungStep;
+      ladderGroup.add(rungMesh);
+    }
+
+    this.group.add(ladderGroup);
+
+    // Trigger Box for ladder climbing interaction
+    const halfX = isZAxis ? 0.55 : 0.4;
+    const halfZ = isZAxis ? 0.4 : 0.55;
+    const box = new THREE.Box3(
+      new THREE.Vector3(x - halfX, bottomY, z - halfZ),
+      new THREE.Vector3(x + halfX, topY, z + halfZ)
+    );
+    this.ladderBoxes.push(box);
+    return box;
+  }
+
+  public checkLadders(playerPos: THREE.Vector3): THREE.Box3 | null {
+    for (const box of this.ladderBoxes) {
+      if (
+        playerPos.x >= box.min.x - 0.45 &&
+        playerPos.x <= box.max.x + 0.45 &&
+        playerPos.z >= box.min.z - 0.45 &&
+        playerPos.z <= box.max.z + 0.45 &&
+        playerPos.y >= box.min.y - 0.25 &&
+        playerPos.y <= box.max.y + 0.5
+      ) {
+        return box;
+      }
+    }
+    return null;
+  }
+
   public checkJumpPads(playerPos: THREE.Vector3): { impulseY: number; impulseX: number; impulseZ: number } | null {
     for (const jp of this.jumpPads) {
       if (jp.box.containsPoint(playerPos)) {
@@ -980,6 +1214,7 @@ export class MapBuilder {
   public dispose(): void {
     this.collisionBoxes = [];
     this.rooftopBoxes = [];
+    this.ladderBoxes = [];
     this.jumpPads = [];
     this.teleportPorts = [];
     this.sceneRef.remove(this.group);

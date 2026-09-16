@@ -14,6 +14,8 @@ import {
 import {
   getMapObstacles,
   hasLineOfSight,
+  CARTOON_CITY_OBSTACLES,
+  CLASSIC_ARENA_OBSTACLES,
   CYBER_SPIRE_OBSTACLES,
   QUANTUM_LAB_OBSTACLES,
   MAGMA_FOUNDRY_OBSTACLES,
@@ -251,5 +253,88 @@ describe('Server-side Obstacle Raycasting & Line-of-Sight on New Maps', () => {
     const p2: [number, number, number] = [0, 2, 15];
     const los = hasLineOfSight(p1, p2, obs);
     assert.strictEqual(los, false, 'Line of sight through bunker main building must be blocked');
+  });
+
+  it('should block line of sight through aerial skybridge in Cartoon City', () => {
+    const obs = getMapObstacles('Cartoon City');
+    assert.strictEqual(obs, CARTOON_CITY_OBSTACLES);
+
+    // Ray passing across z=8.0 at y=14.5 through SkybridgeMainAvenue [-6.2, 13.8, 6.4] to [22.0, 15.2, 9.6]
+    const p1: [number, number, number] = [7.9, 14.5, 0];
+    const p2: [number, number, number] = [7.9, 14.5, 16];
+    const los = hasLineOfSight(p1, p2, obs);
+    assert.strictEqual(los, false, 'Line of sight cutting through aerial skybridge must be blocked');
+  });
+
+  it('should block line of sight through elevated corner bastions on Arena Classic', () => {
+    const obs = getMapObstacles('Arena Classic');
+    assert.strictEqual(obs, CLASSIC_ARENA_OBSTACLES);
+
+    // Ray cutting through BastionNE [31, 0, 31] to [41, 3, 41]
+    const p1: [number, number, number] = [36, 1.5, 25];
+    const p2: [number, number, number] = [36, 1.5, 45];
+    const los = hasLineOfSight(p1, p2, obs);
+    assert.strictEqual(los, false, 'Line of sight cutting through corner bastion must be blocked');
+  });
+});
+
+describe('Expanded Playable Arena Footprints Across All 8 Maps', () => {
+  const scene = new THREE.Scene();
+
+  const expectedExpansions: { map: string; minX: number; maxX: number; minZ: number; maxZ: number }[] = [
+    { map: 'Cartoon City', minX: -80, maxX: 80, minZ: -100, maxZ: 100 },
+    { map: 'Arena Classic', minX: -45, maxX: 45, minZ: -45, maxZ: 45 },
+    { map: 'Neon Warehouse', minX: -50, maxX: 50, minZ: -50, maxZ: 50 },
+    { map: 'Cyber Spire', minX: -50, maxX: 50, minZ: -50, maxZ: 50 },
+    { map: 'Quantum Lab', minX: -50, maxX: 50, minZ: -50, maxZ: 50 },
+    { map: 'Magma Foundry', minX: -50, maxX: 50, minZ: -50, maxZ: 50 },
+    { map: 'Subzero Station', minX: -50, maxX: 50, minZ: -50, maxZ: 50 },
+    { map: 'Sky Sanctuary', minX: -60, maxX: 60, minZ: -60, maxZ: 60 }
+  ];
+
+  expectedExpansions.forEach(({ map, minX, maxX, minZ, maxZ }) => {
+    it(`should enforce expanded play boundaries on ${map}`, () => {
+      const mb = new MapBuilder(scene, map);
+      assert.ok(mb.bounds.minX <= minX, `${map} minX (${mb.bounds.minX}) should be <= ${minX}`);
+      assert.ok(mb.bounds.maxX >= maxX, `${map} maxX (${mb.bounds.maxX}) should be >= ${maxX}`);
+      assert.ok(mb.bounds.minZ <= minZ, `${map} minZ (${mb.bounds.minZ}) should be <= ${minZ}`);
+      assert.ok(mb.bounds.maxZ >= maxZ, `${map} maxZ (${mb.bounds.maxZ}) should be >= ${maxZ}`);
+      mb.dispose();
+    });
+  });
+});
+
+describe('Cartoon City Vertical Building Climbing, Ladders & Skybridges', () => {
+  const scene = new THREE.Scene();
+
+  it('should initialize Cartoon City with climbable ladders, multi-tier fire escapes, and aerial skybridge', () => {
+    const mb = new MapBuilder(scene, 'Cartoon City');
+
+    // 1. Ladder boxes exist and cover multi-tier vertical routes
+    assert.ok(mb.ladderBoxes.length >= 8, `Should have multiple ladder triggers (found ${mb.ladderBoxes.length})`);
+
+    // 2. Ladder trigger detection
+    const ladderPos = new THREE.Vector3(-6.2, 2.0, 6.6);
+    const hitLadder = mb.checkLadders(ladderPos);
+    assert.notStrictEqual(hitLadder, null, 'Ladder check at (-6.2, 2.0, 6.6) should detect ladder trigger box');
+
+    // 3. Fire escape platforms provide stable vertical ground elevations
+    const t1 = mb.getGroundLevel(new THREE.Vector3(-6.2, 3.5, 8.0));
+    assert.ok(Math.abs(t1 - 3.5) < 0.01, `Tier 1 fire escape should provide ground level 3.5 (got ${t1})`);
+
+    const t2 = mb.getGroundLevel(new THREE.Vector3(-6.2, 7.0, 8.0));
+    assert.ok(Math.abs(t2 - 7.0) < 0.01, `Tier 2 fire escape should provide ground level 7.0 (got ${t2})`);
+
+    const t3 = mb.getGroundLevel(new THREE.Vector3(-6.2, 10.5, 8.0));
+    assert.ok(Math.abs(t3 - 10.5) < 0.01, `Tier 3 fire escape should provide ground level 10.5 (got ${t3})`);
+
+    const roof = mb.getGroundLevel(new THREE.Vector3(-6.2, 14.0, 8.0));
+    assert.ok(Math.abs(roof - 14.0) < 0.01, `Roof terrace should provide ground level 14.0 (got ${roof})`);
+
+    // 4. Aerial skybridge spanning between West and East avenue facades
+    const skybridgeGround = mb.getGroundLevel(new THREE.Vector3(7.9, 14.0, 8.0));
+    assert.ok(Math.abs(skybridgeGround - 14.0) < 0.01, `Aerial skybridge at (7.9, 14.0, 8.0) should provide elevated ground level 14.0 (got ${skybridgeGround})`);
+
+    mb.dispose();
   });
 });

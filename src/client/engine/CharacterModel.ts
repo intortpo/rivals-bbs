@@ -458,6 +458,8 @@ export class CharacterModel {
     // Scale to compact, proportional tactical avatar: ~1.26m height (2.10 * 0.60 = 1.26m)
     clone.scale.set(0.60, 0.60, 0.60);
     clone.position.set(0, 0, 0);
+    // Align GLTF +Z line of sight to Three.js -Z forward
+    clone.rotation.y = Math.PI;
 
     // Locate bones
     this.hipsBone = clone.getObjectByName('Hips') || null;
@@ -696,6 +698,8 @@ export class CharacterModel {
     const lArmDelta = isKatana ? CharacterModel._katanaLeftArmDelta : CharacterModel._combatLeftArmDelta;
     const lForeArmDelta = isKatana ? CharacterModel._katanaLeftForeArmDelta : CharacterModel._combatLeftForeArmDelta;
 
+    const clampedPitch = THREE.MathUtils.clamp(-pitch, -0.65, 0.65);
+
     // 1. Locomotion / Running leg swing & knee flexion (alternating stride)
     if (isMoving && !isSliding) {
       this.animTime += delta * 11;
@@ -724,9 +728,9 @@ export class CharacterModel {
         this.rightKneeBone.quaternion.multiplyQuaternions(qRightKneeInit, CharacterModel._deltaQ);
       }
 
-      // Upper body running lean into movement
+      // Upper body running lean into movement with vertical aim pitch tracking
       if (this.spineBone && qSpineInit) {
-        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, 0.12);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, 0.12 + clampedPitch * 0.45);
         this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
       }
 
@@ -768,6 +772,12 @@ export class CharacterModel {
         this.rightKneeBone.quaternion.multiplyQuaternions(qRightKneeInit, CharacterModel._deltaQ);
       }
 
+      // Upper body jumping vertical aim pitch tracking
+      if (this.spineBone && qSpineInit) {
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, clampedPitch * 0.45);
+        this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
+      }
+
       // Arm stability during jump
       if (this.rightArmBone && qRightArmInit) {
         CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, -this.recoilImpulse);
@@ -778,7 +788,9 @@ export class CharacterModel {
         this.rightForeArmBone.quaternion.multiplyQuaternions(qRightForeArmInit, rForeArmDelta);
       }
       if (this.leftArmBone && qLeftArmInit) {
-        this.leftArmBone.quaternion.multiplyQuaternions(qLeftArmInit, lArmDelta);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisZ, clampedPitch * 0.1);
+        CharacterModel._deltaQ2.multiplyQuaternions(lArmDelta, CharacterModel._deltaQ);
+        this.leftArmBone.quaternion.multiplyQuaternions(qLeftArmInit, CharacterModel._deltaQ2);
       }
       if (this.leftForeArmBone && qLeftForeArmInit) {
         this.leftForeArmBone.quaternion.multiplyQuaternions(qLeftForeArmInit, lForeArmDelta);
@@ -790,7 +802,7 @@ export class CharacterModel {
         this.hipsBone.position.y = this.initialHipsPos.y - 0.35;
       }
       if (this.spineBone && qSpineInit) {
-        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, 0.35);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, 0.35 + clampedPitch * 0.35);
         this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
       }
       if (this.leftUpLegBone && qLeftUpLegInit) {
@@ -848,10 +860,9 @@ export class CharacterModel {
         this.rightKneeBone.quaternion.slerp(qRightKneeInit, Math.min(1, delta * 12));
       }
 
-      // Subtle chest breathing & pitch tracking
-      const clampedPitch = THREE.MathUtils.clamp(-pitch, -0.6, 0.6);
+      // Subtle chest breathing & vertical aim pitch tracking
       if (this.spineBone && qSpineInit) {
-        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, breath + clampedPitch * 0.3);
+        CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, breath + clampedPitch * 0.45);
         this.spineBone.quaternion.multiplyQuaternions(qSpineInit, CharacterModel._deltaQ);
       }
 
@@ -876,8 +887,7 @@ export class CharacterModel {
 
     // 5. Head Pitch Tracking
     if (this.headBone && qHeadInit) {
-      const clampedPitch = THREE.MathUtils.clamp(-pitch, -0.6, 0.6);
-      CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, clampedPitch * 0.7);
+      CharacterModel._deltaQ.setFromAxisAngle(CharacterModel._axisX, clampedPitch * 0.75);
       this.headBone.quaternion.multiplyQuaternions(qHeadInit, CharacterModel._deltaQ);
     }
   }

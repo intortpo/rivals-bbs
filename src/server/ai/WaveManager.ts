@@ -278,29 +278,29 @@ export class WaveManager {
 
     const now = Date.now();
     const isCity = this.mapName === 'Cartoon City';
-    let boundX = 25;
-    let boundZ = 25;
+    let boundX = 42;
+    let boundZ = 42;
     if (isCity) {
-      boundX = 50;
-      boundZ = 62;
+      boundX = 76;
+      boundZ = 95;
     } else if (this.mapName === 'Neon Warehouse') {
-      boundX = 30;
-      boundZ = 30;
+      boundX = 47;
+      boundZ = 47;
     } else if (this.mapName === 'Cyber Spire') {
-      boundX = 32;
-      boundZ = 32;
+      boundX = 52;
+      boundZ = 52;
     } else if (this.mapName === 'Quantum Lab') {
-      boundX = 29;
-      boundZ = 29;
+      boundX = 49;
+      boundZ = 49;
     } else if (this.mapName === 'Magma Foundry') {
-      boundX = 31;
-      boundZ = 31;
+      boundX = 51;
+      boundZ = 51;
     } else if (this.mapName === 'Subzero Station') {
-      boundX = 30;
-      boundZ = 30;
+      boundX = 49;
+      boundZ = 49;
     } else if (this.mapName === 'Sky Sanctuary') {
-      boundX = 36;
-      boundZ = 36;
+      boundX = 61;
+      boundZ = 61;
     }
 
     // Process AI for each active bot
@@ -421,9 +421,11 @@ export class WaveManager {
           active.aiState = 'patrol';
         }
       } else if (active.aiState === 'telegraph') {
-        // Bracing to fire: stop to aim
+        // Bracing to fire: stop to aim and lock orientation directly onto target
         bot.vx = 0;
         bot.vz = 0;
+        bot.yaw = targetYaw;
+        bot.pitch = targetPitch;
       } else {
         // Default attack / patrol navigation towards target
         if (dist > 0.1) {
@@ -537,6 +539,8 @@ export class WaveManager {
 
       if (active.aiState === 'telegraph' && now >= active.telegraphUntil) {
         active.aiState = 'attack';
+        bot.yaw = targetYaw;
+        bot.pitch = targetPitch;
 
         // Re-verify line of sight before pulling the trigger
         if (!hasLineOfSight(botEye, targetBody, this.mapObstacles)) {

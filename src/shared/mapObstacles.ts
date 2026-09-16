@@ -1181,6 +1181,11 @@ export const CARTOON_CITY_OBSTACLES: BoundingBox[] = [
       -12.25
     ],
     "name": "Fountain_03003-Mesh_1"
+  },
+  {
+    "min": [-6.2, 13.8, 6.4],
+    "max": [22.0, 15.2, 9.6],
+    "name": "SkybridgeMainAvenue"
   }
 ];
 
@@ -1196,7 +1201,12 @@ export const CLASSIC_ARENA_OBSTACLES: BoundingBox[] = [
   { min: [9.5, 0, 13.5], max: [12.5, 2, 15.5], name: 'LowCoverNE' },
   { min: [9.5, 0, -15.5], max: [12.5, 2, -13.5], name: 'LowCoverSE' },
   { min: [-12.5, 0, 13.5], max: [-9.5, 2, 15.5], name: 'LowCoverNW' },
-  { min: [-12.5, 0, -15.5], max: [-9.5, 2, -13.5], name: 'LowCoverSW' }
+  { min: [-12.5, 0, -15.5], max: [-9.5, 2, -13.5], name: 'LowCoverSW' },
+  // 4 Elevated Corner Sniper Bastions
+  { min: [31, 0, 31], max: [41, 3, 41], name: 'BastionNE' },
+  { min: [31, 0, -41], max: [41, 3, -31], name: 'BastionSE' },
+  { min: [-41, 0, 31], max: [-31, 3, 41], name: 'BastionNW' },
+  { min: [-41, 0, -41], max: [-31, 3, -31], name: 'BastionSW' }
 ];
 
 export const CYBER_SPIRE_OBSTACLES: BoundingBox[] = [
@@ -1206,7 +1216,12 @@ export const CYBER_SPIRE_OBSTACLES: BoundingBox[] = [
   { min: [-24, 2, -2], max: [-20, 5, 2], name: 'WestHelipadCover' },
   { min: [20, 2, -2], max: [24, 5, 2], name: 'EastDeckCover' },
   { min: [-6, 4, -6], max: [-4, 6.5, -4], name: 'Tier2CoverNW' },
-  { min: [4, 4, 4], max: [6, 6.5, 6], name: 'Tier2CoverSE' }
+  { min: [4, 4, 4], max: [6, 6.5, 6], name: 'Tier2CoverSE' },
+  // 4 Outer Helipad Covers
+  { min: [40.5, 2, 40.5], max: [43.5, 4, 43.5], name: 'HelipadCoverNE' },
+  { min: [40.5, 2, -43.5], max: [43.5, 4, -40.5], name: 'HelipadCoverSE' },
+  { min: [-43.5, 2, 40.5], max: [-40.5, 4, 43.5], name: 'HelipadCoverNW' },
+  { min: [-43.5, 2, -43.5], max: [-40.5, 4, -40.5], name: 'HelipadCoverSW' }
 ];
 
 export const QUANTUM_LAB_OBSTACLES: BoundingBox[] = [
@@ -1216,7 +1231,12 @@ export const QUANTUM_LAB_OBSTACLES: BoundingBox[] = [
   { min: [-9, 0, 7], max: [-7, 6, 9], name: 'ColliderCoilNW' },
   { min: [-9, 0, -9], max: [-7, 6, -7], name: 'ColliderCoilSW' },
   { min: [-24, 0, -6], max: [-20, 4, -2], name: 'WestCryoBank' },
-  { min: [20, 0, 2], max: [24, 4, 6], name: 'EastTerminalArray' }
+  { min: [20, 0, 2], max: [24, 4, 6], name: 'EastTerminalArray' },
+  // 4 Outer Cryogenic Cleanroom Coils
+  { min: [37, 2.5, 37], max: [39, 6.5, 39], name: 'CryoBayCoilNE' },
+  { min: [37, 2.5, -39], max: [39, 6.5, -37], name: 'CryoBayCoilSE' },
+  { min: [-39, 2.5, 37], max: [-37, 6.5, 39], name: 'CryoBayCoilNW' },
+  { min: [-39, 2.5, -39], max: [-37, 6.5, -37], name: 'CryoBayCoilSW' }
 ];
 
 export const MAGMA_FOUNDRY_OBSTACLES: BoundingBox[] = [
@@ -1226,7 +1246,12 @@ export const MAGMA_FOUNDRY_OBSTACLES: BoundingBox[] = [
   { min: [-25, 0, -4], max: [-19, 4, 4], name: 'WestSlagVat' },
   { min: [19, 0, -4], max: [25, 4, 4], name: 'EastCoolingTank' },
   { min: [-1, 0, -8], max: [1, 5, -6], name: 'CraneSupportNorth' },
-  { min: [-1, 0, 6], max: [1, 5, 8], name: 'CraneSupportSouth' }
+  { min: [-1, 0, 6], max: [1, 5, 8], name: 'CraneSupportSouth' },
+  // 4 Outer Slag Processing Cooling Towers
+  { min: [40, 0, 40], max: [44, 4, 44], name: 'CoolingTowerNE' },
+  { min: [40, 0, -44], max: [44, 4, -40], name: 'CoolingTowerSE' },
+  { min: [-44, 0, 40], max: [-40, 4, 44], name: 'CoolingTowerNW' },
+  { min: [-44, 0, -44], max: [-40, 4, -40], name: 'CoolingTowerSW' }
 ];
 
 export const SUBZERO_STATION_OBSTACLES: BoundingBox[] = [
@@ -1235,7 +1260,12 @@ export const SUBZERO_STATION_OBSTACLES: BoundingBox[] = [
   { min: [-18, 0, -6], max: [-12, 6, 6], name: 'ShippingContainersWest' },
   { min: [12, 0, -6], max: [18, 6, 6], name: 'ShippingContainersEast' },
   { min: [-6, 0, -22], max: [6, 2.5, -18], name: 'NorthSnowBerm' },
-  { min: [-6, 0, 18], max: [6, 2.5, 22], name: 'SouthSnowBerm' }
+  { min: [-6, 0, 18], max: [6, 2.5, 22], name: 'SouthSnowBerm' },
+  // 4 Outer Satellite Radar Outposts
+  { min: [35, 0, 35], max: [45, 3, 45], name: 'RadarOutpostNE' },
+  { min: [35, 0, -45], max: [45, 3, -35], name: 'RadarOutpostSE' },
+  { min: [-45, 0, 35], max: [-35, 3, 45], name: 'RadarOutpostNW' },
+  { min: [-45, 0, -45], max: [-35, 3, -35], name: 'RadarOutpostSW' }
 ];
 
 export const SKY_SANCTUARY_OBSTACLES: BoundingBox[] = [
@@ -1245,7 +1275,12 @@ export const SKY_SANCTUARY_OBSTACLES: BoundingBox[] = [
   { min: [-3.5, 0, 11], max: [-2.5, 6, 12], name: 'ToriiPillarSouthL' },
   { min: [2.5, 0, 11], max: [3.5, 6, 12], name: 'ToriiPillarSouthR' },
   { min: [-28, 0, -3], max: [-24, 3.5, 3], name: 'WestRockShrine' },
-  { min: [24, 0, -3], max: [28, 5.5, 3], name: 'EastBellTower' }
+  { min: [24, 0, -3], max: [28, 5.5, 3], name: 'EastBellTower' },
+  // 4 Outer Floating Spirit Shrines
+  { min: [48.5, 0, 48.5], max: [51.5, 4, 51.5], name: 'OuterShrineNE' },
+  { min: [48.5, 0, -51.5], max: [51.5, 4, -48.5], name: 'OuterShrineSE' },
+  { min: [-51.5, 0, 48.5], max: [-48.5, 4, 51.5], name: 'OuterShrineNW' },
+  { min: [-51.5, 0, -51.5], max: [-48.5, 4, -48.5], name: 'OuterShrineSW' }
 ];
 
 export function getMapObstacles(mapName: string): BoundingBox[] {

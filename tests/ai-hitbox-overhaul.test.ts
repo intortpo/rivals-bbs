@@ -213,4 +213,76 @@ describe('Normalized Character & Bot Height Parity', () => {
   });
 });
 
+// 6. Character Model Front Facing & Continuous Aim Pitch Tracking
+describe('Character Model Front Facing & Continuous Aim Pitch Tracking', () => {
+  it('should orient glTF root rotation to Math.PI facing Three.js forward (-Z)', () => {
+    const scene = new THREE.Scene();
+    const model = new CharacterModel(scene, 'facing_pilot', 'FacingPilot', '#00d2ff', false, 0);
+
+    const mockGroup = new THREE.Group();
+    const hips = new THREE.Bone();
+    hips.name = 'Hips';
+    const spine = new THREE.Bone();
+    spine.name = 'Spine';
+    hips.add(spine);
+    mockGroup.add(hips);
+
+    (model as any).attachClonedModel(mockGroup);
+    const charMesh = (model as any).characterMesh as THREE.Group;
+    assert.ok(charMesh, 'Character mesh must be attached');
+    assert.strictEqual(charMesh.rotation.y, Math.PI, 'glTF avatar root must rotate Math.PI to face Three.js forward -Z');
+  });
+
+  it('should track vertical aim pitch continuously across running, jumping, sliding, and idle states', () => {
+    const scene = new THREE.Scene();
+    const model = new CharacterModel(scene, 'pitch_pilot', 'PitchPilot', '#00d2ff', false, 0);
+
+    const mockGroup = new THREE.Group();
+    const hips = new THREE.Bone();
+    hips.name = 'Hips';
+    const spine = new THREE.Bone();
+    spine.name = 'Spine';
+    const head = new THREE.Bone();
+    head.name = 'Head';
+    hips.add(spine);
+    spine.add(head);
+    mockGroup.add(hips);
+
+    (model as any).attachClonedModel(mockGroup);
+    const spineBone = (model as any).spineBone as THREE.Bone;
+    assert.ok(spineBone, 'Spine bone must be bound');
+
+    // 1. Idle state with pitch = 0.5 rad
+    model.update(0.016, false, false, false, 0.5);
+    const qIdle = spineBone.quaternion.clone();
+    assert.notStrictEqual(qIdle.x, 0, 'Spine bone must pitch during idle when aiming vertically');
+
+    // 2. Running state with pitch = 0.5 rad vs pitch = 0.0 rad
+    model.update(0.016, true, false, false, 0.0);
+    const qRunFlat = spineBone.quaternion.clone();
+
+    model.update(0.016, true, false, false, 0.5);
+    const qRunPitched = spineBone.quaternion.clone();
+    assert.notDeepStrictEqual(qRunFlat, qRunPitched, 'Running spine pitch must respond to aim pitch');
+
+    // 3. Sliding state with pitch = 0.5 rad vs pitch = 0.0 rad
+    model.update(0.016, false, true, false, 0.0);
+    const qSlideFlat = spineBone.quaternion.clone();
+
+    model.update(0.016, false, true, false, 0.5);
+    const qSlidePitched = spineBone.quaternion.clone();
+    assert.notDeepStrictEqual(qSlideFlat, qSlidePitched, 'Sliding spine pitch must respond to aim pitch');
+
+    // 4. Jumping state with pitch = 0.5 rad vs pitch = 0.0 rad
+    model.update(0.016, false, false, true, 0.0);
+    const qJumpFlat = spineBone.quaternion.clone();
+
+    model.update(0.016, false, false, true, 0.5);
+    const qJumpPitched = spineBone.quaternion.clone();
+    assert.notDeepStrictEqual(qJumpFlat, qJumpPitched, 'Jumping spine pitch must respond to aim pitch');
+
+    console.log('✓ Verified glTF front facing alignment and continuous aim pitch tracking across all states');
+  });
+});
+
 console.log('🎉 ALL AI, HITBOX & AIM INTEGRATION TESTS PASSED CLEANLY!\n');

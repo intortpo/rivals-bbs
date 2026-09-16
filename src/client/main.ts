@@ -630,8 +630,49 @@ class GameApp {
       this.audio.playJump();
     }
 
+    // 3.5 Ladder Climbing Physics
+    const ladderBox = this.mapBuilder.checkLadders(this.playerPos);
+    const isClimbing = ladderBox !== null;
+
+    if (isClimbing) {
+      this.isSliding = false;
+      this.isGrounded = false;
+
+      // Climb controls: Forward (W) or Jump -> climb up, Backward (S) -> climb down
+      if (move.forward > 0 || this.input.isJumping()) {
+        this.playerVel.y = MOVEMENT.CLIMB_SPEED;
+      } else if (move.forward < 0) {
+        this.playerVel.y = -MOVEMENT.CLIMB_SPEED;
+      } else {
+        this.playerVel.y = 0; // Hold position on ladder
+      }
+
+      // Dampen horizontal drift while on ladder
+      this.playerVel.x *= 0.25;
+      this.playerVel.z *= 0.25;
+
+      // Vault off ladder if pressing jump with directional impulse
+      if ((this.jumpBufferTimer > 0 || this.input.isJumping()) && (move.forward < 0 || Math.abs(move.right) > 0.2)) {
+        this.playerVel.y = MOVEMENT.JUMP_VELOCITY * 0.85;
+        this.playerVel.x += (this._scratchRight.x * move.right - this._scratchForward.x * 0.8) * 6.0;
+        this.playerVel.z += (this._scratchRight.z * move.right - this._scratchForward.z * 0.8) * 6.0;
+        this.jumpBufferTimer = 0;
+        this.hasJumpedThisAirtime = true;
+        this.audio.playJump();
+      }
+
+      // Reaching top of ladder: step up smoothly onto rooftop/landing
+      if (this.playerPos.y >= ladderBox.max.y - 0.35 && move.forward > 0) {
+        this.playerPos.y = ladderBox.max.y + 0.05;
+        this.playerVel.x += this._scratchForward.x * 4.0;
+        this.playerVel.z += this._scratchForward.z * 4.0;
+      }
+    }
+
     // 4. Gravity & Vertical motion (in-place math, no Vector3 allocation)
-    this.playerVel.y -= MOVEMENT.GRAVITY * delta;
+    if (!isClimbing) {
+      this.playerVel.y -= MOVEMENT.GRAVITY * delta;
+    }
     this.playerPos.x += this.playerVel.x * delta;
     this.playerPos.y += this.playerVel.y * delta;
     this.playerPos.z += this.playerVel.z * delta;
