@@ -268,6 +268,72 @@ export const ORBITAL_STATION_SPAWNS = [
   { x: -15, y: 0.0, z: 15, yaw: Math.PI / 3 }     // West corridor
 ];
 
+export const BIODOME_SPAWNS = [
+  { x: -24, y: 0.0, z: -24, yaw: Math.PI / 4 },
+  { x: 24, y: 0.0, z: 24, yaw: -3 * Math.PI / 4 },
+  { x: -24, y: 0.0, z: 24, yaw: 3 * Math.PI / 4 },
+  { x: 24, y: 0.0, z: -24, yaw: -Math.PI / 4 },
+  { x: 0, y: 0.0, z: -26, yaw: 0 },
+  { x: 0, y: 0.0, z: 26, yaw: Math.PI },
+  { x: -26, y: 0.0, z: 0, yaw: Math.PI / 2 },
+  { x: 26, y: 0.0, z: 0, yaw: -Math.PI / 2 }
+];
+
+export const METRO_UNDERPASS_SPAWNS = [
+  { x: -18, y: 1.2, z: -20, yaw: Math.PI / 2 },
+  { x: -18, y: 1.2, z: 20, yaw: Math.PI / 2 },
+  { x: -18, y: 1.2, z: 0, yaw: Math.PI / 2 },
+  { x: 18, y: 1.2, z: -20, yaw: -Math.PI / 2 },
+  { x: 18, y: 1.2, z: 20, yaw: -Math.PI / 2 },
+  { x: 18, y: 1.2, z: 0, yaw: -Math.PI / 2 },
+  { x: 0, y: 0.0, z: -2, yaw: 0 },
+  { x: 0, y: 0.0, z: 2, yaw: Math.PI }
+];
+
+export const SUNKEN_ATOLL_SPAWNS = [
+  { x: 0, y: 1.6, z: 0, yaw: 0 },
+  { x: -20, y: 2.0, z: -5, yaw: Math.PI / 2 },
+  { x: -20, y: 2.0, z: 5, yaw: Math.PI / 2 },
+  { x: 20, y: 2.0, z: -5, yaw: -Math.PI / 2 },
+  { x: 20, y: 2.0, z: 5, yaw: -Math.PI / 2 },
+  { x: -10, y: 0.0, z: -15, yaw: Math.PI / 4 },
+  { x: 10, y: 0.0, z: 15, yaw: -3 * Math.PI / 4 },
+  { x: 0, y: 0.0, z: -14, yaw: 0 }
+];
+
+export const SCRAPYARD_CANYON_SPAWNS = [
+  { x: 8, y: 5.0, z: 0, yaw: -Math.PI / 2 },
+  { x: -8, y: 5.0, z: 0, yaw: Math.PI / 2 },
+  { x: 0, y: 0.0, z: -20, yaw: 0 },
+  { x: 0, y: 0.0, z: 20, yaw: Math.PI },
+  { x: -16, y: 0.0, z: 0, yaw: Math.PI / 2 },
+  { x: 16, y: 0.0, z: 0, yaw: -Math.PI / 2 },
+  { x: -18, y: 0.0, z: -22, yaw: Math.PI / 4 },
+  { x: 18, y: 0.0, z: 22, yaw: -3 * Math.PI / 4 }
+];
+
+export const SOLAR_RELAY_SPAWNS = [
+  { x: -5, y: 0.0, z: 0, yaw: Math.PI / 2 },
+  { x: 5, y: 0.0, z: 0, yaw: -Math.PI / 2 },
+  { x: -20, y: 2.5, z: -5, yaw: 0 },
+  { x: -20, y: 2.5, z: 5, yaw: Math.PI },
+  { x: 20, y: 2.5, z: -5, yaw: 0 },
+  { x: 20, y: 2.5, z: 5, yaw: Math.PI },
+  { x: 0, y: 3.5, z: -22, yaw: 0 },
+  { x: 0, y: 3.5, z: 22, yaw: Math.PI }
+];
+
+export const SKYLINE_PENTHOUSE_SPAWNS = [
+  { x: 14, y: 0.0, z: 0, yaw: 0 },
+  { x: 14, y: 0.0, z: -14, yaw: 0 },
+  { x: 14, y: 0.0, z: 14, yaw: Math.PI },
+  { x: -4, y: 0.0, z: -14, yaw: Math.PI / 4 },
+  { x: -4, y: 0.0, z: 14, yaw: -3 * Math.PI / 4 },
+  { x: -16, y: 4.0, z: -12, yaw: 0 },
+  { x: -16, y: 4.0, z: 12, yaw: Math.PI },
+  { x: 4, y: 0.0, z: 0, yaw: -Math.PI / 2 }
+];
+
 export function getMapSpawns(mapName?: string) {
   switch (mapName) {
     case 'Facility':
@@ -290,6 +356,24 @@ export function getMapSpawns(mapName?: string) {
       return SKY_SANCTUARY_SPAWNS;
     case 'Orbital Station':
       return ORBITAL_STATION_SPAWNS;
+    case 'Bio-Dome':
+    case 'Bio-Dome (Neo Arboretum)':
+      return BIODOME_SPAWNS;
+    case 'Metro Underpass':
+    case 'Metro Underpass (Neon Subways)':
+      return METRO_UNDERPASS_SPAWNS;
+    case 'Sunken Atoll':
+    case 'Sunken Atoll (Ancient Coral Ruins)':
+      return SUNKEN_ATOLL_SPAWNS;
+    case 'Scrapyard Canyon':
+    case 'Scrapyard Canyon (Rust Basin)':
+      return SCRAPYARD_CANYON_SPAWNS;
+    case 'Solar Relay':
+    case 'Solar Relay (Helios Mirror Array)':
+      return SOLAR_RELAY_SPAWNS;
+    case 'Skyline Penthouse':
+    case 'Skyline Penthouse (Vertigo Lounge)':
+      return SKYLINE_PENTHOUSE_SPAWNS;
     default:
       return FACILITY_SPAWNS;
   }
@@ -492,6 +576,108 @@ export function getTeamSpawn(team: 'blue' | 'red', index: number, mapName?: stri
           { x: 22, y: 0.0, z: -4, yaw: -Math.PI / 2 },
           { x: 18, y: 0.0, z: 0, yaw: -Math.PI / 2 },
           { x: 24, y: 0.0, z: 0, yaw: -Math.PI / 2 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Bio-Dome' || mapName === 'Bio-Dome (Neo Arboretum)') {
+    const list = team === 'blue'
+      ? [
+          { x: -4, y: 0.0, z: 26, yaw: Math.PI },
+          { x: 4, y: 0.0, z: 26, yaw: Math.PI },
+          { x: 0, y: 0.0, z: 28, yaw: Math.PI },
+          { x: 0, y: 0.0, z: 24, yaw: Math.PI }
+        ]
+      : [
+          { x: -4, y: 0.0, z: -26, yaw: 0 },
+          { x: 4, y: 0.0, z: -26, yaw: 0 },
+          { x: 0, y: 0.0, z: -28, yaw: 0 },
+          { x: 0, y: 0.0, z: -24, yaw: 0 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Metro Underpass' || mapName === 'Metro Underpass (Neon Subways)') {
+    const list = team === 'blue'
+      ? [
+          { x: -18, y: 1.2, z: 20, yaw: Math.PI / 2 },
+          { x: -18, y: 1.2, z: 24, yaw: Math.PI / 2 },
+          { x: -20, y: 1.2, z: 22, yaw: Math.PI / 2 },
+          { x: -16, y: 1.2, z: 22, yaw: Math.PI / 2 }
+        ]
+      : [
+          { x: 18, y: 1.2, z: -20, yaw: -Math.PI / 2 },
+          { x: 18, y: 1.2, z: -24, yaw: -Math.PI / 2 },
+          { x: 20, y: 1.2, z: -22, yaw: -Math.PI / 2 },
+          { x: 16, y: 1.2, z: -22, yaw: -Math.PI / 2 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Sunken Atoll' || mapName === 'Sunken Atoll (Ancient Coral Ruins)') {
+    const list = team === 'blue'
+      ? [
+          { x: -4, y: 0.0, z: 28, yaw: Math.PI },
+          { x: 4, y: 0.0, z: 28, yaw: Math.PI },
+          { x: 0, y: 0.0, z: 29, yaw: Math.PI },
+          { x: 0, y: 0.0, z: 27, yaw: Math.PI }
+        ]
+      : [
+          { x: -4, y: 0.0, z: -28, yaw: 0 },
+          { x: 4, y: 0.0, z: -28, yaw: 0 },
+          { x: 0, y: 0.0, z: -29, yaw: 0 },
+          { x: 0, y: 0.0, z: -27, yaw: 0 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Scrapyard Canyon' || mapName === 'Scrapyard Canyon (Rust Basin)') {
+    const list = team === 'blue'
+      ? [
+          { x: -4, y: 0.0, z: 20, yaw: Math.PI },
+          { x: 4, y: 0.0, z: 20, yaw: Math.PI },
+          { x: 0, y: 0.0, z: 22, yaw: Math.PI },
+          { x: 0, y: 0.0, z: 18, yaw: Math.PI }
+        ]
+      : [
+          { x: -4, y: 0.0, z: -20, yaw: 0 },
+          { x: 4, y: 0.0, z: -20, yaw: 0 },
+          { x: 0, y: 0.0, z: -22, yaw: 0 },
+          { x: 0, y: 0.0, z: -18, yaw: 0 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Solar Relay' || mapName === 'Solar Relay (Helios Mirror Array)') {
+    const list = team === 'blue'
+      ? [
+          { x: -3, y: 3.5, z: 22, yaw: Math.PI },
+          { x: 3, y: 3.5, z: 22, yaw: Math.PI },
+          { x: 0, y: 3.5, z: 20, yaw: Math.PI },
+          { x: 0, y: 3.5, z: 24, yaw: Math.PI }
+        ]
+      : [
+          { x: -3, y: 3.5, z: -22, yaw: 0 },
+          { x: 3, y: 3.5, z: -22, yaw: 0 },
+          { x: 0, y: 3.5, z: -20, yaw: 0 },
+          { x: 0, y: 3.5, z: -24, yaw: 0 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Skyline Penthouse' || mapName === 'Skyline Penthouse (Vertigo Lounge)') {
+    const list = team === 'blue'
+      ? [
+          { x: 12, y: 0.0, z: 16, yaw: Math.PI },
+          { x: 16, y: 0.0, z: 16, yaw: Math.PI },
+          { x: 14, y: 0.0, z: 18, yaw: Math.PI },
+          { x: 14, y: 0.0, z: 14, yaw: Math.PI }
+        ]
+      : [
+          { x: 12, y: 0.0, z: -16, yaw: 0 },
+          { x: 16, y: 0.0, z: -16, yaw: 0 },
+          { x: 14, y: 0.0, z: -18, yaw: 0 },
+          { x: 14, y: 0.0, z: -14, yaw: 0 }
         ];
     return list[index % list.length];
   }

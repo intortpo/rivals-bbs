@@ -67,6 +67,54 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     fogDensity: 0.0035,
     sunColor: '#ffffff',
     ambientColor: '#7a8e9e'
+  },
+  biodome: {
+    id: 'biodome',
+    name: '🌿 Biosphere Emerald',
+    bgColor: '#0d281e',
+    fogDensity: 0.0022,
+    sunColor: '#c8f5d0',
+    ambientColor: '#13281e'
+  },
+  subway: {
+    id: 'subway',
+    name: '🚇 Dystopian Metro',
+    bgColor: '#0a0e18',
+    fogDensity: 0.003,
+    sunColor: '#00d2ff',
+    ambientColor: '#111827'
+  },
+  tropical: {
+    id: 'tropical',
+    name: '🏝️ Tropical Lagoon',
+    bgColor: '#164e63',
+    fogDensity: 0.0018,
+    sunColor: '#fef08a',
+    ambientColor: '#083344'
+  },
+  canyon: {
+    id: 'canyon',
+    name: '🏜️ Rust Canyon',
+    bgColor: '#431407',
+    fogDensity: 0.0022,
+    sunColor: '#fdba74',
+    ambientColor: '#270e04'
+  },
+  solar: {
+    id: 'solar',
+    name: '☀️ Stratosphere Solar',
+    bgColor: '#020617',
+    fogDensity: 0.0012,
+    sunColor: '#ffffff',
+    ambientColor: '#0f172a'
+  },
+  penthouse: {
+    id: 'penthouse',
+    name: '🍸 Vertigo Skyline',
+    bgColor: '#090514',
+    fogDensity: 0.0019,
+    sunColor: '#e879f9',
+    ambientColor: '#190a28'
   }
 };
 
@@ -311,6 +359,30 @@ export class PCMapBuilder {
         break;
       case 'Orbital Station':
         this.buildOrbitalStation();
+        break;
+      case 'Bio-Dome':
+      case 'Bio-Dome (Neo Arboretum)':
+        this.buildBioDome();
+        break;
+      case 'Metro Underpass':
+      case 'Metro Underpass (Neon Subways)':
+        this.buildMetroUnderpass();
+        break;
+      case 'Sunken Atoll':
+      case 'Sunken Atoll (Ancient Coral Ruins)':
+        this.buildSunkenAtoll();
+        break;
+      case 'Scrapyard Canyon':
+      case 'Scrapyard Canyon (Rust Basin)':
+        this.buildScrapyardCanyon();
+        break;
+      case 'Solar Relay':
+      case 'Solar Relay (Helios Mirror Array)':
+        this.buildSolarRelay();
+        break;
+      case 'Skyline Penthouse':
+      case 'Skyline Penthouse (Vertigo Lounge)':
+        this.buildSkylinePenthouse();
         break;
       default:
         this.buildFacilityArena();
@@ -735,6 +807,191 @@ export class PCMapBuilder {
       }
     }
     return null;
+  }
+
+  // 11. Bio-Dome (Neo Arboretum)
+  private buildBioDome(): void {
+    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
+    this.hasGroundPlane = true;
+
+    // Biosphere moss concrete floor
+    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#13281e', false, { metalness: 0.1, gloss: 0.4 });
+
+    // Perimeter geodesic containment walls
+    this.addBox(0, 4, 32, 66, 8, 2, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
+    this.addBox(0, 4, -32, 66, 8, 2, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
+    this.addBox(-32, 4, 0, 2, 8, 66, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
+    this.addBox(32, 4, 0, 2, 8, 66, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
+
+    // Central Hydroponic Spire (Glass tower with upper suspended ring)
+    this.addBox(0, 3, 0, 8, 6, 8, '#2d4a3e', false, { metalness: 0.4, gloss: 0.7, emissive: '#10b981', emissiveIntensity: 0.5 });
+    this.addBox(0, 6.8, 0, 16, 0.4, 16, '#38bdf8', true, { opacity: 0.85, emissive: '#0284c7', emissiveIntensity: 0.8 });
+
+    // Terraced Botanical Planters
+    this.addBox(0, 1.2, -18, 14, 2.4, 6, '#22543d', true, { gloss: 0.6 });
+    this.addBox(0, 1.2, 18, 14, 2.4, 6, '#22543d', true, { gloss: 0.6 });
+    this.addBox(-18, 1.2, 0, 6, 2.4, 14, '#22543d', true, { gloss: 0.6 });
+    this.addBox(18, 1.2, 0, 6, 2.4, 14, '#22543d', true, { gloss: 0.6 });
+
+    // Research Stations
+    this.addBox(-16, 1.5, -16, 6, 3, 6, '#f8fafc', true, { metalness: 0.2, gloss: 0.8 });
+    this.addBox(16, 1.5, 16, 6, 3, 6, '#f8fafc', true, { metalness: 0.2, gloss: 0.8 });
+
+    // Planter Jump Pads launching toward Upper Ring
+    this.createJumpPad(0, 2.4, -18, 17.0, 0, 6);
+    this.createJumpPad(0, 2.4, 18, 17.0, 0, -6);
+  }
+
+  // 12. Metro Underpass (Neon Subways)
+  private buildMetroUnderpass(): void {
+    this.bounds = { minX: -30, maxX: 30, minZ: -32, maxZ: 32 };
+    this.hasGroundPlane = true;
+
+    // Sunken Track Bed
+    this.addBox(0, -0.2, 0, 12, 0.4, 64, '#11141c', false, { metalness: 0.5, gloss: 0.3 });
+    this.addBox(-2, 0.05, 0, 0.3, 0.1, 64, '#71717a', false, { metalness: 0.9, gloss: 0.6 });
+    this.addBox(2, 0.05, 0, 0.3, 0.1, 64, '#71717a', false, { metalness: 0.9, gloss: 0.6 });
+
+    // West and East Passenger Platforms
+    this.addBox(-18, 0.6, 0, 14, 1.2, 64, '#27272a', true, { metalness: 0.2, gloss: 0.4 });
+    this.addBox(18, 0.6, 0, 14, 1.2, 64, '#27272a', true, { metalness: 0.2, gloss: 0.4 });
+
+    // Perimeter Tunnel Walls
+    this.addBox(0, 4, 32, 60, 8, 2, '#090d16', false);
+    this.addBox(0, 4, -32, 60, 8, 2, '#090d16', false);
+    this.addBox(-26, 4, 0, 2, 8, 64, '#090d16', false);
+    this.addBox(26, 4, 0, 2, 8, 64, '#090d16', false);
+
+    // Stationary Subway Train Cars (Walkable elevated cover)
+    this.addBox(0, 1.8, -14, 4.2, 3.2, 16, '#0284c7', true, { metalness: 0.7, gloss: 0.6 });
+    this.addBox(0, 1.8, 14, 4.2, 3.2, 16, '#0284c7', true, { metalness: 0.7, gloss: 0.6 });
+
+    // Station Columns
+    this.addBox(-12, 3, -16, 1.5, 6, 1.5, '#3f3f46');
+    this.addBox(-12, 3, 16, 1.5, 6, 1.5, '#3f3f46');
+    this.addBox(12, 3, -16, 1.5, 6, 1.5, '#3f3f46');
+    this.addBox(12, 3, 16, 1.5, 6, 1.5, '#3f3f46');
+
+    // Overhead Footbridges
+    this.addBox(0, 4.5, -24, 28, 0.4, 4, '#18181b', true);
+    this.addBox(0, 4.5, 24, 28, 0.4, 4, '#18181b', true);
+
+    // Track bed jump pads
+    this.createJumpPad(0, 0.0, -4, 16.0, 0, -6);
+    this.createJumpPad(0, 0.0, 4, 16.0, 0, 6);
+  }
+
+  // 13. Sunken Atoll (Ancient Coral Ruins)
+  private buildSunkenAtoll(): void {
+    this.bounds = { minX: -34, maxX: 34, minZ: -34, maxZ: 34 };
+    this.hasGroundPlane = true;
+
+    // Lagoon Water Floor
+    this.addBox(0, -0.1, 0, 70, 0.2, 70, '#0e7490', false, { metalness: 0.3, gloss: 0.85, emissive: '#0891b2', emissiveIntensity: 0.4 });
+
+    // Central Temple Altar
+    this.addBox(0, 0.8, 0, 16, 1.6, 16, '#d6d3d1', true, { metalness: 0.1, gloss: 0.3 });
+    this.addBox(0, 3.8, -8, 8, 4.4, 2, '#a8a29e', false);
+    this.addBox(0, 3.8, 8, 8, 4.4, 2, '#a8a29e', false);
+
+    // Sandy Dunes & Coral Bastions
+    this.addBox(-20, 1.0, 0, 8, 2.0, 24, '#fef08a', true, { metalness: 0.05, gloss: 0.2 });
+    this.addBox(20, 1.0, 0, 8, 2.0, 24, '#fef08a', true, { metalness: 0.05, gloss: 0.2 });
+    this.addBox(0, 1.2, -22, 14, 2.4, 8, '#78716c', true);
+    this.addBox(0, 1.2, 22, 14, 2.4, 8, '#78716c', true);
+
+    // Perimeter Reef Barriers
+    this.addBox(0, 3, 34, 70, 6, 2, '#155e75', false);
+    this.addBox(0, 3, -34, 70, 6, 2, '#155e75', false);
+    this.addBox(-34, 3, 0, 2, 6, 70, '#155e75', false);
+    this.addBox(34, 3, 0, 2, 6, 70, '#155e75', false);
+
+    // Jump pads from sand dunes to temple altar
+    this.createJumpPad(-14, 2.0, 0, 15.0, 8, 0);
+    this.createJumpPad(14, 2.0, 0, 15.0, -8, 0);
+  }
+
+  // 14. Scrapyard Canyon (Rust Basin)
+  private buildScrapyardCanyon(): void {
+    this.bounds = { minX: -34, maxX: 34, minZ: -34, maxZ: 34 };
+    this.hasGroundPlane = true;
+
+    // Rust Basin Floor
+    this.addBox(0, -0.1, 0, 70, 0.2, 70, '#451a03', false, { metalness: 0.2, gloss: 0.3 });
+
+    // Canyon Rim Ridges
+    this.addBox(-26, 4, 0, 10, 8, 70, '#78350f', false);
+    this.addBox(26, 4, 0, 10, 8, 70, '#78350f', false);
+    this.addBox(0, 4, -30, 70, 8, 8, '#78350f', false);
+    this.addBox(0, 4, 30, 70, 8, 8, '#78350f', false);
+
+    // Central Crane Tower & Walkway
+    this.addBox(0, 3.5, 0, 4, 7, 4, '#ea580c', false, { metalness: 0.8, gloss: 0.5 });
+    this.addBox(0, 4.8, 0, 24, 0.4, 5, '#292524', true);
+
+    // Scrapped Container Clusters
+    this.addBox(-12, 1.5, -12, 6, 3, 10, '#b91c1c', true);
+    this.addBox(12, 1.5, 12, 6, 3, 10, '#1d4ed8', true);
+    this.addBox(-10, 1.5, 12, 8, 3, 6, '#b45309', true);
+    this.addBox(10, 1.5, -12, 8, 3, 6, '#047857', true);
+
+    // Jump pads
+    this.createJumpPad(0, 0.0, 8, 18.0, 0, -6);
+    this.createJumpPad(-20, 0.0, -16, 17.0, 8, 6);
+  }
+
+  // 15. Solar Relay (Helios Mirror Array)
+  private buildSolarRelay(): void {
+    this.bounds = { minX: -35, maxX: 35, minZ: -35, maxZ: 35 };
+    this.hasGroundPlane = false; // Void abyss below!
+
+    // Central Relay Hub Platform
+    this.addBox(0, -0.5, 0, 18, 1, 18, '#0f172a', true, { metalness: 0.7, gloss: 0.8 });
+    this.addBox(0, 5, 0, 3, 10, 3, '#38bdf8', false, { emissive: '#0284c7', emissiveIntensity: 2.2 });
+
+    // Solar Mirror Platforms (Floating wings)
+    this.addBox(-20, 2.0, 0, 12, 1, 20, '#0284c7', true, { metalness: 0.95, gloss: 0.95, emissive: '#38bdf8', emissiveIntensity: 0.5 });
+    this.addBox(20, 2.0, 0, 12, 1, 20, '#0284c7', true, { metalness: 0.95, gloss: 0.95, emissive: '#38bdf8', emissiveIntensity: 0.5 });
+    this.addBox(0, 3.0, -22, 14, 1, 8, '#1e293b', true);
+    this.addBox(0, 3.0, 22, 14, 1, 8, '#1e293b', true);
+
+    // Teleport Portals between Mirror Wings
+    this.createTeleportPort('Port_W', 'Port_E', -18, 2.0, 0, new pc.Vec3(18, 2.5, 0), -Math.PI / 2, '#38bdf8');
+    this.createTeleportPort('Port_E', 'Port_W', 18, 2.0, 0, new pc.Vec3(-18, 2.5, 0), Math.PI / 2, '#38bdf8');
+
+    // Void Crossing Jump Pads
+    this.createJumpPad(0, 0.0, -7, 18.0, 0, -12);
+    this.createJumpPad(0, 0.0, 7, 18.0, 0, 12);
+  }
+
+  // 16. Skyline Penthouse (Vertigo Lounge)
+  private buildSkylinePenthouse(): void {
+    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
+    this.hasGroundPlane = true;
+
+    // Indoor Lounge Marble Floor
+    this.addBox(-12, -0.1, 0, 24, 0.2, 48, '#0f172a', false, { metalness: 0.6, gloss: 0.9 });
+    this.addBox(-16, 3.8, 0, 14, 0.4, 40, '#1e293b', true);
+
+    // Bar Counter & Elevator Shaft
+    this.addBox(-8, 0.6, 0, 2, 1.2, 12, '#e11d48', true, { emissive: '#e11d48', emissiveIntensity: 1.2 });
+    this.addBox(-22, 4, 0, 4, 8, 8, '#020617', false);
+
+    // Outdoor Helipad Deck
+    this.addBox(14, -0.1, 0, 24, 0.2, 48, '#18181b', false, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(14, 0.02, 0, 12, 0.04, 12, '#f59e0b', false, { emissive: '#f59e0b', emissiveIntensity: 1.0 });
+
+    // Glass Balcony Perimeters
+    this.addBox(26, 0.6, 0, 0.4, 1.2, 48, '#38bdf8', false, { opacity: 0.5 });
+    this.addBox(14, 0.6, 24, 24, 1.2, 0.4, '#38bdf8', false, { opacity: 0.5 });
+    this.addBox(14, 0.6, -24, 24, 1.2, 0.4, '#38bdf8', false, { opacity: 0.5 });
+
+    // High Billboard Gantry
+    this.addBox(18, 6.5, -18, 10, 0.4, 4, '#334155', true);
+
+    // Jump Pads
+    this.createJumpPad(18, 0.0, -10, 19.0, 0, -6);
+    this.createJumpPad(4, 0.0, 12, 17.0, -12, 0);
   }
 
   public getGroundLevel(pos: { x: number; y: number; z: number } | pc.Vec3): number {

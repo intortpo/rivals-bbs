@@ -31,9 +31,9 @@ import {
   ORBITAL_STATION_SPAWNS
 } from '../src/shared/constants.js';
 
-console.log('🧪 Starting 10 Maps, PBR Graphics & Tablet Optimization Tests...');
+console.log('🧪 Starting 16 Maps, PBR Graphics & Tablet Optimization Tests...');
 
-describe('PlayCanvas 10 Arena Maps Geometry & Bounds', () => {
+describe('PlayCanvas 16 Arena Maps Geometry & Bounds', () => {
   const ALL_MAP_NAMES = [
     'Facility',
     'Cartoon City',
@@ -44,10 +44,16 @@ describe('PlayCanvas 10 Arena Maps Geometry & Bounds', () => {
     'Magma Foundry',
     'Subzero Station',
     'Sky Sanctuary',
-    'Orbital Station'
+    'Orbital Station',
+    'Bio-Dome',
+    'Metro Underpass',
+    'Sunken Atoll',
+    'Scrapyard Canyon',
+    'Solar Relay',
+    'Skyline Penthouse'
   ];
 
-  it('should verify all 10 maps instantiate in PCMapBuilder with colliders and jump pads', () => {
+  it('should verify all 16 maps instantiate in PCMapBuilder with colliders and jump pads', () => {
     for (const mapName of ALL_MAP_NAMES) {
       const mb = new PCMapBuilder(undefined, mapName);
       assert.strictEqual(mb.mapName, mapName);
@@ -56,16 +62,14 @@ describe('PlayCanvas 10 Arena Maps Geometry & Bounds', () => {
       assert.ok(mb.bounds.minZ < mb.bounds.maxZ, `Map ${mapName} should have valid Z bounds`);
 
       // Verify jump pads or teleporters exist on maps
-      if (['Facility', 'Cartoon City', 'Arena Classic', 'Neon Warehouse', 'Cyber Spire', 'Quantum Lab', 'Magma Foundry', 'Subzero Station', 'Sky Sanctuary', 'Orbital Station'].includes(mapName)) {
-        assert.ok(mb.jumpPads.length > 0 || mb.teleportPorts.length > 0, `Map ${mapName} must have jump pads or teleporters`);
-      }
+      assert.ok(mb.jumpPads.length > 0 || mb.teleportPorts.length > 0, `Map ${mapName} must have jump pads or teleporters`);
 
       // Verify ground level check
       if (mb.hasGroundPlane) {
         const centerGround = mb.getGroundLevel(new pc.Vec3(0, 0.5, 0));
         assert.ok(centerGround >= 0.0, `Map ${mapName} should return valid ground height`);
       } else {
-        // Void map (e.g. Cyber Spire or Magma Foundry): stepping off platform into abyss returns -100
+        // Void map (e.g. Cyber Spire, Magma Foundry, Solar Relay): stepping off platform into abyss returns -100
         const voidGround = mb.getGroundLevel(new pc.Vec3(-35, -5, -35));
         assert.strictEqual(voidGround, -100, `Map ${mapName} void space should return -100`);
       }
@@ -92,7 +96,7 @@ describe('PlayCanvas 10 Arena Maps Geometry & Bounds', () => {
   });
 
   it('should verify environmental sky themes include required PBR atmospheric parameters', () => {
-    const requiredThemes = ['twilight', 'sunset', 'sage', 'deepspace', 'subzero'];
+    const requiredThemes = ['twilight', 'sunset', 'sage', 'deepspace', 'subzero', 'biodome', 'subway', 'tropical', 'canyon', 'solar', 'penthouse'];
     for (const themeId of requiredThemes) {
       const theme = SKY_THEMES[themeId];
       assert.ok(theme, `Sky theme ${themeId} should exist`);
@@ -103,7 +107,7 @@ describe('PlayCanvas 10 Arena Maps Geometry & Bounds', () => {
   });
 });
 
-describe('Server Authoritative Obstacles & Line of Sight for 10 Maps', () => {
+describe('Server Authoritative Obstacles & Line of Sight for 16 Maps', () => {
   const ALL_MAP_NAMES = [
     'Facility',
     'Cartoon City',
@@ -114,10 +118,16 @@ describe('Server Authoritative Obstacles & Line of Sight for 10 Maps', () => {
     'Magma Foundry',
     'Subzero Station',
     'Sky Sanctuary',
-    'Orbital Station'
+    'Orbital Station',
+    'Bio-Dome',
+    'Metro Underpass',
+    'Sunken Atoll',
+    'Scrapyard Canyon',
+    'Solar Relay',
+    'Skyline Penthouse'
   ];
 
-  it('should return valid obstacles for each of the 10 maps in getMapObstacles', () => {
+  it('should return valid obstacles for each of the 16 maps in getMapObstacles', () => {
     for (const mapName of ALL_MAP_NAMES) {
       const obs = getMapObstacles(mapName);
       assert.ok(obs.length > 5, `Obstacles for ${mapName} should contain at least 5 bounding boxes`);
@@ -146,9 +156,25 @@ describe('Server Authoritative Obstacles & Line of Sight for 10 Maps', () => {
     const clear = hasLineOfSight(p1, p2, obstacles);
     assert.strictEqual(clear, false, 'Line of sight should be occluded by GravityCore');
   });
+
+  it('should occlude line of sight through Bio-Dome hydroponic spire', () => {
+    const obstacles = getMapObstacles('Bio-Dome');
+    const p1: [number, number, number] = [0, 1.5, -10];
+    const p2: [number, number, number] = [0, 1.5, 10];
+    const clear = hasLineOfSight(p1, p2, obstacles);
+    assert.strictEqual(clear, false, 'Line of sight should be occluded by HydroponicSpire');
+  });
+
+  it('should occlude line of sight through Scrapyard Canyon crane tower', () => {
+    const obstacles = getMapObstacles('Scrapyard Canyon');
+    const p1: [number, number, number] = [-10, 2.0, 0];
+    const p2: [number, number, number] = [10, 2.0, 0];
+    const clear = hasLineOfSight(p1, p2, obstacles);
+    assert.strictEqual(clear, false, 'Line of sight should be occluded by CraneTower');
+  });
 });
 
-describe('Spawn Points Void Safety & Obstacle Clearance for 10 Maps', () => {
+describe('Spawn Points Void Safety & Obstacle Clearance for 16 Maps', () => {
   const ALL_MAP_NAMES = [
     'Facility',
     'Cartoon City',
@@ -159,10 +185,16 @@ describe('Spawn Points Void Safety & Obstacle Clearance for 10 Maps', () => {
     'Magma Foundry',
     'Subzero Station',
     'Sky Sanctuary',
-    'Orbital Station'
+    'Orbital Station',
+    'Bio-Dome',
+    'Metro Underpass',
+    'Sunken Atoll',
+    'Scrapyard Canyon',
+    'Solar Relay',
+    'Skyline Penthouse'
   ];
 
-  it('should verify all 8 spawns for all 10 maps are safe above ground and within bounds', () => {
+  it('should verify all 8 spawns for all 16 maps are safe above ground and within bounds', () => {
     for (const mapName of ALL_MAP_NAMES) {
       const spawns = getMapSpawns(mapName);
       assert.ok(spawns.length >= 6, `Map ${mapName} should have at least 6 FFA spawns`);
@@ -184,7 +216,7 @@ describe('Spawn Points Void Safety & Obstacle Clearance for 10 Maps', () => {
     }
   });
 
-  it('should verify team spawns for Blue and Red on all 10 maps', () => {
+  it('should verify team spawns for Blue and Red on all 16 maps', () => {
     for (const mapName of ALL_MAP_NAMES) {
       for (let i = 0; i < 4; i++) {
         const blue = getTeamSpawn('blue', i, mapName);
@@ -268,10 +300,16 @@ describe('In-World 3D Powerup Pickups & Map Distribution', () => {
     'Magma Foundry',
     'Subzero Station',
     'Sky Sanctuary',
-    'Orbital Station'
+    'Orbital Station',
+    'Bio-Dome',
+    'Metro Underpass',
+    'Sunken Atoll',
+    'Scrapyard Canyon',
+    'Solar Relay',
+    'Skyline Penthouse'
   ];
 
-  it('should define tactical 3D powerup pickup locations for all 10 maps', async () => {
+  it('should define tactical 3D powerup pickup locations for all 16 maps', async () => {
     const { MAP_POWERUP_LOCATIONS, PCPowerupManager } = await import('../src/client/engine/playcanvas/PCPowerupManager.js');
     const { AudioManager } = await import('../src/client/engine/AudioManager.js');
 

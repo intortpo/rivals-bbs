@@ -76,6 +76,42 @@ export const MAP_POWERUP_LOCATIONS: Record<string, { type: PowerupType; x: numbe
     { type: 'speed', x: -16, y: 1.2, z: 0 },
     { type: 'shield', x: 16, y: 1.2, z: 0 },
     { type: 'rapid_mag', x: 0, y: 1.2, z: 16 }
+  ],
+  'Bio-Dome': [
+    { type: 'quad_damage', x: 0, y: 7.8, z: 0 },
+    { type: 'shield', x: -16, y: 3.8, z: -16 },
+    { type: 'speed', x: 16, y: 3.8, z: 16 },
+    { type: 'rapid_mag', x: 0, y: 1.2, z: 0 }
+  ],
+  'Metro Underpass': [
+    { type: 'quad_damage', x: 0, y: 5.5, z: 0 },
+    { type: 'shield', x: -18, y: 2.0, z: 0 },
+    { type: 'speed', x: 18, y: 2.0, z: 0 },
+    { type: 'rapid_mag', x: 0, y: 4.2, z: 14 }
+  ],
+  'Sunken Atoll': [
+    { type: 'quad_damage', x: 0, y: 2.5, z: 0 },
+    { type: 'speed', x: -20, y: 2.5, z: 0 },
+    { type: 'shield', x: 20, y: 2.5, z: 0 },
+    { type: 'rapid_mag', x: 0, y: 3.0, z: -22 }
+  ],
+  'Scrapyard Canyon': [
+    { type: 'quad_damage', x: 0, y: 5.8, z: 0 },
+    { type: 'shield', x: -12, y: 3.8, z: -12 },
+    { type: 'speed', x: 12, y: 3.8, z: 12 },
+    { type: 'rapid_mag', x: 0, y: 1.2, z: -18 }
+  ],
+  'Solar Relay': [
+    { type: 'quad_damage', x: 0, y: 1.2, z: 0 },
+    { type: 'speed', x: -20, y: 3.2, z: 0 },
+    { type: 'shield', x: 20, y: 3.2, z: 0 },
+    { type: 'rapid_mag', x: 0, y: 4.2, z: -22 }
+  ],
+  'Skyline Penthouse': [
+    { type: 'quad_damage', x: 18, y: 7.5, z: -18 },
+    { type: 'shield', x: -16, y: 4.8, z: 0 },
+    { type: 'speed', x: 14, y: 1.2, z: 0 },
+    { type: 'rapid_mag', x: -8, y: 2.0, z: 0 }
   ]
 };
 

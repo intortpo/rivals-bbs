@@ -1385,6 +1385,118 @@ export const ORBITAL_STATION_OBSTACLES: BoundingBox[] = [
   { min: [-3, 0, 10], max: [3, 1.4, 12], name: 'ConsoleSouth' }
 ];
 
+export const BIODOME_OBSTACLES: BoundingBox[] = [
+  // Perimeter containment walls
+  { min: [-33, 0, 31], max: [33, 8, 33], name: 'DomeWallNorth' },
+  { min: [-33, 0, -33], max: [33, 8, -31], name: 'DomeWallSouth' },
+  { min: [-33, 0, -33], max: [-31, 8, 33], name: 'DomeWallWest' },
+  { min: [31, 0, -33], max: [33, 8, 33], name: 'DomeWallEast' },
+
+  // Central Hydroponic Spire & Suspended Ring
+  { min: [-4, 0, -4], max: [4, 6, 4], name: 'HydroponicSpire' },
+  { min: [-8, 6.6, -8], max: [8, 7.0, 8], name: 'SpireUpperRing' },
+
+  // Terraced Botanical Planters
+  { min: [-7, 0, -21], max: [7, 2.4, -15], name: 'PlanterNorth' },
+  { min: [-7, 0, 15], max: [7, 2.4, 21], name: 'PlanterSouth' },
+  { min: [-21, 0, -7], max: [-15, 2.4, 7], name: 'PlanterWest' },
+  { min: [15, 0, -7], max: [21, 2.4, 7], name: 'PlanterEast' },
+
+  // Research Stations
+  { min: [-19, 0, -19], max: [-13, 3, -13], name: 'ResearchStationNW' },
+  { min: [13, 0, 13], max: [19, 3, 19], name: 'ResearchStationSE' }
+];
+
+export const METRO_UNDERPASS_OBSTACLES: BoundingBox[] = [
+  // Perimeter tunnel walls
+  { min: [-30, 0, 31], max: [30, 8, 33], name: 'TunnelWallNorth' },
+  { min: [-30, 0, -33], max: [30, 8, -31], name: 'TunnelWallSouth' },
+  { min: [-27, 0, -32], max: [-25, 8, 32], name: 'TunnelWallWest' },
+  { min: [25, 0, -32], max: [27, 8, 32], name: 'TunnelWallEast' },
+
+  // Platforms
+  { min: [-25, 0, -32], max: [-11, 1.2, 32], name: 'PlatformWest' },
+  { min: [11, 0, -32], max: [25, 1.2, 32], name: 'PlatformEast' },
+
+  // Subway Train Cars
+  { min: [-2.1, 0.2, -22], max: [2.1, 3.4, -6], name: 'TrainNorth' },
+  { min: [-2.1, 0.2, 6], max: [2.1, 3.4, 22], name: 'TrainSouth' },
+
+  // Station Support Columns
+  { min: [-12.75, 0, -16.75], max: [-11.25, 6, -15.25], name: 'ColumnNW' },
+  { min: [-12.75, 0, 15.25], max: [-11.25, 6, 16.75], name: 'ColumnSW' },
+  { min: [11.25, 0, -16.75], max: [12.75, 6, -15.25], name: 'ColumnNE' },
+  { min: [11.25, 0, 15.25], max: [12.75, 6, 16.75], name: 'ColumnSE' },
+
+  // Overhead Footbridges
+  { min: [-14, 4.3, -26], max: [14, 4.7, -22], name: 'FootbridgeNorth' },
+  { min: [-14, 4.3, 22], max: [14, 4.7, 26], name: 'FootbridgeSouth' }
+];
+
+export const SUNKEN_ATOLL_OBSTACLES: BoundingBox[] = [
+  // Perimeter Reef Barriers
+  { min: [-35, 0, 33], max: [35, 6, 35], name: 'ReefNorth' },
+  { min: [-35, 0, -35], max: [35, 6, -33], name: 'ReefSouth' },
+  { min: [-35, 0, -35], max: [-33, 6, 35], name: 'ReefWest' },
+  { min: [33, 0, -35], max: [35, 6, 35], name: 'ReefEast' },
+
+  // Central Temple Altar & Arches
+  { min: [-8, 0, -8], max: [8, 1.6, 8], name: 'TempleAltar' },
+  { min: [-4, 1.6, -9], max: [4, 6.0, -7], name: 'AltarArchNorth' },
+  { min: [-4, 1.6, 7], max: [4, 6.0, 9], name: 'AltarArchSouth' },
+
+  // Sandy Dunes & Coral Bastions
+  { min: [-24, 0, -12], max: [-16, 2.0, 12], name: 'DuneWest' },
+  { min: [16, 0, -12], max: [24, 2.0, 12], name: 'DuneEast' },
+  { min: [-7, 0, -26], max: [7, 2.4, -18], name: 'BastionNorth' },
+  { min: [-7, 0, 18], max: [7, 2.4, 26], name: 'BastionSouth' }
+];
+
+export const SCRAPYARD_CANYON_OBSTACLES: BoundingBox[] = [
+  // Canyon Rim Ridges
+  { min: [-31, 0, -35], max: [-21, 8, 35], name: 'CanyonRidgeWest' },
+  { min: [21, 0, -35], max: [31, 8, 35], name: 'CanyonRidgeEast' },
+  { min: [-35, 0, -34], max: [35, 8, -26], name: 'CanyonRidgeNorth' },
+  { min: [-35, 0, 26], max: [35, 8, 34], name: 'CanyonRidgeSouth' },
+
+  // Central Crane Tower & Walkway
+  { min: [-2, 0, -2], max: [2, 7.0, 2], name: 'CraneTower' },
+  { min: [-12, 4.6, -2.5], max: [12, 5.0, 2.5], name: 'CraneWalkway' },
+
+  // Scrapped Container Clusters
+  { min: [-15, 0, -17], max: [-9, 3, -7], name: 'ContainerNW' },
+  { min: [9, 0, 7], max: [15, 3, 17], name: 'ContainerSE' },
+  { min: [-14, 0, 9], max: [-6, 3, 15], name: 'ContainerSW' },
+  { min: [6, 0, -15], max: [14, 3, -9], name: 'ContainerNE' }
+];
+
+export const SOLAR_RELAY_OBSTACLES: BoundingBox[] = [
+  // Central Relay Hub Platform & Spire
+  { min: [-9, -1, -9], max: [9, 0, 9], name: 'RelayHubPlatform' },
+  { min: [-1.5, 0, -1.5], max: [1.5, 10, 1.5], name: 'SolarCoreSpire' },
+
+  // Solar Mirror Platforms & Outposts
+  { min: [-26, 1.5, -10], max: [-14, 2.5, 10], name: 'MirrorWingWest' },
+  { min: [14, 1.5, -10], max: [26, 2.5, 10], name: 'MirrorWingEast' },
+  { min: [-7, 2.5, -26], max: [7, 3.5, -18], name: 'RelayOutpostNorth' },
+  { min: [-7, 2.5, 18], max: [7, 3.5, 26], name: 'RelayOutpostSouth' }
+];
+
+export const SKYLINE_PENTHOUSE_OBSTACLES: BoundingBox[] = [
+  // Indoor Lounge Mezzanine & Elevator Core & Bar
+  { min: [-23, 3.6, -20], max: [-9, 4.0, 20], name: 'LoungeMezzanine' },
+  { min: [-9, 0, -6], max: [-7, 1.2, 6], name: 'BarCounter' },
+  { min: [-24, 0, -4], max: [-20, 8, 4], name: 'ElevatorShaft' },
+
+  // Glass Balcony Perimeters
+  { min: [25.8, 0, -24], max: [26.2, 1.2, 24], name: 'BalconyEast' },
+  { min: [2, 0, 23.8], max: [26, 1.2, 24.2], name: 'BalconyNorth' },
+  { min: [2, 0, -24.2], max: [26, 1.2, -23.8], name: 'BalconySouth' },
+
+  // High Billboard Gantry
+  { min: [13, 6.3, -20], max: [23, 6.7, -16], name: 'BillboardGantry' }
+];
+
 export function getMapObstacles(mapName: string): BoundingBox[] {
   switch (mapName) {
     case 'Facility':
@@ -1407,6 +1519,24 @@ export function getMapObstacles(mapName: string): BoundingBox[] {
       return SKY_SANCTUARY_OBSTACLES;
     case 'Orbital Station':
       return ORBITAL_STATION_OBSTACLES;
+    case 'Bio-Dome':
+    case 'Bio-Dome (Neo Arboretum)':
+      return BIODOME_OBSTACLES;
+    case 'Metro Underpass':
+    case 'Metro Underpass (Neon Subways)':
+      return METRO_UNDERPASS_OBSTACLES;
+    case 'Sunken Atoll':
+    case 'Sunken Atoll (Ancient Coral Ruins)':
+      return SUNKEN_ATOLL_OBSTACLES;
+    case 'Scrapyard Canyon':
+    case 'Scrapyard Canyon (Rust Basin)':
+      return SCRAPYARD_CANYON_OBSTACLES;
+    case 'Solar Relay':
+    case 'Solar Relay (Helios Mirror Array)':
+      return SOLAR_RELAY_OBSTACLES;
+    case 'Skyline Penthouse':
+    case 'Skyline Penthouse (Vertigo Lounge)':
+      return SKYLINE_PENTHOUSE_OBSTACLES;
     default:
       return FACILITY_OBSTACLES;
   }

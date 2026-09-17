@@ -188,6 +188,12 @@ export class LobbyUI {
                 <option value="Subzero Station">❄️ Subzero Station</option>
                 <option value="Sky Sanctuary">⛩️ Sky Sanctuary</option>
                 <option value="Orbital Station">🛰️ Orbital Station</option>
+                <option value="Bio-Dome">🌿 Bio-Dome (Neo Arboretum)</option>
+                <option value="Metro Underpass">🚇 Metro Underpass (Neon Subways)</option>
+                <option value="Sunken Atoll">🏝️ Sunken Atoll (Coral Ruins)</option>
+                <option value="Scrapyard Canyon">🏗️ Scrapyard Canyon (Rust Basin)</option>
+                <option value="Solar Relay">☀️ Solar Relay (Helios Mirror)</option>
+                <option value="Skyline Penthouse">🍸 Skyline Penthouse (Vertigo)</option>
               </select>
             </div>
           </div>
