@@ -1,11 +1,10 @@
-import * as THREE from 'three';
-import { Renderer } from './engine/Renderer.js';
-import { MapBuilder } from './engine/MapBuilder.js';
+import * as pc from 'playcanvas';
+import { PCRenderer } from './engine/playcanvas/PCRenderer.js';
+import { PCMapBuilder } from './engine/playcanvas/PCMapBuilder.js';
 import { AudioManager } from './engine/AudioManager.js';
-import { FXManager } from './engine/FXManager.js';
-import { WeaponManager } from './engine/WeaponManager.js';
-import { CharacterModel } from './engine/CharacterModel.js';
-import { PowerupManager } from './engine/PowerupManager.js';
+import { PCFXManager } from './engine/playcanvas/PCFXManager.js';
+import { PCWeaponManager } from './engine/playcanvas/PCWeaponManager.js';
+import { PCPowerupManager } from './engine/playcanvas/PCPowerupManager.js';
 import { InputManager } from './controls/InputManager.js';
 import { TouchHUD } from './ui/TouchHUD.js';
 import { QRManager } from './ui/QRManager.js';
@@ -16,19 +15,23 @@ import { SettingsUI } from './ui/SettingsUI.js';
 import { DashboardUI } from './ui/DashboardUI.js';
 import { CharacterBuilderUI } from './ui/CharacterBuilderUI.js';
 import { LoadingScreenUI } from './ui/LoadingScreenUI.js';
-import { NetworkClient } from './network/NetworkClient.js';
-import { ProjectileManager } from './engine/ProjectileManager.js';
+import { PCNetworkClient } from './network/PCNetworkClient.js';
+import { PCProjectileManager } from './engine/playcanvas/PCProjectileManager.js';
 import { MOVEMENT, NETWORK, WEAPON_ORDER, getMapSpawns } from '../shared/constants.js';
 import { TeamColor } from '../shared/types.js';
 
+function damp(current: number, target: number, lambda: number, dt: number): number {
+  return pc.math.lerp(current, target, 1 - Math.exp(-lambda * dt));
+}
+
 class GameApp {
   private appContainer: HTMLElement;
-  private renderer!: Renderer;
+  private renderer!: PCRenderer;
   private audio!: AudioManager;
-  private fx!: FXManager;
-  private projectileManager!: ProjectileManager;
-  private powerupManager!: PowerupManager;
-  private weaponManager!: WeaponManager;
+  private fx!: PCFXManager;
+  private projectileManager!: PCProjectileManager;
+  private powerupManager!: PCPowerupManager;
+  private weaponManager!: PCWeaponManager;
   private input!: InputManager;
   private hud!: TouchHUD;
   private settingsUI!: SettingsUI;
@@ -39,18 +42,18 @@ class GameApp {
   private lobbyUI!: LobbyUI;
   private authUI!: AuthUI;
   private grammarReloadUI!: GrammarReloadUI;
-  private networkClient!: NetworkClient;
-  private mapBuilder!: MapBuilder;
+  private networkClient!: PCNetworkClient;
+  private mapBuilder!: PCMapBuilder;
 
   // Local player physics state
-  private playerPos = new THREE.Vector3(0, 0, 0);
-  private playerVel = new THREE.Vector3(0, 0, 0);
+  private playerPos = new pc.Vec3(0, 0, 0);
+  private playerVel = new pc.Vec3(0, 0, 0);
   private playerYaw: number = 0;
   private playerPitch: number = 0;
   private isGrounded: boolean = true;
   private isSliding: boolean = false;
   private slideTimer: number = 0;
-  private slideDirection = new THREE.Vector3();
+  private slideDirection = new pc.Vec3();
   private currentHp: number = 100;
   private currentShield: number = 0;
   private myTeam: TeamColor = 'none';
@@ -69,11 +72,9 @@ class GameApp {
   private swayOffsetY: number = 0;
 
   // Pre-allocated scratch vectors to prevent GC spikes in tick loop
-  private _scratchForward = new THREE.Vector3();
-  private _scratchRight = new THREE.Vector3();
-  private _scratchMoveDir = new THREE.Vector3();
-  private _scratchCamPos = new THREE.Vector3();
-  private _scratchCamDir = new THREE.Vector3();
+  private _scratchForward = new pc.Vec3();
+  private _scratchRight = new pc.Vec3();
+  private _scratchMoveDir = new pc.Vec3();
 
   private lastTime: number = performance.now();
   private inputSendTimer: number = 0;
@@ -93,12 +94,12 @@ class GameApp {
 
   private async init(): Promise<void> {
     // 1. Core systems
-    this.renderer = new Renderer(this.appContainer);
+    this.renderer = new PCRenderer(this.appContainer);
     this.audio = new AudioManager();
-    this.fx = new FXManager(this.renderer.scene);
-    this.projectileManager = new ProjectileManager(this.renderer.scene, this.fx);
-    this.powerupManager = new PowerupManager(this.renderer.scene, this.audio);
-    this.weaponManager = new WeaponManager(this.renderer.scene, this.renderer.camera, this.fx, this.audio);
+    this.fx = new PCFXManager(this.renderer.app);
+    this.projectileManager = new PCProjectileManager(this.renderer.app, this.fx);
+    this.powerupManager = new PCPowerupManager(this.renderer.app, this.audio);
+    this.weaponManager = new PCWeaponManager(this.renderer.app, this.renderer.cameraEntity, this.fx, this.audio);
     this.input = new InputManager(this.appContainer);
     this.hud = new TouchHUD(this.appContainer);
     this.settingsUI = new SettingsUI(this.appContainer, (settings) => {
@@ -113,7 +114,7 @@ class GameApp {
     this.dashboardUI = new DashboardUI(this.appContainer);
     this.loadingScreenUI = new LoadingScreenUI(this.appContainer);
     this.qrManager = new QRManager();
-    this.mapBuilder = new MapBuilder(this.renderer.scene, 'Cartoon City', 'twilight');
+    this.mapBuilder = new PCMapBuilder(this.renderer.app, 'Cartoon City', 'twilight');
 
     // Wire HUD top-right quick access and powerup buttons
     this.hud.onPowerupClick = () => {
@@ -129,8 +130,8 @@ class GameApp {
     };
 
     // 2. Network Client
-    this.networkClient = new NetworkClient(
-      this.renderer.scene,
+    this.networkClient = new PCNetworkClient(
+      this.renderer.app,
       this.audio,
       this.fx,
       this.weaponManager
@@ -140,16 +141,14 @@ class GameApp {
     this.lobbyUI = new LobbyUI(this.appContainer, {
       onCreateRoom: async (name, mode, fragLimit, mapName, skyTheme = 'twilight', outfitIndex = 0, customization) => {
         this.audio.touchUnlock();
-        // Rebuild map or sky if different
         if (this.mapBuilder.mapName !== mapName || this.mapBuilder.skyTheme !== skyTheme) {
           this.mapBuilder.dispose();
-          this.mapBuilder = new MapBuilder(this.renderer.scene, mapName, skyTheme);
+          this.mapBuilder = new PCMapBuilder(this.renderer.app, mapName, skyTheme);
         }
         const res = await this.networkClient.createRoom(name, mode, fragLimit, mapName, outfitIndex, customization);
         if (res.success && res.roomId) {
           if (this.networkClient.currentRoomState) {
             this.lobbyUI.showInRoomLobby(this.networkClient.currentRoomState, true);
-            // Automatically display QR code so host can easily show it to opponents
             this.qrManager.showQRModal(res.roomId);
           }
         } else {
@@ -269,7 +268,7 @@ class GameApp {
     // 5. Hook Network Callbacks
     this.setupNetworkCallbacks();
 
-    // 6. Check URL parameters for direct join via QR scan or shared link (?room=RV-XXXX)
+    // 6. Check URL parameters for direct join
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
@@ -277,13 +276,8 @@ class GameApp {
       if (codeInput) codeInput.value = roomParam.toUpperCase();
     }
 
-    // 7. Interactive Asset Loading Screen (Preload character models, weapon GLBs, audio buffers & warm up shaders)
-    await this.loadingScreenUI.preloadGameAssets(
-      this.renderer.scene,
-      this.renderer.camera,
-      this.renderer.renderer,
-      this.audio
-    );
+    // 7. Interactive Asset Loading Screen
+    await this.loadingScreenUI.preloadGameAssets(this.audio);
 
     // 8. Start Render & Game Loop
     requestAnimationFrame(this.gameLoop.bind(this));
@@ -302,7 +296,6 @@ class GameApp {
 
         const myState = state.players[this.networkClient.myId];
         if (myState && this.isDead && !myState.isDead) {
-          // Local player respawned!
           this.isDead = false;
           this.currentHp = myState.health;
           this.currentShield = myState.shieldHp;
@@ -357,10 +350,7 @@ class GameApp {
       if (payload.playerId === this.networkClient.myId) {
         this.powerupManager.applyActivePowerup(payload.powerup, payload.durationSec);
       } else {
-        const remote = this.networkClient.remotePlayers.get(payload.playerId);
-        if (remote) {
-          this.powerupManager.triggerRemoteAura(remote.model.root, payload.powerup);
-        }
+        this.powerupManager.triggerRemoteAura(payload.powerup);
       }
     };
 
@@ -385,10 +375,8 @@ class GameApp {
       this.projectileManager.clear();
       this.hud.showWaveCleared(payload.waveNumber, payload.nextWaveInSec);
 
-      // Free ammo bonus
       this.weaponManager.grantAmmo(35);
 
-      // Boost shield & revive local player if downed
       this.currentShield = Math.min(50, this.currentShield + 25);
       this.hud.updateShield(this.currentShield);
 
@@ -430,7 +418,6 @@ class GameApp {
 
       if (payload.victimId === this.networkClient.myId) {
         this.isDead = true;
-        // In wave mode, player waits for wave clear revive; in PvP auto-respawn after 3s
         if (this.networkClient.currentRoomState?.mode !== 'wave') {
           setTimeout(() => {
             this.currentHp = 100;
@@ -475,7 +462,6 @@ class GameApp {
         } : undefined
       );
 
-      // Record match result to dashboard if logged in
       try {
         const token = this.authUI.getToken();
         if (token) {
@@ -525,11 +511,10 @@ class GameApp {
     this.hud.setVisible(true);
     this.lobbyUI.hideLobby();
 
-    // Ensure local client has loaded the room's selected map
     const chosenMap = state.mapName || 'Cartoon City';
     if (this.mapBuilder.mapName !== chosenMap) {
       this.mapBuilder.dispose();
-      this.mapBuilder = new MapBuilder(this.renderer.scene, chosenMap);
+      this.mapBuilder = new PCMapBuilder(this.renderer.app, chosenMap);
     }
 
     const myState = state.players[this.networkClient.myId];
@@ -581,6 +566,10 @@ class GameApp {
       this.sendNetworkInput(delta);
     }
 
+    const move = this.input.getMoveVector();
+    const isMovingInput = Math.abs(move.forward) > 0.05 || Math.abs(move.right) > 0.05;
+    const currentSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
+
     // Engine updates
     this.powerupManager.update(delta, this.playerPos);
     this.hud.updatePowerupSlot(
@@ -590,12 +579,13 @@ class GameApp {
     );
     this.networkClient.update(delta);
     this.projectileManager.update(delta);
-    this.weaponManager.update(delta, this.input.isFiring());
+    this.weaponManager.update(delta, isMovingInput, currentSpeed);
     this.fx.update(delta);
-    CharacterModel.updateDebris(delta);
 
-    // Render 3D Scene
-    this.renderer.render();
+    // Render PlayCanvas Scene
+    if (this.renderer.app) {
+      this.renderer.app.render();
+    }
   }
 
   private updatePlayerMovement(delta: number): void {
@@ -604,28 +594,28 @@ class GameApp {
     this.playerYaw -= look.yaw;
     this.playerPitch = Math.max(-1.4, Math.min(1.4, this.playerPitch - look.pitch));
 
-    // Dynamic viewmodel sway: weapon lags slightly behind fast pans and smoothly catches up
-    this.swayOffsetX = THREE.MathUtils.lerp(this.swayOffsetX, Math.max(-0.06, Math.min(0.06, -look.yaw * 0.8)), delta * 15);
-    this.swayOffsetY = THREE.MathUtils.lerp(this.swayOffsetY, Math.max(-0.05, Math.min(0.05, -look.pitch * 0.8)), delta * 15);
-    this.weaponManager.viewModelContainer.position.set(this.swayOffsetX, this.swayOffsetY, 0);
+    this.swayOffsetX = pc.math.lerp(this.swayOffsetX, Math.max(-0.06, Math.min(0.06, -look.yaw * 0.8)), delta * 15);
+    this.swayOffsetY = pc.math.lerp(this.swayOffsetY, Math.max(-0.05, Math.min(0.05, -look.pitch * 0.8)), delta * 15);
+    if (this.weaponManager.viewModelContainer) {
+      this.weaponManager.viewModelContainer.setLocalPosition(this.swayOffsetX, this.swayOffsetY, 0);
+    }
 
     // 2. Input movement vector
     const move = this.input.getMoveVector();
     const isMovingInput = Math.abs(move.forward) > 0.05 || Math.abs(move.right) > 0.05;
 
-    // Movement forward/right relative to yaw using scratch vectors (no per-frame allocations)
     this._scratchForward.set(-Math.sin(this.playerYaw), 0, -Math.cos(this.playerYaw));
     this._scratchRight.set(Math.cos(this.playerYaw), 0, -Math.sin(this.playerYaw));
 
     // Jump buffering & coyote timing
     if (this.input.isJumping()) {
-      this.jumpBufferTimer = 0.12; // 120ms jump buffer
+      this.jumpBufferTimer = 0.12;
     } else if (this.jumpBufferTimer > 0) {
       this.jumpBufferTimer -= delta;
     }
 
     if (this.isGrounded) {
-      this.coyoteTimer = 0.10; // 100ms coyote time
+      this.coyoteTimer = 0.10;
       this.hasJumpedThisAirtime = false;
     } else {
       this.coyoteTimer -= delta;
@@ -634,11 +624,13 @@ class GameApp {
     // 3. Sliding mechanic
     const slideRequested = this.input.isSliding();
     if (slideRequested && this.isGrounded && !this.isSliding && isMovingInput) {
-      // Initiate slide boost
       this.isSliding = true;
       this.slideTimer = MOVEMENT.SLIDE_DURATION_MAX;
-      this.slideDirection.copy(this._scratchForward).multiplyScalar(move.forward)
-        .addScaledVector(this._scratchRight, move.right).normalize();
+      this.slideDirection.set(
+        this._scratchForward.x * move.forward + this._scratchRight.x * move.right,
+        0,
+        this._scratchForward.z * move.forward + this._scratchRight.z * move.right
+      ).normalize();
       this.playerVel.x = this.slideDirection.x * MOVEMENT.SLIDE_INITIAL_SPEED;
       this.playerVel.z = this.slideDirection.z * MOVEMENT.SLIDE_INITIAL_SPEED;
       this.audio.playSlide();
@@ -648,7 +640,6 @@ class GameApp {
 
     if (this.isSliding) {
       this.slideTimer -= delta;
-      // Exponential friction
       const currentSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
       const newSpeed = Math.max(MOVEMENT.SLIDE_MIN_SPEED, currentSpeed - MOVEMENT.SLIDE_FRICTION * delta);
       const ratio = newSpeed / (currentSpeed || 1);
@@ -657,7 +648,6 @@ class GameApp {
 
       this.fx.spawnSlideDust(this.playerPos);
 
-      // Slide-cancel jump with jump buffer
       if (canJump) {
         this.playerVel.y = MOVEMENT.JUMP_VELOCITY * MOVEMENT.SLIDE_JUMP_BOOST;
         this.isGrounded = false;
@@ -671,15 +661,16 @@ class GameApp {
         this.isSliding = false;
       }
     } else if (this.isGrounded) {
-      // Normal walk / sprint with speed boost support
       const speedMult = this.powerupManager.getSpeedMultiplier();
       const targetSpeed = MOVEMENT.WALK_SPEED * speedMult;
-      this._scratchMoveDir.copy(this._scratchForward).multiplyScalar(move.forward)
-        .addScaledVector(this._scratchRight, move.right);
+      this._scratchMoveDir.set(
+        this._scratchForward.x * move.forward + this._scratchRight.x * move.right,
+        0,
+        this._scratchForward.z * move.forward + this._scratchRight.z * move.right
+      );
       this.playerVel.x = this._scratchMoveDir.x * targetSpeed;
       this.playerVel.z = this._scratchMoveDir.z * targetSpeed;
 
-      // Regular jump with buffer & coyote
       if (canJump) {
         this.playerVel.y = MOVEMENT.JUMP_VELOCITY;
         this.isGrounded = false;
@@ -688,9 +679,7 @@ class GameApp {
         this.audio.playJump();
       }
     } else {
-      // Mid-Air Control & Momentum Steering
       if (canJump) {
-        // Coyote time jump after stepping off ledge
         this.playerVel.y = MOVEMENT.JUMP_VELOCITY;
         this.coyoteTimer = 0;
         this.jumpBufferTimer = 0;
@@ -701,21 +690,21 @@ class GameApp {
       if (isMovingInput) {
         const speedMult = this.powerupManager.getSpeedMultiplier();
         const targetSpeed = MOVEMENT.AIR_MAX_SPEED * speedMult;
-        this._scratchMoveDir.copy(this._scratchForward).multiplyScalar(move.forward)
-          .addScaledVector(this._scratchRight, move.right).normalize();
+        this._scratchMoveDir.set(
+          this._scratchForward.x * move.forward + this._scratchRight.x * move.right,
+          0,
+          this._scratchForward.z * move.forward + this._scratchRight.z * move.right
+        ).normalize();
         const desiredX = this._scratchMoveDir.x * targetSpeed;
         const desiredZ = this._scratchMoveDir.z * targetSpeed;
 
         const currentHorizSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
 
         if (currentHorizSpeed <= targetSpeed) {
-          // Accelerate smoothly towards desired input vector
           const steerRate = MOVEMENT.AIR_ACCEL * delta;
-          this.playerVel.x = THREE.MathUtils.damp(this.playerVel.x, desiredX, steerRate, delta);
-          this.playerVel.z = THREE.MathUtils.damp(this.playerVel.z, desiredZ, steerRate, delta);
+          this.playerVel.x = damp(this.playerVel.x, desiredX, steerRate, delta);
+          this.playerVel.z = damp(this.playerVel.z, desiredZ, steerRate, delta);
         } else {
-          // High-speed momentum (from jump pad or slide-jump):
-          // Steer velocity vector direction towards input without abruptly clamping magnitude!
           const steerAngle = Math.atan2(desiredZ, desiredX);
           const currentAngle = Math.atan2(this.playerVel.z, this.playerVel.x);
           let angleDiff = steerAngle - currentAngle;
@@ -724,7 +713,6 @@ class GameApp {
 
           const maxAngleChange = 4.5 * delta;
           const newAngle = currentAngle + Math.max(-maxAngleChange, Math.min(maxAngleChange, angleDiff));
-          // Apply gentle air drag
           const retainedSpeed = currentHorizSpeed * MOVEMENT.AIR_DRAG;
           this.playerVel.x = Math.cos(newAngle) * retainedSpeed;
           this.playerVel.z = Math.sin(newAngle) * retainedSpeed;
@@ -736,24 +724,22 @@ class GameApp {
     const ladderBox = this.mapBuilder.checkLadders(this.playerPos);
     const isClimbing = ladderBox !== null;
 
-    if (isClimbing) {
+    if (isClimbing && ladderBox) {
       this.isSliding = false;
       this.isGrounded = false;
+      const ladderMax = ladderBox.getMax();
 
-      // Climb controls: Forward (W) or Jump -> climb up, Backward (S) -> climb down
       if (move.forward > 0 || this.input.isJumping()) {
         this.playerVel.y = MOVEMENT.CLIMB_SPEED;
       } else if (move.forward < 0) {
         this.playerVel.y = -MOVEMENT.CLIMB_SPEED;
       } else {
-        this.playerVel.y = 0; // Hold position on ladder
+        this.playerVel.y = 0;
       }
 
-      // Dampen horizontal drift while on ladder
       this.playerVel.x *= 0.25;
       this.playerVel.z *= 0.25;
 
-      // Vault off ladder if pressing jump with directional impulse
       if ((this.jumpBufferTimer > 0 || this.input.isJumping()) && (move.forward < 0 || Math.abs(move.right) > 0.2)) {
         this.playerVel.y = MOVEMENT.JUMP_VELOCITY * 0.85;
         this.playerVel.x += (this._scratchRight.x * move.right - this._scratchForward.x * 0.8) * 6.0;
@@ -763,15 +749,14 @@ class GameApp {
         this.audio.playJump();
       }
 
-      // Reaching top of ladder: step up smoothly onto rooftop/landing
-      if (this.playerPos.y >= ladderBox.max.y - 0.35 && move.forward > 0) {
-        this.playerPos.y = ladderBox.max.y + 0.05;
+      if (this.playerPos.y >= ladderMax.y - 0.35 && move.forward > 0) {
+        this.playerPos.y = ladderMax.y + 0.05;
         this.playerVel.x += this._scratchForward.x * 4.0;
         this.playerVel.z += this._scratchForward.z * 4.0;
       }
     }
 
-    // 4. Gravity & Vertical motion (in-place math, no Vector3 allocation)
+    // 4. Gravity & Vertical motion
     if (!isClimbing) {
       this.playerVel.y -= MOVEMENT.GRAVITY * delta;
     }
@@ -787,12 +772,10 @@ class GameApp {
       this.isGrounded = true;
     }
 
-    // Check jump pads (Vertical Launchers and Directional Aerial Boosters)
     const pad = this.mapBuilder.checkJumpPads(this.playerPos);
     if (pad !== null && this.playerVel.y <= 2.5) {
       this.playerVel.y = Math.max(pad.impulseY, this.playerVel.y + pad.impulseY * 0.5);
       if (pad.impulseX !== 0 || pad.impulseZ !== 0) {
-        // Directional booster: preserve and enhance momentum along launch vector
         const currentHorizSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
         const padSpeed = Math.hypot(pad.impulseX, pad.impulseZ);
         const launchSpeed = Math.max(currentHorizSpeed, padSpeed);
@@ -806,19 +789,17 @@ class GameApp {
       this.audio.playJump();
     }
 
-    // Check teleporters (Bidirectional paired portals with 1.5s cooldown)
     const hitPort = this.mapBuilder.checkTeleportPorts(this.playerPos, this.lastTeleportTime);
     if (hitPort) {
       this.lastTeleportTime = performance.now();
       this.playerPos.copy(hitPort.exitPos);
       this.playerYaw = hitPort.exitYaw;
 
-      // Preserve full vector momentum & redirect forward along exitYaw
       const inSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
-      const exitSpeed = Math.max(inSpeed, 14.0); // Minimum 14 m/s launch burst through portal
+      const exitSpeed = Math.max(inSpeed, 14.0);
       this.playerVel.x = Math.sin(hitPort.exitYaw) * exitSpeed;
       this.playerVel.z = Math.cos(hitPort.exitYaw) * exitSpeed;
-      this.playerVel.y = Math.max(this.playerVel.y, 3.5); // Vertical clearance to prevent ground snagging
+      this.playerVel.y = Math.max(this.playerVel.y, 3.5);
       this.isGrounded = false;
       this.hasJumpedThisAirtime = true;
 
@@ -826,7 +807,6 @@ class GameApp {
       this.hud.showTeleportEffect();
     }
 
-    // Environmental Void / Lava hazard check
     if (this.playerPos.y < -3.0 && this.networkClient.isInGame && !this.isDead) {
       this.isDead = true;
       this.currentHp = 0;
@@ -837,12 +817,11 @@ class GameApp {
       this.playerVel.set(0, 0, 0);
     }
 
-    // Boundary & obstacle collision clamping
     this.resolveArenaCollisions();
 
-    // 5. Update Camera (Roll tilt, dynamic head bob, and position)
+    // 5. Update Camera
     const targetRoll = this.isSliding ? -0.05 : -move.right * 0.025;
-    this.cameraRoll = THREE.MathUtils.lerp(this.cameraRoll, targetRoll, delta * 14);
+    this.cameraRoll = pc.math.lerp(this.cameraRoll, targetRoll, delta * 14);
 
     if (this.isGrounded && isMovingInput) {
       this.bobTimer += delta * (this.isSliding ? 14 : 10);
@@ -852,79 +831,73 @@ class GameApp {
     const bobOffset = this.isGrounded && isMovingInput ? Math.sin(this.bobTimer) * 0.035 : 0;
 
     const eyeHeight = (this.isSliding ? MOVEMENT.SLIDE_EYE_HEIGHT : MOVEMENT.EYE_HEIGHT) + bobOffset;
-    this.renderer.camera.position.set(this.playerPos.x, this.playerPos.y + eyeHeight, this.playerPos.z);
-    this.renderer.camera.rotation.y = this.playerYaw;
-    this.renderer.camera.rotation.x = this.playerPitch;
-    this.renderer.camera.rotation.z = this.cameraRoll;
+    if (this.renderer.cameraEntity) {
+      this.renderer.cameraEntity.setPosition(this.playerPos.x, this.playerPos.y + eyeHeight, this.playerPos.z);
+      this.renderer.cameraEntity.setEulerAngles(
+        (this.playerPitch * 180) / Math.PI,
+        (this.playerYaw * 180) / Math.PI,
+        (this.cameraRoll * 180) / Math.PI
+      );
+    }
 
-    // Crosshair dynamic spread
     this.hud.updateCrosshairSpread(isMovingInput, this.isSliding);
   }
 
   private resolveArenaCollisions(): void {
-    // Keep within map boundaries
     const b = this.mapBuilder.bounds;
     this.playerPos.x = Math.max(b.minX, Math.min(b.maxX, this.playerPos.x));
     this.playerPos.z = Math.max(b.minZ, Math.min(b.maxZ, this.playerPos.z));
 
-    // Check box obstacles with vertical clearance and tangential sliding
     const playerRadius = MOVEMENT.PLAYER_RADIUS;
     const playerFeet = this.playerPos.y;
     const playerHead = this.playerPos.y + (this.isSliding ? MOVEMENT.PLAYER_SLIDE_HEIGHT : MOVEMENT.PLAYER_HEIGHT);
 
     for (const box of this.mapBuilder.collisionBoxes) {
-      // Spatial broadphase: discard boxes more than 6m away from player
+      const min = box.getMin();
+      const max = box.getMax();
+
       if (
-        this.playerPos.x < box.min.x - 6 ||
-        this.playerPos.x > box.max.x + 6 ||
-        this.playerPos.z < box.min.z - 6 ||
-        this.playerPos.z > box.max.z + 6
+        this.playerPos.x < min.x - 6 ||
+        this.playerPos.x > max.x + 6 ||
+        this.playerPos.z < min.z - 6 ||
+        this.playerPos.z > max.z + 6
       ) {
         continue;
       }
 
-      // If player's feet are above the obstacle surface, they are standing or landing on top
-      if (playerFeet >= box.max.y - 0.2) {
-        continue;
-      }
-      // If player's head is completely beneath an elevated obstacle
-      if (playerHead <= box.min.y + 0.1) {
-        continue;
-      }
+      if (playerFeet >= max.y - 0.2) continue;
+      if (playerHead <= min.y + 0.1) continue;
 
-      // Horizontal cylinder vs AABB intersection
       if (
-        this.playerPos.x + playerRadius > box.min.x &&
-        this.playerPos.x - playerRadius < box.max.x &&
-        this.playerPos.z + playerRadius > box.min.z &&
-        this.playerPos.z - playerRadius < box.max.z
+        this.playerPos.x + playerRadius > min.x &&
+        this.playerPos.x - playerRadius < max.x &&
+        this.playerPos.z + playerRadius > min.z &&
+        this.playerPos.z - playerRadius < max.z
       ) {
-        // Penetration depths from each boundary
-        const dx1 = Math.abs(this.playerPos.x + playerRadius - box.min.x);
-        const dx2 = Math.abs(box.max.x - (this.playerPos.x - playerRadius));
-        const dz1 = Math.abs(this.playerPos.z + playerRadius - box.min.z);
-        const dz2 = Math.abs(box.max.z - (this.playerPos.z - playerRadius));
+        const dx1 = Math.abs(this.playerPos.x + playerRadius - min.x);
+        const dx2 = Math.abs(max.x - (this.playerPos.x - playerRadius));
+        const dz1 = Math.abs(this.playerPos.z + playerRadius - min.z);
+        const dz2 = Math.abs(max.z - (this.playerPos.z - playerRadius));
 
-        const min = Math.min(dx1, dx2, dz1, dz2);
-        if (min === dx1) {
-          this.playerPos.x = box.min.x - playerRadius;
-          if (this.playerVel.x > 0) this.playerVel.x = 0; // zero penetration velocity, slide freely along Z
-        } else if (min === dx2) {
-          this.playerPos.x = box.max.x + playerRadius;
-          if (this.playerVel.x < 0) this.playerVel.x = 0; // zero penetration velocity, slide freely along Z
-        } else if (min === dz1) {
-          this.playerPos.z = box.min.z - playerRadius;
-          if (this.playerVel.z > 0) this.playerVel.z = 0; // zero penetration velocity, slide freely along X
-        } else if (min === dz2) {
-          this.playerPos.z = box.max.z + playerRadius;
-          if (this.playerVel.z < 0) this.playerVel.z = 0; // zero penetration velocity, slide freely along X
+        const minDiff = Math.min(dx1, dx2, dz1, dz2);
+        if (minDiff === dx1) {
+          this.playerPos.x = min.x - playerRadius;
+          if (this.playerVel.x > 0) this.playerVel.x = 0;
+        } else if (minDiff === dx2) {
+          this.playerPos.x = max.x + playerRadius;
+          if (this.playerVel.x < 0) this.playerVel.x = 0;
+        } else if (minDiff === dz1) {
+          this.playerPos.z = min.z - playerRadius;
+          if (this.playerVel.z > 0) this.playerVel.z = 0;
+        } else if (minDiff === dz2) {
+          this.playerPos.z = max.z + playerRadius;
+          if (this.playerVel.z < 0) this.playerVel.z = 0;
         }
       }
     }
   }
 
   private updateCombat(_delta: number): void {
-    // Weapon switch
     const switchIdx = this.input.consumeWeaponSwitch();
     if (switchIdx !== undefined && switchIdx >= 0 && switchIdx < WEAPON_ORDER.length) {
       const type = WEAPON_ORDER[switchIdx];
@@ -932,23 +905,19 @@ class GameApp {
       this.networkClient.sendWeaponSwitch(switchIdx);
     }
 
-    // Reload
     if (this.input.consumeReload()) {
       this.triggerReloadFlow();
     }
 
-    // Powerup trigger
     if (this.input.consumePowerup()) {
       this.activateCurrentPowerup();
     }
 
-    // Aim down sights (ADS)
     const isAiming = this.input.isAiming();
     const targetFov = isAiming ? this.weaponManager.currentStats.adsZoomFov : 75;
-    this.renderer.setFov(THREE.MathUtils.lerp(this.renderer.camera.fov, targetFov, 0.2));
+    this.renderer.setFov(pc.math.lerp(this.renderer.cameraEntity?.camera?.fov || 75, targetFov, 0.2));
     this.hud.setAdsScope(isAiming, this.weaponManager.currentWeaponType);
 
-    // Shooting
     if (this.input.isFiring()) {
       if (
         this.weaponManager.ammoInMag[this.weaponManager.currentWeaponType] <= 0 &&
@@ -956,23 +925,21 @@ class GameApp {
       ) {
         this.triggerReloadFlow();
       } else {
-        const targetMeshes = this.networkClient.getTargetableMeshes();
-        const solidMeshes = this.mapBuilder.getSolidMeshes();
+        const targetables = this.networkClient.getTargetables();
+        const obstacles = this.mapBuilder.collisionBoxes;
         const fireRes = this.weaponManager.fire(
-          this.renderer.camera,
-          targetMeshes,
-          solidMeshes,
-          this.input.isFiring(),
+          this.renderer.cameraEntity,
+          targetables,
+          obstacles,
           isAiming
         );
 
         if (fireRes.fired) {
           this.audio.playShoot(this.weaponManager.currentWeaponType);
 
-          this.renderer.camera.getWorldPosition(this._scratchCamPos);
-          this.renderer.camera.getWorldDirection(this._scratchCamDir);
+          const camPos = this.renderer.cameraEntity.getPosition();
+          const camDir = this.renderer.cameraEntity.forward;
 
-          // Subtle visceral camera recoil punch on fire
           const currentW = this.weaponManager.currentWeaponType;
           const recoilKick = currentW === 'sniper' || currentW === 'railgun' ? 0.034
             : currentW === 'plasma_launcher' ? 0.026
@@ -981,8 +948,8 @@ class GameApp {
 
           this.networkClient.sendFire({
             weaponType: this.weaponManager.currentWeaponType,
-            origin: [this._scratchCamPos.x, this._scratchCamPos.y, this._scratchCamPos.z],
-            direction: [this._scratchCamDir.x, this._scratchCamDir.y, this._scratchCamDir.z],
+            origin: [camPos.x, camPos.y, camPos.z],
+            direction: [camDir.x, camDir.y, camDir.z],
             targetPlayerId: fireRes.hitPlayerId,
             isHeadshot: fireRes.isHeadshot,
             hitPoint: fireRes.hitPoint
@@ -991,7 +958,6 @@ class GameApp {
       }
     }
 
-    // Update ammo display
     this.hud.updateAmmo(
       this.weaponManager.ammoInMag[this.weaponManager.currentWeaponType],
       this.weaponManager.currentStats,
@@ -1007,15 +973,29 @@ class GameApp {
 
     let targetPoint: [number, number, number] | undefined;
     if (pType === 'airstrike') {
-      const forward = new THREE.Vector3(-Math.sin(this.playerYaw), 0, -Math.cos(this.playerYaw));
+      const forwardX = -Math.sin(this.playerYaw);
+      const forwardZ = -Math.cos(this.playerYaw);
       targetPoint = [
-        this.playerPos.x + forward.x * 20,
+        this.playerPos.x + forwardX * 20,
         this.playerPos.y,
-        this.playerPos.z + forward.z * 20
+        this.playerPos.z + forwardZ * 20
       ];
     }
 
-    this.networkClient.activatePowerup(pType, targetPoint);
+    this.networkClient.sendInput({
+      x: this.playerPos.x,
+      y: this.playerPos.y,
+      z: this.playerPos.z,
+      vx: this.playerVel.x,
+      vy: this.playerVel.y,
+      vz: this.playerVel.z,
+      yaw: this.playerYaw,
+      pitch: this.playerPitch,
+      isSliding: this.isSliding,
+      isJumping: !this.isGrounded,
+      isGrounded: this.isGrounded,
+      timestamp: Date.now()
+    });
     this.powerupManager.activatePowerup(pType, targetPoint);
     if (pType === 'shield') {
       this.currentShield = 50;
@@ -1045,9 +1025,7 @@ class GameApp {
 
         await this.authUI.recordGrammarStats(2, 2, grantedAmmo);
       },
-      () => {
-        // Canceled reload
-      }
+      () => {}
     );
   }
 

@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AudioManager } from '../engine/AudioManager.js';
 export class LoadingScreenUI {
   private container: HTMLElement;
@@ -185,73 +183,20 @@ export class LoadingScreenUI {
    * 4. Three.js Scene Shaders
    */
   public async preloadGameAssets(
-    scene: THREE.Scene,
-    camera: THREE.Camera,
-    renderer: THREE.WebGLRenderer,
     audio?: AudioManager
   ): Promise<void> {
     this.show('Connecting to BBS Asset Matrix...');
 
-    const manager = new THREE.LoadingManager();
-    const loader = new GLTFLoader(manager);
-
-    const assetUrls: { name: string; url: string }[] = [
-      { name: 'Character Combat Rig', url: '/models/characters/creative_character.glb' },
-      { name: 'Assault Rifle Model', url: '/models/weapons/assault_rifle.glb' },
-      { name: 'Shotgun Model', url: '/models/weapons/shotgun.glb' },
-      { name: 'Sniper Rifle Model', url: '/models/weapons/sniper.glb' },
-      { name: 'Katana Blade Model', url: '/models/weapons/katana.glb' },
-      { name: 'Needle Carbine Model', url: '/models/weapons/needle_carbine.glb' },
-      { name: 'Plasma Launcher Model', url: '/models/weapons/plasma_launcher.glb' },
-      { name: 'Hyper Railgun Model', url: '/models/weapons/railgun.glb' },
-      { name: 'Arc Disruptor Model', url: '/models/weapons/arc_disruptor.glb' }
-    ];
-
-    let itemsLoaded = 0;
-    const totalItems = assetUrls.length + 2; // +1 for shaders, +1 for audio
-
-    manager.onProgress = (url, loaded, total) => {
-      itemsLoaded = loaded;
-      const ratio = itemsLoaded / totalItems;
-      const basename = url.split('/').pop() || url;
-      this.setProgress(ratio, `Cached: ${basename} (${itemsLoaded}/${total})`);
-    };
-
-    // 1. Preload 3D Models in parallel
-    const modelPromises = assetUrls.map((item) => {
-      return new Promise<void>((resolve) => {
-        loader.load(
-          item.url,
-          () => {
-            resolve();
-          },
-          undefined,
-          (err) => {
-            console.warn(`[LoadingScreenUI] Optional asset skipped ${item.url}:`, err);
-            resolve();
-          }
-        );
-      });
-    });
-
-    await Promise.all(modelPromises);
-
-    // 2. Warm up and compile scene shaders
-    this.setProgress((totalItems - 1) / totalItems, 'Compiling Arena Shaders & PBR Pipelines...');
-    try {
-      renderer.compile(scene, camera);
-    } catch (e) {
-      console.warn('[LoadingScreenUI] Shader precompilation warning:', e);
-    }
-
-    // 3. Audio buffers warmup
-    this.setProgress(1.0, 'Match Ready. Engaging Arena...');
+    // 1. Audio buffers warmup
+    this.setProgress(0.5, 'Preloading Audio & Weapon Buffers...');
     if (audio) {
       try {
         audio.touchUnlock();
       } catch {}
     }
 
+    // 2. PlayCanvas WebGL pipelines
+    this.setProgress(1.0, 'Match Ready. Engaging Arena...');
     await this.hide(350);
   }
 }

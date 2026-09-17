@@ -20,7 +20,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          three: ['three'],
+          playcanvas: ['playcanvas'],
           vendor: ['socket.io-client', 'qrcode', 'html5-qrcode']
         }
       }
