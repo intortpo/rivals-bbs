@@ -1497,6 +1497,6 @@ export const SKYLINE_PENTHOUSE_OBSTACLES: BoundingBox[] = [
   { min: [13, 6.3, -20], max: [23, 6.7, -16], name: 'BillboardGantry' }
 ];
 
-export function getMapObstacles(mapName: string): BoundingBox[] {
+export function getMapObstacles(_mapName: string): BoundingBox[] {
   return []; // Procedural maps do not use hardcoded server obstacles, allowing bullet hell projectile penetration.
 }
