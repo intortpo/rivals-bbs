@@ -104,6 +104,7 @@ export class GameSession {
       currentWeaponIndex: 0,
       isSliding: false,
       isJumping: false,
+      isGrappling: false,
       isDead: false,
       score: 0,
       kills: 0,
@@ -308,6 +309,8 @@ export class GameSession {
     player.pitch = input.pitch;
     player.isSliding = input.isSliding;
     player.isJumping = input.isJumping;
+    player.isGrappling = input.isGrappling;
+    player.grappleAnchor = input.grappleAnchor;
   }
 
   public handleWeaponSwitch(playerId: string, weaponIndex: number): void {
@@ -722,6 +725,8 @@ export class GameSession {
         pitch: Math.round(p.pitch * 100) / 100,
         isSliding: p.isSliding,
         isJumping: p.isJumping,
+        isGrappling: p.isGrappling,
+        grappleAnchor: p.grappleAnchor,
         health: p.health,
         shieldHp: p.shieldHp,
         activePowerup: p.activePowerup,

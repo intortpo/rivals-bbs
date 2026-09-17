@@ -81,6 +81,8 @@ export interface PlayerInputPayload {
   isSliding: boolean;
   isJumping: boolean;
   isGrounded: boolean;
+  isGrappling?: boolean;
+  grappleAnchor?: [number, number, number];
   timestamp: number;
 }
 
@@ -121,6 +123,8 @@ export interface PlayerNetworkState {
   currentWeaponIndex: number;
   isSliding: boolean;
   isJumping: boolean;
+  isGrappling?: boolean;
+  grappleAnchor?: [number, number, number];
   isDead: boolean;
   score: number;
   kills: number;
@@ -172,6 +176,8 @@ export interface WorldSnapshot {
     pitch: number;
     isSliding: boolean;
     isJumping: boolean;
+    isGrappling?: boolean;
+    grappleAnchor?: [number, number, number];
     health: number;
     shieldHp?: number;
     activePowerup?: PowerupType | null;

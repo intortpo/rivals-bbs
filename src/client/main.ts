@@ -59,6 +59,11 @@ class GameApp {
   private myTeam: TeamColor = 'none';
   private isDead: boolean = false;
 
+  // Grappling Hook State & Physics
+  private isGrappling: boolean = false;
+  private grappleAnchor = new pc.Vec3();
+  private grappleCooldownTimer: number = 0;
+
   // Movement feel & responsive input enhancements
   private jumpBufferTimer: number = 0;
   private coyoteTimer: number = 0;
@@ -702,6 +707,20 @@ class GameApp {
       this.coyoteTimer -= delta;
     }
 
+    // 2.5 Grappling Hook cooldown & input trigger
+    if (this.grappleCooldownTimer > 0) {
+      this.grappleCooldownTimer = Math.max(0, this.grappleCooldownTimer - delta);
+    }
+
+    const grappleRequested = this.input.consumeGrapple();
+    if (grappleRequested) {
+      if (this.isGrappling) {
+        this.detachGrapple(false);
+      } else if (this.grappleCooldownTimer <= 0 && !this.isDead) {
+        this.fireGrappleHook();
+      }
+    }
+
     // 3. Sliding mechanic
     const slideRequested = this.input.isSliding();
     if (slideRequested && this.isGrounded && !this.isSliding && isMovingInput) {
@@ -801,6 +820,40 @@ class GameApp {
       }
     }
 
+    // 3.3 Active Grappling Hook Physics & Swing Dynamics
+    if (this.isGrappling) {
+      const toAnchor = new pc.Vec3().sub2(this.grappleAnchor, this.playerPos);
+      const dist = toAnchor.length();
+
+      if (dist <= MOVEMENT.GRAPPLE_DETACH_DIST) {
+        this.detachGrapple(true);
+      } else {
+        const pullDir = toAnchor.clone().normalize();
+        const accel = MOVEMENT.GRAPPLE_PULL_ACCEL * delta;
+        this.playerVel.x += pullDir.x * accel;
+        this.playerVel.y += pullDir.y * accel;
+        this.playerVel.z += pullDir.z * accel;
+
+        if (isMovingInput) {
+          const steerRate = MOVEMENT.AIR_ACCEL * 0.8 * delta;
+          this.playerVel.x += this._scratchMoveDir.x * steerRate;
+          this.playerVel.z += this._scratchMoveDir.z * steerRate;
+        }
+
+        const currentGrappleSpeed = this.playerVel.length();
+        if (currentGrappleSpeed > MOVEMENT.GRAPPLE_PULL_SPEED) {
+          this.playerVel.mulScalar(MOVEMENT.GRAPPLE_PULL_SPEED / currentGrappleSpeed);
+        }
+
+        if (canJump || this.input.isJumping()) {
+          this.detachGrapple(true);
+          this.jumpBufferTimer = 0;
+          this.hasJumpedThisAirtime = true;
+          this.audio.playJump();
+        }
+      }
+    }
+
     // 3.5 Ladder Climbing Physics
     const ladderBox = this.mapBuilder.checkLadders(this.playerPos);
     const isClimbing = ladderBox !== null;
@@ -895,6 +948,7 @@ class GameApp {
       this.hud.updateHealth(0);
       this.audio.playOofDeath();
       this.networkClient.sendVoidFall();
+      this.detachGrapple(false);
       this.playerVel.set(0, 0, 0);
     }
 
@@ -932,6 +986,77 @@ class GameApp {
 
     const recoilSpread = Math.abs(this.weaponManager.recoilRotation.x) * 0.04;
     this.hud.updateCrosshairSpread(isMovingInput, this.isSliding, recoilSpread);
+
+    // 6. Update Grappling Hook Cable & HUD
+    if (this.isGrappling) {
+      const muzzlePos = new pc.Vec3(
+        this.playerPos.x + this._scratchRight.x * 0.22,
+        this.playerPos.y + eyeHeight - 0.18,
+        this.playerPos.z + this._scratchRight.z * 0.22
+      );
+      this.fx.updateGrappleCable(muzzlePos, this.grappleAnchor, delta);
+    } else {
+      this.fx.hideGrappleCable();
+    }
+
+    this.hud.updateGrappleState(this.isGrappling, this.grappleCooldownTimer);
+    this.input.touch.setGrappleCooldown(this.grappleCooldownTimer);
+  }
+
+  private fireGrappleHook(): void {
+    const eyeHeight = this.isSliding ? MOVEMENT.SLIDE_EYE_HEIGHT : MOVEMENT.EYE_HEIGHT;
+    const camPos = new pc.Vec3(this.playerPos.x, this.playerPos.y + eyeHeight, this.playerPos.z);
+    const forwardX = -Math.sin(this.playerYaw) * Math.cos(this.playerPitch);
+    const forwardY = Math.sin(this.playerPitch);
+    const forwardZ = -Math.cos(this.playerYaw) * Math.cos(this.playerPitch);
+    const camDir = new pc.Vec3(forwardX, forwardY, forwardZ).normalize();
+
+    const ray = new pc.Ray(camPos, camDir);
+    let closestDist = MOVEMENT.GRAPPLE_MAX_DIST;
+    let hitPoint: pc.Vec3 | null = null;
+    const testPt = new pc.Vec3();
+
+    for (const box of this.mapBuilder.collisionBoxes) {
+      if (box.intersectsRay(ray, testPt)) {
+        const d = camPos.distance(testPt);
+        if (d < closestDist && d > 1.8) {
+          closestDist = d;
+          if (!hitPoint) hitPoint = new pc.Vec3();
+          hitPoint.copy(testPt);
+        }
+      }
+    }
+
+    this.audio.playGrappleShoot();
+
+    if (hitPoint) {
+      this.isGrappling = true;
+      this.grappleAnchor.copy(hitPoint);
+      this.isGrounded = false;
+      this.isSliding = false;
+      this.hasJumpedThisAirtime = true;
+      this.audio.playGrappleLatch();
+      this.fx.spawnGrappleImpact(hitPoint);
+    } else {
+      // Whiff penalty cooldown
+      this.grappleCooldownTimer = 0.6;
+    }
+  }
+
+  private detachGrapple(withBoost: boolean): void {
+    if (!this.isGrappling) return;
+    this.isGrappling = false;
+    this.grappleCooldownTimer = MOVEMENT.GRAPPLE_COOLDOWN_SEC;
+    this.fx.hideGrappleCable();
+    this.audio.playGrappleRelease();
+
+    if (withBoost) {
+      this.playerVel.x *= MOVEMENT.GRAPPLE_SLINGSHOT_BOOST;
+      this.playerVel.z *= MOVEMENT.GRAPPLE_SLINGSHOT_BOOST;
+      this.playerVel.y = Math.max(MOVEMENT.JUMP_VELOCITY * 0.75, this.playerVel.y * 1.15 + 3.0);
+      this.isGrounded = false;
+      this.hasJumpedThisAirtime = true;
+    }
   }
 
   private resolveArenaCollisions(): void {
@@ -1092,6 +1217,8 @@ class GameApp {
       isSliding: this.isSliding,
       isJumping: !this.isGrounded,
       isGrounded: this.isGrounded,
+      isGrappling: this.isGrappling,
+      grappleAnchor: this.isGrappling ? [this.grappleAnchor.x, this.grappleAnchor.y, this.grappleAnchor.z] : undefined,
       timestamp: Date.now()
     });
     this.powerupManager.activatePowerup(pType, targetPoint);
@@ -1143,6 +1270,8 @@ class GameApp {
         isSliding: this.isSliding,
         isJumping: !this.isGrounded,
         isGrounded: this.isGrounded,
+        isGrappling: this.isGrappling,
+        grappleAnchor: this.isGrappling ? [this.grappleAnchor.x, this.grappleAnchor.y, this.grappleAnchor.z] : undefined,
         timestamp: Date.now()
       });
     }

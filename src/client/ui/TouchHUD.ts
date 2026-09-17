@@ -168,6 +168,12 @@ export class TouchHUD {
         <div id="hud-powerup-timer-bar" style="position: absolute; bottom: -4px; left: 15%; width: 70%; height: 3px; background: #00d2ff; border-radius: 2px; display: none;"></div>
       </div>
 
+      <!-- Desktop Grapple Hook Indicator -->
+      <div id="hud-grapple-indicator" style="position: absolute; bottom: 65px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; background: rgba(15, 20, 32, 0.7); border: 1px solid rgba(0, 210, 255, 0.4); border-radius: 14px; padding: 4px 12px; backdrop-filter: blur(6px); color: #00d2ff; font-size: 11px; font-weight: 800; pointer-events: none; opacity: 0.85;">
+        <span>🪝 [F] HOOK</span>
+        <span id="hud-grapple-status" style="color: #00ffaa; font-weight: 900;">READY</span>
+      </div>
+
       <!-- Ammo & Reload Counter (Bottom Right near action cluster) -->
       <div id="hud-ammo-container" style="position: absolute; bottom: 24px; right: 280px; display: flex; align-items: center; gap: 8px; background: rgba(15, 20, 32, 0.75); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 6px 14px; backdrop-filter: blur(5px);">
         <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
@@ -699,5 +705,27 @@ export class TouchHUD {
     }
 
     this.gameOverModalEl.style.display = 'flex';
+  }
+
+  public updateGrappleState(isGrappling: boolean, remainingCooldownSec: number): void {
+    const el = document.getElementById('hud-grapple-status');
+    const container = document.getElementById('hud-grapple-indicator');
+    if (!el || !container) return;
+    if (isGrappling) {
+      el.textContent = 'ACTIVE';
+      el.style.color = '#00d2ff';
+      container.style.borderColor = '#00d2ff';
+      container.style.boxShadow = '0 0 12px rgba(0, 210, 255, 0.6)';
+    } else if (remainingCooldownSec > 0.05) {
+      el.textContent = remainingCooldownSec.toFixed(1) + 's';
+      el.style.color = '#8da2c0';
+      container.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+      container.style.boxShadow = 'none';
+    } else {
+      el.textContent = 'READY';
+      el.style.color = '#00ffaa';
+      container.style.borderColor = 'rgba(0, 210, 255, 0.4)';
+      container.style.boxShadow = 'none';
+    }
   }
 }

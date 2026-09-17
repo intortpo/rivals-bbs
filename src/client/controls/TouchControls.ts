@@ -9,6 +9,8 @@ export interface TouchInputState {
   isAiming: boolean;
   isJumping: boolean;
   isSliding: boolean;
+  isGrappling: boolean;
+  grappleRequested: boolean;
   switchWeaponIndex?: number;
   reloadRequested: boolean;
 }
@@ -34,6 +36,8 @@ export class TouchControls {
     isAiming: false,
     isJumping: false,
     isSliding: false,
+    isGrappling: false,
+    grappleRequested: false,
     reloadRequested: false
   };
 
@@ -171,6 +175,12 @@ export class TouchControls {
       <div id="btn-reload" class="touch-btn touch-btn-secondary" style="bottom: max(95px, calc(env(safe-area-inset-bottom, 20px) + 75px)); right: max(190px, calc(env(safe-area-inset-right, 20px) + 165px));">
         <span class="touch-icon">🔄</span>
         <span class="touch-label">RELOAD</span>
+      </div>
+
+      <div id="btn-grapple" class="touch-btn touch-btn-secondary" style="bottom: max(100px, calc(env(safe-area-inset-bottom, 20px) + 80px)); right: max(25px, env(safe-area-inset-right, 20px)); border-color: rgba(0, 210, 255, 0.6); box-shadow: 0 0 14px rgba(0, 210, 255, 0.3);">
+        <span class="touch-icon">🪝</span>
+        <span class="touch-label">HOOK</span>
+        <div id="grapple-cooldown-fill" style="position: absolute; inset: 0; border-radius: 50%; background: rgba(0,0,0,0.72); display: none; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; color: #00d2ff;"></div>
       </div>
 
       <!-- Quick Weapon Bar (Bottom Center) -->
@@ -375,6 +385,23 @@ export class TouchControls {
         this.state.reloadRequested = true;
         this.triggerHaptic(15);
       }, { passive: false });
+    }
+
+    const grappleBtn = document.getElementById('btn-grapple');
+    if (grappleBtn) {
+      grappleBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.state.grappleRequested = true;
+        grappleBtn.classList.add('active');
+        this.triggerHaptic(15);
+      }, { passive: false });
+      const stopGrapple = (e: Event) => {
+        e.preventDefault();
+        grappleBtn.classList.remove('active');
+      };
+      grappleBtn.addEventListener('touchend', stopGrapple);
+      grappleBtn.addEventListener('touchcancel', stopGrapple);
     }
 
     // Loadout toggle button
@@ -619,5 +646,19 @@ export class TouchControls {
     this.state.lookDeltaYaw = 0;
     this.state.lookDeltaPitch = 0;
     return this._lookDeltas;
+  }
+
+  public setGrappleCooldown(remainingSec: number): void {
+    const fill = document.getElementById('grapple-cooldown-fill');
+    const btn = document.getElementById('btn-grapple');
+    if (!fill || !btn) return;
+    if (remainingSec > 0.05) {
+      fill.style.display = 'flex';
+      fill.textContent = remainingSec.toFixed(1) + 's';
+      btn.style.opacity = '0.55';
+    } else {
+      fill.style.display = 'none';
+      btn.style.opacity = '1.0';
+    }
   }
 }

@@ -46,6 +46,13 @@ export class PCFXManager {
   private beamTracers: BeamTracer[] = [];
   private beamPool: pc.Entity[] = [];
 
+  // Grappling Hook glowing PBR energy cable & anchor
+  private grappleCableEntity?: pc.Entity;
+  private grappleAnchorEntity?: pc.Entity;
+  private grappleCableMaterial?: pc.StandardMaterial;
+  private grappleAnchorMaterial?: pc.StandardMaterial;
+  private grapplePulseTimer: number = 0;
+
   // Hitmarker DOM
   private hitmarkerEl: HTMLElement | null = null;
   private hitmarkerTimer: number = 0;
@@ -256,6 +263,74 @@ export class PCFXManager {
   public spawnPlasmaExplosion(pos: pc.Vec3): void {
     this.spawnShieldDeflect(pos);
     this.spawnHitSparks(pos, undefined, true);
+  }
+
+  public updateGrappleCable(from: pc.Vec3, to: pc.Vec3, dt: number = 0.016): void {
+    if (!this.app || !this.rootEntity) return;
+    const dist = from.distance(to);
+    if (dist <= 0.05) {
+      this.hideGrappleCable();
+      return;
+    }
+
+    if (!this.grappleCableEntity) {
+      this.grappleCableEntity = new pc.Entity('GrappleEnergyCable');
+      this.grappleCableMaterial = new pc.StandardMaterial();
+      this.grappleCableMaterial.diffuse = new pc.Color(0, 0.95, 1);
+      this.grappleCableMaterial.emissive = new pc.Color(0, 0.85, 1);
+      this.grappleCableMaterial.emissiveIntensity = 2.8;
+      this.grappleCableMaterial.opacity = 0.9;
+      this.grappleCableMaterial.blendType = pc.BLEND_ADDITIVE;
+      this.grappleCableMaterial.update();
+      this.grappleCableEntity.addComponent('render', { type: 'cylinder', material: this.grappleCableMaterial });
+      this.rootEntity.addChild(this.grappleCableEntity);
+    }
+
+    if (!this.grappleAnchorEntity) {
+      this.grappleAnchorEntity = new pc.Entity('GrappleAnchorNode');
+      this.grappleAnchorMaterial = new pc.StandardMaterial();
+      this.grappleAnchorMaterial.diffuse = new pc.Color(0.2, 1.0, 0.9);
+      this.grappleAnchorMaterial.emissive = new pc.Color(0, 1.0, 0.9);
+      this.grappleAnchorMaterial.emissiveIntensity = 4.0;
+      this.grappleAnchorMaterial.update();
+      this.grappleAnchorEntity.addComponent('render', { type: 'sphere', material: this.grappleAnchorMaterial });
+      this.rootEntity.addChild(this.grappleAnchorEntity);
+    }
+
+    this.grapplePulseTimer += dt * 14.0;
+    const pulseFactor = 0.85 + Math.sin(this.grapplePulseTimer) * 0.25;
+    if (this.grappleCableMaterial) {
+      this.grappleCableMaterial.emissiveIntensity = 2.6 * pulseFactor;
+      this.grappleCableMaterial.update();
+    }
+
+    // Position and orient cylinder between from and to
+    this.grappleCableEntity.enabled = true;
+    const mid = new pc.Vec3().add2(from, to).mulScalar(0.5);
+    this.grappleCableEntity.setPosition(mid);
+    this.grappleCableEntity.lookAt(to);
+    this.grappleCableEntity.rotateLocal(90, 0, 0);
+    this.grappleCableEntity.setLocalScale(0.045, dist, 0.045);
+
+    // Position anchor node at contact surface
+    this.grappleAnchorEntity.enabled = true;
+    this.grappleAnchorEntity.setPosition(to);
+    const anchorScale = 0.22 + Math.sin(this.grapplePulseTimer * 1.5) * 0.06;
+    this.grappleAnchorEntity.setLocalScale(anchorScale, anchorScale, anchorScale);
+  }
+
+  public hideGrappleCable(): void {
+    if (this.grappleCableEntity) {
+      this.grappleCableEntity.enabled = false;
+    }
+    if (this.grappleAnchorEntity) {
+      this.grappleAnchorEntity.enabled = false;
+    }
+  }
+
+  public spawnGrappleImpact(hitPoint: pc.Vec3, normal?: pc.Vec3): void {
+    this.spawnHitSparks(hitPoint, normal, true);
+    this.spawnShieldDeflect(hitPoint);
   }
 
   public update(dt: number): void {

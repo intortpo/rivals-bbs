@@ -3,6 +3,7 @@ import { TouchControls, isTouchDevice } from './TouchControls.js';
 export class InputManager {
   public touch: TouchControls;
   public powerupRequested: boolean = false;
+  public grappleRequested: boolean = false;
   public mouseSensitivity: number = 1.0;
   public invertY: boolean = false;
   private keys: Record<string, boolean> = {};
@@ -41,6 +42,9 @@ export class InputManager {
       }
       if (['KeyQ', 'KeyE'].includes(e.code)) {
         this.powerupRequested = true;
+      }
+      if (e.code === 'KeyF') {
+        this.grappleRequested = true;
       }
       if (e.code === 'Escape' || e.code === 'KeyP') {
         this.unlockCursor();
@@ -232,6 +236,13 @@ export class InputManager {
     const p = this.powerupRequested;
     this.powerupRequested = false;
     return p;
+  }
+
+  public consumeGrapple(): boolean {
+    const g = this.grappleRequested || this.touch.state.grappleRequested;
+    this.grappleRequested = false;
+    this.touch.state.grappleRequested = false;
+    return g;
   }
 
   public unlockCursor(): void {

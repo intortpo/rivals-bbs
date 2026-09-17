@@ -784,4 +784,97 @@ export class AudioManager {
     noise.start(t);
     noise.stop(t + 0.45);
   }
+
+  public playGrappleShoot(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+    const t = this.ctx.currentTime;
+
+    // Pneumatic cable launch burst
+    if (this.sharedNoiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.sharedNoiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(2200, t);
+      filter.frequency.exponentialRampToValueAtTime(700, t + 0.18);
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.45 * this.sfxVolume, t);
+      nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.masterGain);
+      noise.start(t);
+      noise.stop(t + 0.18);
+    }
+
+    // High-tech winch spool whir
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.exponentialRampToValueAtTime(720, t + 0.16);
+    gain.gain.setValueAtTime(0.35 * this.sfxVolume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.16);
+  }
+
+  public playGrappleLatch(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+    const t = this.ctx.currentTime;
+
+    // Crisp metallic anchor strike
+    [1400, 2600].forEach((freq) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.45, t + 0.09);
+      gain.gain.setValueAtTime(0.4 * this.sfxVolume, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t);
+      osc.stop(t + 0.09);
+    });
+
+    // Solid anchor thud
+    const oscThud = this.ctx.createOscillator();
+    const gainThud = this.ctx.createGain();
+    oscThud.type = 'triangle';
+    oscThud.frequency.setValueAtTime(170, t);
+    oscThud.frequency.exponentialRampToValueAtTime(55, t + 0.12);
+    gainThud.gain.setValueAtTime(0.55 * this.sfxVolume, t);
+    gainThud.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    oscThud.connect(gainThud);
+    gainThud.connect(this.masterGain);
+    oscThud.start(t);
+    oscThud.stop(t + 0.12);
+  }
+
+  public playGrappleRelease(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+    const t = this.ctx.currentTime;
+
+    // High velocity aerodynamic whoosh / slingshot snap
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, t);
+    osc.frequency.exponentialRampToValueAtTime(140, t + 0.18);
+    gain.gain.setValueAtTime(0.4 * this.sfxVolume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
 }
