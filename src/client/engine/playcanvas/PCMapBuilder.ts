@@ -560,15 +560,50 @@ export class PCMapBuilder {
     }
 
     if (this.app) {
-      const ent = new pc.Entity('MapBox');
-      const mat = this.createPBRMaterial(colorHex, pbr);
-      ent.addComponent('render', { type: 'box', material: mat });
-      if (this.staticBatchGroupId !== undefined && ent.render) {
-        ent.render.batchGroupId = this.staticBatchGroupId;
+      if (pbr?.opacity !== undefined || pbr?.emissive) {
+        // Retain procedural primitives for glass and glowing lights
+        const ent = new pc.Entity('MapBox');
+        const mat = this.createPBRMaterial(colorHex, pbr);
+        ent.addComponent('render', { type: 'box', material: mat });
+        if (this.staticBatchGroupId !== undefined && ent.render) {
+          ent.render.batchGroupId = this.staticBatchGroupId;
+        }
+        ent.setPosition(x, y, z);
+        ent.setLocalScale(w, h, d);
+        this.mapRoot.addChild(ent);
+      } else {
+        // Use Kenney platformer blocks for structural walls/floors
+        let assetName = 'platform.glb';
+        if (this.skyTheme === 'subzero') assetName = 'block-snow.glb';
+        else if (this.skyTheme === 'magma') assetName = 'block-moving.glb';
+        else if (this.skyTheme === 'neon') assetName = 'block-moving-blue.glb';
+        else if (this.skyTheme === 'tropical' || this.skyTheme === 'biodome') assetName = 'block-grass.glb';
+
+        // Tile the blocks across X and Z to avoid horrible stretching on large surfaces
+        const BLOCK_SIZE = 2; // Assuming Kenney blocks are ~2x2
+        const nx = Math.max(1, Math.round(w / BLOCK_SIZE));
+        const nz = Math.max(1, Math.round(d / BLOCK_SIZE));
+        
+        const actualBlockW = w / nx;
+        const actualBlockD = d / nz;
+        
+        const startX = x - w / 2 + actualBlockW / 2;
+        const startZ = z - d / 2 + actualBlockD / 2;
+        
+        for (let ix = 0; ix < nx; ix++) {
+          for (let iz = 0; iz < nz; iz++) {
+            const px = startX + ix * actualBlockW;
+            const pz = startZ + iz * actualBlockD;
+            this.addPlatformerProp(
+              assetName,
+              px, y, pz,
+              actualBlockW,
+              0, 0, 0,
+              h, actualBlockD
+            );
+          }
+        }
       }
-      ent.setPosition(x, y, z);
-      ent.setLocalScale(w, h, d);
-      this.mapRoot.addChild(ent);
     }
 
     return box;
@@ -624,6 +659,12 @@ export class PCMapBuilder {
           ent.setPosition(p.x, p.y, p.z);
           ent.setLocalEulerAngles(p.rotX ?? 0, p.rotY ?? 0, p.rotZ ?? 0);
           ent.setLocalScale(p.scaleX ?? 1, p.scaleY ?? 1, p.scaleZ ?? 1);
+          
+          if (this.staticBatchGroupId !== undefined) {
+            const renders = ent.findComponents('render');
+            renders.forEach((r: any) => { r.batchGroupId = this.staticBatchGroupId; });
+          }
+          
           this.mapRoot.addChild(ent);
           this.platformerEntities.push(ent);
         }
