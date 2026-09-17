@@ -23,7 +23,6 @@ export interface LobbyCallbacks {
   onAuthClick?: () => void;
   onOpenDashboard?: () => void;
   onOpenSettings?: () => void;
-  onOpenCharacterBuilder?: () => void;
   onRefreshRooms?: () => void;
   onLeaveRoom?: () => void;
   onDeleteRoom?: (roomId: string) => void;
@@ -35,7 +34,6 @@ export class LobbyUI {
   public callbacks: LobbyCallbacks;
   public selectedColor: string = PLAYER_COLORS[0];
   public selectedOutfit: number = 0;
-  public customOutfit: CharacterCustomization | null = null;
   public selectedSky: string = 'twilight';
   public autoStartSolo: boolean = false;
   private currentOpenRooms: OpenRoomSummary[] = [];
@@ -130,30 +128,6 @@ export class LobbyUI {
               </select>
             </div>
           </div>
-
-          <!-- Open 3D Character Builder Button -->
-          <button id="btn-open-character-builder" type="button" class="btn" style="
-            width: 100%;
-            margin-top: 10px;
-            padding: 9px 12px;
-            font-size: 12px;
-            font-weight: 800;
-            background: linear-gradient(135deg, rgba(0, 210, 255, 0.2), rgba(181, 55, 242, 0.2));
-            border: 1px solid rgba(0, 210, 255, 0.5);
-            color: #00d2ff;
-            border-radius: 10px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            box-shadow: 0 2px 10px rgba(0, 210, 255, 0.15);
-            transition: all 0.2s;
-          ">
-            <span style="font-size: 15px;">🎨</span>
-            <span>CUSTOMIZE 3D AVATAR</span>
-            <span style="font-size: 10px; background: rgba(0, 210, 255, 0.3); color: #ffffff; padding: 2px 6px; border-radius: 6px; font-weight: 900;">STUDIO</span>
-          </button>
 
           <label style="font-size: 12px; font-weight: bold; color: #8da2c0; display: block; text-align: left; margin: 12px 0 6px 0;">AVATAR ACCENT COLOR</label>
           <div id="color-picker-row" style="display: flex; gap: 8px; justify-content: center;">
@@ -452,14 +426,6 @@ export class LobbyUI {
       }
     });
 
-    // Open 3D Character Studio
-    const builderBtn = document.getElementById('btn-open-character-builder');
-    builderBtn?.addEventListener('click', () => {
-      if (this.callbacks.onOpenCharacterBuilder) {
-        this.callbacks.onOpenCharacterBuilder();
-      }
-    });
-
     // Play Solo Wave (Instant Match Start)
     const soloBtn = document.getElementById('btn-play-solo');
     soloBtn?.addEventListener('click', () => {
@@ -469,8 +435,7 @@ export class LobbyUI {
       const outfitSelect = document.getElementById('select-character-outfit') as HTMLSelectElement;
       const skySelect = document.getElementById('select-sky-theme') as HTMLSelectElement;
 
-      const isCustom = outfitSelect?.value === 'custom';
-      const outfitIdx = isCustom ? 0 : parseInt(outfitSelect?.value || '0', 10);
+      const outfitIdx = parseInt(outfitSelect?.value || '0', 10) || 0;
       const skyTheme = skySelect?.value || 'twilight';
 
       this.selectedOutfit = outfitIdx;
@@ -482,8 +447,7 @@ export class LobbyUI {
         10,
         mapSelect?.value || 'Facility',
         skyTheme,
-        outfitIdx,
-        isCustom || this.customOutfit ? (this.customOutfit || undefined) : undefined
+        outfitIdx
       );
     });
 
@@ -496,8 +460,7 @@ export class LobbyUI {
       const outfitSelect = document.getElementById('select-character-outfit') as HTMLSelectElement;
       const skySelect = document.getElementById('select-sky-theme') as HTMLSelectElement;
 
-      const isCustom = outfitSelect?.value === 'custom';
-      const outfitIdx = isCustom ? 0 : parseInt(outfitSelect?.value || '0', 10);
+      const outfitIdx = parseInt(outfitSelect?.value || '0', 10) || 0;
       const skyTheme = skySelect?.value || 'twilight';
       const mode: GameMode = (modeSelect?.value as GameMode) || 'wave';
       const fragGoal = mode === 'wave' ? 10 : 5;
@@ -511,8 +474,7 @@ export class LobbyUI {
         fragGoal,
         mapSelect?.value || 'Facility',
         skyTheme,
-        outfitIdx,
-        isCustom || this.customOutfit ? (this.customOutfit || undefined) : undefined
+        outfitIdx
       );
     });
 
@@ -535,8 +497,7 @@ export class LobbyUI {
         this.callbacks.onJoinRoom(
           code,
           name,
-          outfitIdx,
-          isCustom || this.customOutfit ? (this.customOutfit || undefined) : undefined
+          outfitIdx
         );
       }
     };
@@ -657,45 +618,16 @@ export class LobbyUI {
         const roomId = btn.getAttribute('data-room');
         const name = nameInput?.value.trim() || 'Rival';
         const outfitSelect = document.getElementById('select-character-outfit') as HTMLSelectElement;
-        const isCustom = outfitSelect?.value === 'custom';
-        const outfitIdx = isCustom ? 0 : parseInt(outfitSelect?.value || '0', 10);
+        const outfitIdx = parseInt(outfitSelect?.value || '0', 10) || 0;
         if (roomId) {
           this.callbacks.onJoinRoom(
             roomId,
             name,
-            outfitIdx,
-            isCustom || this.customOutfit ? (this.customOutfit || undefined) : undefined
+            outfitIdx
           );
         }
       });
     });
-  }
-
-  public setSelectedOutfitCustom(custom: CharacterCustomization): void {
-    this.customOutfit = custom;
-    const outfitSelect = document.getElementById('select-character-outfit') as HTMLSelectElement;
-    if (outfitSelect) {
-      let customOpt = outfitSelect.querySelector('option[value="custom"]') as HTMLOptionElement;
-      if (!customOpt) {
-        customOpt = document.createElement('option');
-        customOpt.value = 'custom';
-        customOpt.textContent = '✨ Custom Studio Outfit';
-        outfitSelect.appendChild(customOpt);
-      }
-      outfitSelect.value = 'custom';
-    }
-    if (custom.accentColor) {
-      this.selectedColor = custom.accentColor;
-      const swatches = this.container.querySelectorAll('.color-swatch');
-      swatches.forEach((sw) => {
-        const el = sw as HTMLElement;
-        if (el.dataset.color === custom.accentColor) {
-          el.classList.add('active');
-        } else {
-          el.classList.remove('active');
-        }
-      });
-    }
   }
 
   public showInRoomLobby(state: RoomNetworkState, isHost: boolean): void {

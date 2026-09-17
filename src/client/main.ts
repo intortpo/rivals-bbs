@@ -13,7 +13,6 @@ import { AuthUI } from './ui/AuthUI.js';
 import { GrammarReloadUI } from './ui/GrammarReloadUI.js';
 import { SettingsUI, GameSettings } from './ui/SettingsUI.js';
 import { DashboardUI } from './ui/DashboardUI.js';
-import { CharacterBuilderUI } from './ui/CharacterBuilderUI.js';
 import { LoadingScreenUI } from './ui/LoadingScreenUI.js';
 import { PCNetworkClient } from './network/PCNetworkClient.js';
 import { PCProjectileManager } from './engine/playcanvas/PCProjectileManager.js';
@@ -37,7 +36,6 @@ class GameApp {
   private hud!: TouchHUD;
   private settingsUI!: SettingsUI;
   private dashboardUI!: DashboardUI;
-  private characterBuilderUI!: CharacterBuilderUI;
   private loadingScreenUI!: LoadingScreenUI;
   private qrManager!: QRManager;
   private lobbyUI!: LobbyUI;
@@ -223,10 +221,6 @@ class GameApp {
         this.input.unlockCursor();
         this.settingsUI.open();
       },
-      onOpenCharacterBuilder: () => {
-        this.input.unlockCursor();
-        this.characterBuilderUI.open(this.lobbyUI.customOutfit || undefined);
-      },
       onRefreshRooms: async () => {
         try {
           const res = await fetch('/api/rooms');
@@ -248,19 +242,7 @@ class GameApp {
       })
       .catch(() => {});
 
-    // 4. Initialize Character Builder, Auth & Grammar Reload UI
-    this.characterBuilderUI = new CharacterBuilderUI(this.appContainer, (custom) => {
-      this.lobbyUI.setSelectedOutfitCustom(custom);
-    });
-
-    const savedCustom = localStorage.getItem('bbs_character_customization');
-    if (savedCustom) {
-      try {
-        const parsed = JSON.parse(savedCustom);
-        this.lobbyUI.setSelectedOutfitCustom(parsed);
-      } catch {}
-    }
-
+    // 4. Initialize Auth & Grammar Reload UI
     this.authUI = new AuthUI(
       this.appContainer,
       (user) => {
