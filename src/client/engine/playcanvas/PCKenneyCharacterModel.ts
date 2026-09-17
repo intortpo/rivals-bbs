@@ -210,13 +210,22 @@ export class PCKenneyCharacterModel implements PCTargetable {
         for (const rc of renders) {
           if (rc.meshInstances) {
             for (const mi of rc.meshInstances) {
-              const mat = new pc.StandardMaterial();
-              mat.diffuseMap = loaded.resource as pc.Texture;
-              mat.useMetalness = true;
-              mat.metalness = 0.1;
-              mat.gloss = 0.6;
-              mat.update();
-              mi.material = mat;
+              // If material already exists, mutate diffuseMap so shader skinning setup is preserved
+              if (mi.material && mi.material instanceof pc.StandardMaterial) {
+                mi.material.diffuseMap = loaded.resource as pc.Texture;
+                mi.material.useMetalness = true;
+                mi.material.metalness = 0.1;
+                mi.material.gloss = 0.6;
+                mi.material.update();
+              } else {
+                const mat = new pc.StandardMaterial();
+                mat.diffuseMap = loaded.resource as pc.Texture;
+                mat.useMetalness = true;
+                mat.metalness = 0.1;
+                mat.gloss = 0.6;
+                mat.update();
+                mi.material = mat;
+              }
             }
           }
         }
@@ -226,7 +235,7 @@ export class PCKenneyCharacterModel implements PCTargetable {
   }
 
   private setupAnimations(container: pc.ContainerResource): void {
-    if (!this.modelEntity || !this.app) return;
+    if (!this.modelEntity) return;
 
     const animClips = (container as any).animations;
     if (!animClips || animClips.length === 0) return;
@@ -237,19 +246,78 @@ export class PCKenneyCharacterModel implements PCTargetable {
         speed: 1.0
       });
 
-      const anim = this.modelEntity.anim;
-      if (!anim) return;
+      const animComponent = this.modelEntity.anim;
+      if (!animComponent) return;
+
+      const stateNames = [
+        'idle',
+        'run',
+        'sprint',
+        'slide',
+        'jump',
+        'strafe_left',
+        'strafe_right'
+      ];
+
+      // PlayCanvas 2.x AnimComponent requires an explicit State Graph
+      // before assignAnimation can register clips to states
+      const graph = {
+        layers: [
+          {
+            name: 'Base',
+            states: [
+              { name: 'START', speed: 1 },
+              ...stateNames.map((name) => ({
+                name,
+                speed: 1.0,
+                loop: !['jump', 'slide'].includes(name),
+                defaultState: name === 'idle'
+              }))
+            ],
+            transitions: [
+              { from: 'START', to: 'idle' },
+              ...stateNames.map((name) => ({
+                from: 'idle',
+                to: name,
+                time: 0,
+                exitTime: 0,
+                blendDuration: 0.15
+              })),
+              ...stateNames.map((name) => ({
+                from: name,
+                to: 'idle',
+                time: 0,
+                exitTime: 0,
+                blendDuration: 0.15
+              })),
+              { from: 'run', to: 'sprint', blendDuration: 0.15 },
+              { from: 'sprint', to: 'run', blendDuration: 0.15 },
+              { from: 'run', to: 'slide', blendDuration: 0.15 },
+              { from: 'sprint', to: 'slide', blendDuration: 0.15 },
+              { from: 'slide', to: 'run', blendDuration: 0.2 },
+              { from: 'jump', to: 'run', blendDuration: 0.15 },
+              { from: 'jump', to: 'idle', blendDuration: 0.15 }
+            ]
+          }
+        ],
+        parameters: {}
+      };
+
+      animComponent.loadStateGraph(graph);
 
       for (const clip of animClips) {
-        const name = clip.name;
-        if (name) {
-          anim.assignAnimation(name, clip);
+        // Can be a pc.Asset or pc.AnimTrack
+        const track: pc.AnimTrack = (clip && clip.resource) ? clip.resource : clip;
+        const rawName = (track.name || clip.name || '').toLowerCase();
+
+        for (const s of stateNames) {
+          if (rawName === s || rawName.includes(s)) {
+            animComponent.baseLayer?.assignAnimation(s, track);
+          }
         }
       }
 
-      if (anim.baseLayer) {
-        anim.baseLayer.play('idle');
-      }
+      animComponent.baseLayer?.play('idle');
       this.currentAnimState = 'idle';
     } catch (e) {
       console.warn('[PCKenneyCharacterModel] Anim setup notice:', e);
@@ -319,18 +387,28 @@ export class PCKenneyCharacterModel implements PCTargetable {
     let targetState = 'idle';
     if (this.isDead) {
       targetState = 'idle';
-    } else if (this.isSliding) {
-      targetState = 'run';
     } else if (isJumping) {
       targetState = 'jump';
-    } else if (Math.abs(speed) > 0.4 || Math.abs(strafeSpeed) > 0.4) {
-      targetState = 'run';
+    } else if (this.isSliding) {
+      targetState = 'slide';
+    } else {
+      const fwd = Math.abs(speed);
+      const strafe = Math.abs(strafeSpeed);
+      if (fwd > 6.0) {
+        targetState = 'sprint';
+      } else if (fwd > 0.3) {
+        targetState = 'run';
+      } else if (strafe > 0.3) {
+        targetState = strafeSpeed > 0 ? 'strafe_right' : 'strafe_left';
+      } else {
+        targetState = 'idle';
+      }
     }
 
     // Sync animation playback rate with actual ground velocity so feet do not slide
-    if (targetState === 'run') {
+    if (targetState === 'run' || targetState === 'sprint' || targetState.startsWith('strafe')) {
       const totalSpeed = Math.hypot(speed, strafeSpeed);
-      (layer as any).speed = Math.max(0.65, Math.min(1.4, totalSpeed / 6.5));
+      (layer as any).speed = Math.max(0.65, Math.min(1.4, totalSpeed / 6.0));
     } else {
       (layer as any).speed = 1.0;
     }
