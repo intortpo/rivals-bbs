@@ -197,14 +197,30 @@ export class LoadingScreenUI {
       } catch {}
     }
 
-    // 2. Preload 3D Character GLB container with animations
+    // 2. Preload 3D Character & Blaster Kit Armory
     if (glbLoader) {
-      this.setProgress(0.6, 'Loading 3D Animated Arena Characters...');
+      this.setProgress(0.5, 'Loading 3D Animated Arena Characters...');
       try {
-        await glbLoader.load('/models/characters/arena_character.glb');
+        await Promise.all([
+          glbLoader.load('/models/characters/kenney/kenney_character.glb').catch(() => null),
+          glbLoader.load('/models/characters/arena_character.glb').catch(() => null)
+        ]);
       } catch (err) {
-        console.warn('[LoadingScreenUI] Failed to preload arena_character.glb:', err);
+        console.warn('[LoadingScreenUI] Failed to preload character models:', err);
       }
+
+      this.setProgress(0.75, 'Loading 3D Blaster Armory & Platformer Assets...');
+      const blasterUrls = [
+        '/models/blasters/blaster-a.glb',
+        '/models/blasters/blaster-b.glb',
+        '/models/blasters/blaster-c.glb',
+        '/models/blasters/blaster-e.glb',
+        '/models/blasters/blaster-g.glb',
+        '/models/blasters/blaster-j.glb',
+        '/models/blasters/blaster-m.glb',
+        '/models/blasters/blaster-o.glb'
+      ];
+      await Promise.all(blasterUrls.map((u) => glbLoader.load(u).catch(() => null)));
     }
 
     // 3. PlayCanvas WebGL pipelines ready

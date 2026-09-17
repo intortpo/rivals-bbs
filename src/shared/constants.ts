@@ -3,7 +3,7 @@ import { PowerupDefinition, PowerupType, TeamColor, WeaponStats, WeaponType } fr
 export const WEAPONS: Record<WeaponType, WeaponStats> = {
   rifle: {
     type: 'rifle',
-    name: 'Assault Rifle',
+    name: 'Assault Blaster Mk-I',
     damage: 24,
     headshotMultiplier: 1.75, // 42 headshot
     fireRate: 0.11, // ~545 RPM
@@ -17,7 +17,7 @@ export const WEAPONS: Record<WeaponType, WeaponStats> = {
   },
   shotgun: {
     type: 'shotgun',
-    name: 'Pump Shotgun',
+    name: 'Scatter Blaster Heavy',
     damage: 13, // 8 pellets * 13 = 104 if all hit body
     headshotMultiplier: 1.5, // 19.5 per pellet
     fireRate: 0.75,
@@ -32,7 +32,7 @@ export const WEAPONS: Record<WeaponType, WeaponStats> = {
   },
   sniper: {
     type: 'sniper',
-    name: 'Heavy Sniper',
+    name: 'Longshot Blaster Rifle',
     damage: 95,
     headshotMultiplier: 2.0, // 190 headshot = instant elimination
     fireRate: 1.25,
@@ -46,21 +46,21 @@ export const WEAPONS: Record<WeaponType, WeaponStats> = {
   },
   katana: {
     type: 'katana',
-    name: 'Energy Katana',
+    name: 'Pulse Blaster Sidearm',
     damage: 75,
     headshotMultiplier: 1.0,
     fireRate: 0.45,
-    magazineSize: 1, // melee doesn't reload
+    magazineSize: 1, // melee/sidearm doesn't reload
     reloadTime: 0.1,
     automatic: false,
     spread: 0.0,
     range: 4.0,
     adsZoomFov: 70,
-    icon: '⚔️'
+    icon: '⚡'
   },
   needle_carbine: {
     type: 'needle_carbine',
-    name: 'Crystalline Needler',
+    name: 'Needler Blaster Carbine',
     damage: 18,
     headshotMultiplier: 1.5,
     fireRate: 0.12, // ~500 RPM
@@ -77,7 +77,7 @@ export const WEAPONS: Record<WeaponType, WeaponStats> = {
   },
   plasma_launcher: {
     type: 'plasma_launcher',
-    name: 'Quantum Plasma Launcher',
+    name: 'Plasma Cannon Blaster',
     damage: 70,
     headshotMultiplier: 1.25,
     fireRate: 0.65,
@@ -94,7 +94,7 @@ export const WEAPONS: Record<WeaponType, WeaponStats> = {
   },
   railgun: {
     type: 'railgun',
-    name: 'Hyper-Velocity Railgun',
+    name: 'Hyper-Rail Blaster',
     damage: 110,
     headshotMultiplier: 2.0, // 220 critical headshot
     fireRate: 1.35,
@@ -110,7 +110,7 @@ export const WEAPONS: Record<WeaponType, WeaponStats> = {
   },
   arc_disruptor: {
     type: 'arc_disruptor',
-    name: 'Tesla Arc Disruptor',
+    name: 'Arc Disruptor Blaster',
     damage: 16,
     headshotMultiplier: 1.0,
     fireRate: 0.10, // continuous channel 600 ticks/min
@@ -141,17 +141,37 @@ export const WEAPON_ORDER: WeaponType[] = [
   'arc_disruptor'
 ];
 
+export const MAP_NAMES = [
+  'Facility',
+  'Neon Warehouse',
+  'Magma Foundry',
+  'Bio-Dome',
+  'Quantum Lab',
+  'Orbital Station',
+  'Subzero Station',
+  'Scrapyard Canyon',
+  'Cyber Spire',
+  'Desert Outpost',
+  'Toxic Sludge',
+  'Crystal Caverns',
+  'Ruined Temple',
+  'Sky Islands',
+  'Cartoon City',
+  'Pixel Plaza',
+  'Void Arena'
+] as const;
+
 export const MOVEMENT = {
-  WALK_SPEED: 12.0,
-  SLIDE_INITIAL_SPEED: 22.0,
+  WALK_SPEED: 8.5,
+  SLIDE_INITIAL_SPEED: 16.0,
   SLIDE_FRICTION: 12.0,
-  SLIDE_MIN_SPEED: 6.0,
+  SLIDE_MIN_SPEED: 4.5,
   SLIDE_DURATION_MAX: 0.85,
   JUMP_VELOCITY: 11.5,
   SLIDE_JUMP_BOOST: 1.2,
   GRAVITY: 28.0,
-  AIR_ACCEL: 24.0,
-  AIR_MAX_SPEED: 12.0,
+  AIR_ACCEL: 18.0,
+  AIR_MAX_SPEED: 8.5,
   AIR_DRAG: 0.985,
   PLAYER_HEIGHT: 1.28,
   PLAYER_SLIDE_HEIGHT: 0.70,
@@ -340,6 +360,26 @@ export const SKYLINE_PENTHOUSE_SPAWNS = [
   { x: 4, y: 0.0, z: 0, yaw: -Math.PI / 2 }
 ];
 
+export const SKY_ISLANDS_SPAWNS = [
+
+  { x: 0, y: 3.0, z: -6, yaw: 0 },
+
+  { x: 0, y: 3.0, z: 6, yaw: Math.PI },
+
+  { x: 6, y: 3.0, z: 0, yaw: -Math.PI / 2 },
+
+  { x: -6, y: 3.0, z: 0, yaw: Math.PI / 2 },
+
+  { x: 0, y: -2.0, z: -35, yaw: 0 },
+
+  { x: 0, y: 14.0, z: 35, yaw: Math.PI },
+
+  { x: 40, y: 16.0, z: 0, yaw: Math.PI / 2 },
+
+  { x: 20, y: 6.0, z: 0, yaw: Math.PI / 2 }
+
+];
+
 export function getMapSpawns(mapName?: string) {
   switch (mapName) {
     case 'Facility':
@@ -377,6 +417,8 @@ export function getMapSpawns(mapName?: string) {
     case 'Solar Relay':
     case 'Solar Relay (Helios Mirror Array)':
       return SOLAR_RELAY_SPAWNS;
+    case 'Sky Islands':
+      return SKY_ISLANDS_SPAWNS;
     case 'Skyline Penthouse':
     case 'Skyline Penthouse (Vertigo Lounge)':
       return SKYLINE_PENTHOUSE_SPAWNS;

@@ -62,6 +62,7 @@ class GameApp {
   // Grappling Hook State & Physics
   private isGrappling: boolean = false;
   private grappleAnchor = new pc.Vec3();
+  private grappleRopeLength: number = 0;
   private grappleCooldownTimer: number = 0;
 
   // Movement feel & responsive input enhancements
@@ -151,6 +152,7 @@ class GameApp {
         if (this.mapBuilder.mapName !== mapName || this.mapBuilder.skyTheme !== skyTheme) {
           this.mapBuilder.dispose();
           this.mapBuilder = new PCMapBuilder(this.renderer.app, mapName, skyTheme);
+          this.mapBuilder.loadPlatformerAssets(this.glbLoader);
           this.powerupManager.spawnWorldPickups(mapName);
         }
         const isSolo = this.lobbyUI.autoStartSolo;
@@ -273,10 +275,18 @@ class GameApp {
 
     // 7. Interactive Asset Loading Screen
     await this.loadingScreenUI.preloadGameAssets(this.audio, this.glbLoader);
+    const kenneyContainer = this.glbLoader.get('/models/characters/kenney/kenney_character.glb');
+    if (kenneyContainer) {
+      this.networkClient.kenneyCharacterContainer = kenneyContainer;
+    }
     const charContainer = this.glbLoader.get('/models/characters/arena_character.glb');
     if (charContainer) {
       this.networkClient.characterContainer = charContainer;
     }
+
+    // Load weapon and map models
+    await this.weaponManager.loadBlasterModels(this.glbLoader);
+    await this.mapBuilder.loadPlatformerAssets(this.glbLoader);
 
     // 8. Start Render & Game Loop
     requestAnimationFrame(this.gameLoop.bind(this));
@@ -585,6 +595,7 @@ class GameApp {
     if (this.mapBuilder.mapName !== chosenMap) {
       this.mapBuilder.dispose();
       this.mapBuilder = new PCMapBuilder(this.renderer.app, chosenMap);
+      this.mapBuilder.loadPlatformerAssets(this.glbLoader);
       this.powerupManager.spawnWorldPickups(chosenMap);
     }
 
@@ -768,8 +779,12 @@ class GameApp {
         0,
         this._scratchForward.z * move.forward + this._scratchRight.z * move.right
       );
-      this.playerVel.x = this._scratchMoveDir.x * targetSpeed;
-      this.playerVel.z = this._scratchMoveDir.z * targetSpeed;
+      const desiredX = this._scratchMoveDir.x * targetSpeed;
+      const desiredZ = this._scratchMoveDir.z * targetSpeed;
+      // Exponential velocity dampening removes instant jerky snapping
+      const groundAccel = isMovingInput ? 18.0 : 22.0;
+      this.playerVel.x = damp(this.playerVel.x, desiredX, groundAccel, delta);
+      this.playerVel.z = damp(this.playerVel.z, desiredZ, groundAccel, delta);
 
       if (canJump) {
         this.playerVel.y = MOVEMENT.JUMP_VELOCITY;
@@ -820,7 +835,7 @@ class GameApp {
       }
     }
 
-    // 3.3 Active Grappling Hook Physics & Swing Dynamics
+    // 3.3 Spider-Man Web Pendulum & Centripetal Swing Physics
     if (this.isGrappling) {
       const toAnchor = new pc.Vec3().sub2(this.grappleAnchor, this.playerPos);
       const dist = toAnchor.length();
@@ -828,23 +843,77 @@ class GameApp {
       if (dist <= MOVEMENT.GRAPPLE_DETACH_DIST) {
         this.detachGrapple(true);
       } else {
-        const pullDir = toAnchor.clone().normalize();
-        const accel = MOVEMENT.GRAPPLE_PULL_ACCEL * delta;
-        this.playerVel.x += pullDir.x * accel;
-        this.playerVel.y += pullDir.y * accel;
-        this.playerVel.z += pullDir.z * accel;
+        const radialDir = toAnchor.clone().normalize();
 
-        if (isMovingInput) {
-          const steerRate = MOVEMENT.AIR_ACCEL * 0.8 * delta;
-          this.playerVel.x += this._scratchMoveDir.x * steerRate;
-          this.playerVel.z += this._scratchMoveDir.z * steerRate;
+        // 1. Reel-in: Holding forward slowly shortens rope length to pull upward
+        if (move.forward > 0) {
+          this.grappleRopeLength = Math.max(3.5, this.grappleRopeLength - 7.5 * delta);
         }
 
+        // 2. Spider-Man swing pumping: add tangential acceleration in input or look direction
+        if (isMovingInput) {
+          const inDotR = this._scratchMoveDir.x * radialDir.x + this._scratchMoveDir.z * radialDir.z;
+          const tangX = this._scratchMoveDir.x - radialDir.x * inDotR;
+          const tangZ = this._scratchMoveDir.z - radialDir.z * inDotR;
+          const tangLen = Math.hypot(tangX, tangZ);
+          if (tangLen > 0.001) {
+            const swingAccel = 22.0 * delta;
+            this.playerVel.x += (tangX / tangLen) * swingAccel;
+            this.playerVel.z += (tangZ / tangLen) * swingAccel;
+          }
+        } else {
+          const lookDotR = this._scratchForward.x * radialDir.x + this._scratchForward.z * radialDir.z;
+          const tangX = this._scratchForward.x - radialDir.x * lookDotR;
+          const tangZ = this._scratchForward.z - radialDir.z * lookDotR;
+          const tangLen = Math.hypot(tangX, tangZ);
+          if (tangLen > 0.001) {
+            const fwdPump = 11.0 * delta;
+            this.playerVel.x += (tangX / tangLen) * fwdPump;
+            this.playerVel.z += (tangZ / tangLen) * fwdPump;
+          }
+        }
+
+        // 3. Pendulum constraint: when distance >= rope length, prevent rope stretching
+        // and redirect outward kinetic energy along the tangential swing arc
+        if (dist >= this.grappleRopeLength) {
+          const radialVel = this.playerVel.x * radialDir.x + this.playerVel.y * radialDir.y + this.playerVel.z * radialDir.z;
+          // If moving outward away from anchor
+          if (radialVel < 0) {
+            this.playerVel.x -= radialDir.x * radialVel;
+            this.playerVel.y -= radialDir.y * radialVel;
+            this.playerVel.z -= radialDir.z * radialVel;
+          }
+
+          // Elastic tension restoring towards rope length
+          const stretch = dist - this.grappleRopeLength;
+          if (stretch > 0) {
+            const springForce = Math.min(50.0, stretch * 35.0) * delta;
+            this.playerVel.x += radialDir.x * springForce;
+            this.playerVel.y += radialDir.y * springForce;
+            this.playerVel.z += radialDir.z * springForce;
+          }
+
+          // Centripetal upward lift through the bottom of the pendulum arc
+          const horizSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
+          if (radialDir.y > 0.05 && horizSpeed > 3.0) {
+            const centripetalLift = (horizSpeed * horizSpeed / dist) * radialDir.y * delta * 0.75;
+            this.playerVel.y += Math.min(16.0 * delta, centripetalLift);
+          }
+        }
+
+        // 4. Gentle tractor pull towards anchor to assist smooth swooping
+        const gentlePull = MOVEMENT.GRAPPLE_PULL_ACCEL * 0.35 * delta;
+        this.playerVel.x += radialDir.x * gentlePull;
+        this.playerVel.y += radialDir.y * gentlePull;
+        this.playerVel.z += radialDir.z * gentlePull;
+
+        // Cap max swing speed to prevent unmanageable velocities
         const currentGrappleSpeed = this.playerVel.length();
         if (currentGrappleSpeed > MOVEMENT.GRAPPLE_PULL_SPEED) {
           this.playerVel.mulScalar(MOVEMENT.GRAPPLE_PULL_SPEED / currentGrappleSpeed);
         }
 
+        // Slingshot release with jump or re-trigger
         if (canJump || this.input.isJumping()) {
           this.detachGrapple(true);
           this.jumpBufferTimer = 0;
@@ -984,6 +1053,10 @@ class GameApp {
       );
     }
 
+    if (this.mapBuilder && this.renderer.cameraEntity) {
+      this.mapBuilder.updateSkyDome(this.renderer.cameraEntity.getPosition());
+    }
+
     const recoilSpread = Math.abs(this.weaponManager.recoilRotation.x) * 0.04;
     this.hud.updateCrosshairSpread(isMovingInput, this.isSliding, recoilSpread);
 
@@ -1032,6 +1105,7 @@ class GameApp {
     if (hitPoint) {
       this.isGrappling = true;
       this.grappleAnchor.copy(hitPoint);
+      this.grappleRopeLength = Math.max(3.5, this.playerPos.distance(hitPoint));
       this.isGrounded = false;
       this.isSliding = false;
       this.hasJumpedThisAirtime = true;

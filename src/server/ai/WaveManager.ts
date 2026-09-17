@@ -412,11 +412,23 @@ export class WaveManager {
         const hoverOffset = 1.6 + Math.sin((now / 1000) * 2.0 + seed) * 0.35;
         bot.y = groundY + hoverOffset;
       } else {
-        const targetGroundY = this.getTerrainHeight(bot.x, bot.z, bot.y);
-        if (bot.y > targetGroundY) {
-          bot.y = Math.max(targetGroundY, bot.y - 14.0 * dt);
+        // Vertical physics & jumping for ground bots
+        if (bot.isJumping || bot.vy > 0) {
+          bot.vy -= MOVEMENT.GRAVITY * dt;
+          bot.y += bot.vy * dt;
+          const groundY = this.getTerrainHeight(bot.x, bot.z, bot.y);
+          if (bot.y <= groundY) {
+            bot.y = groundY;
+            bot.vy = 0;
+            bot.isJumping = false;
+          }
         } else {
-          bot.y = targetGroundY;
+          const targetGroundY = this.getTerrainHeight(bot.x, bot.z, bot.y);
+          if (bot.y > targetGroundY) {
+            bot.y = Math.max(targetGroundY, bot.y - 14.0 * dt);
+          } else {
+            bot.y = targetGroundY;
+          }
         }
       }
 
@@ -443,18 +455,6 @@ export class WaveManager {
       const dist = Math.sqrt(minDistSq) || 0.01;
       const dist3D = Math.hypot(dx, dy, dz) || 0.01;
 
-      // Desired 3D aim angles towards target
-      const targetYaw = Math.atan2(-dx, -dz);
-      const targetPitch = Math.asin(Math.max(-0.95, Math.min(0.95, dy / dist3D)));
-
-      // Smooth turning towards target
-      let yawDiff = targetYaw - bot.yaw;
-      while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
-      while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
-      const maxTurn = (archetype.role === 'boss' ? 6.0 : 10.0) * dt;
-      bot.yaw += Math.max(-maxTurn, Math.min(maxTurn, yawDiff));
-      bot.pitch = targetPitch;
-
       // 2. Line of Sight & Sensory Perception
       const botEye: [number, number, number] = [bot.x, bot.y + 1.08, bot.z];
       const targetBody: [number, number, number] = [target.x, target.y + 0.8, target.z];
@@ -465,6 +465,37 @@ export class WaveManager {
       const dot = (fwdX * dx + fwdZ * dz) / dist;
       const inVisionCone = dot > 0.20 || dist < 14;
       const canSeeTarget = hasLOS && inVisionCone;
+
+      // Desired 3D aim angles: aim at target if seen or telegraphing; otherwise face movement direction or search node
+      let targetYaw = bot.yaw;
+      let targetPitch = 0;
+
+      if (canSeeTarget || active.aiState === 'telegraph' || active.aiState === 'attack' || archetype.role === 'boss') {
+        targetYaw = Math.atan2(-dx, -dz);
+        targetPitch = Math.asin(Math.max(-0.95, Math.min(0.95, dy / dist3D)));
+      } else if (active.aiState === 'hunt' && active.lastSeenTargetPos) {
+        const hdx = active.lastSeenTargetPos[0] - bot.x;
+        const hdz = active.lastSeenTargetPos[2] - bot.z;
+        targetYaw = Math.atan2(-hdx, -hdz);
+        targetPitch = 0;
+      } else if (Math.abs(bot.vx) > 0.1 || Math.abs(bot.vz) > 0.1) {
+        targetYaw = Math.atan2(-bot.vx, -bot.vz);
+        targetPitch = 0;
+      }
+
+      // Smooth turning towards desired orientation
+      let yawDiff = targetYaw - bot.yaw;
+      while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+      while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+      const maxTurn = (archetype.role === 'boss' ? 6.0 : 10.0) * dt;
+      bot.yaw += Math.max(-maxTurn, Math.min(maxTurn, yawDiff));
+      bot.pitch = targetPitch;
+
+      // Smart jumping: if pursuing elevated target or overcoming obstacles
+      if (!bot.isJumping && target && target.y > bot.y + 1.2 && dist < 14 && (archetype.role === 'scout' || archetype.role === 'rusher')) {
+        bot.isJumping = true;
+        bot.vy = 10.5;
+      }
 
       // 3. State-Driven Goal Machine Transitions
       if (canSeeTarget) {
@@ -481,11 +512,10 @@ export class WaveManager {
         }
       } else {
         if (active.aiState === 'attack' || active.aiState === 'boss_phase') {
-          if (active.lastSeenTargetPos) {
-            active.aiState = 'hunt';
-            active.stateTimer = 4.0;
-          } else {
-            active.aiState = 'patrol';
+          active.aiState = 'hunt';
+          active.stateTimer = 5.0;
+          if (!active.lastSeenTargetPos && target) {
+            active.lastSeenTargetPos = [target.x, target.y, target.z];
           }
         } else if (active.aiState === 'hunt') {
           active.stateTimer -= dt;
@@ -511,9 +541,10 @@ export class WaveManager {
           bot.x += bot.vx * dt;
           bot.z += bot.vz * dt;
         }
-      } else if (active.aiState === 'hunt' && active.lastSeenTargetPos) {
-        const hdx = active.lastSeenTargetPos[0] - bot.x;
-        const hdz = active.lastSeenTargetPos[2] - bot.z;
+      } else if (active.aiState === 'hunt') {
+        const dest = active.lastSeenTargetPos || (target ? [target.x, target.y, target.z] : active.patrolNode);
+        const hdx = dest[0] - bot.x;
+        const hdz = dest[2] - bot.z;
         const hdist = Math.hypot(hdx, hdz);
         if (hdist > 0.8) {
           bot.vx = (hdx / hdist) * archetype.speed;
@@ -522,6 +553,25 @@ export class WaveManager {
           bot.z += bot.vz * dt;
         } else {
           active.aiState = 'patrol';
+        }
+      } else if (active.aiState === 'patrol') {
+        // Patrol: advance towards general target area or roam around patrol node with periodic wandering
+        const wanderAngle = (now / 2000) + seed;
+        const targetBiasX = target ? target.x : active.patrolNode[0];
+        const targetBiasZ = target ? target.z : active.patrolNode[2];
+        const wanderTargetX = targetBiasX + Math.cos(wanderAngle) * 6.0;
+        const wanderTargetZ = targetBiasZ + Math.sin(wanderAngle) * 6.0;
+        const pdx = wanderTargetX - bot.x;
+        const pdz = wanderTargetZ - bot.z;
+        const pdist = Math.hypot(pdx, pdz);
+        if (pdist > 0.5) {
+          bot.vx = (pdx / pdist) * (archetype.speed * 0.7);
+          bot.vz = (pdz / pdist) * (archetype.speed * 0.7);
+          bot.x += bot.vx * dt;
+          bot.z += bot.vz * dt;
+        } else {
+          bot.vx = 0;
+          bot.vz = 0;
         }
       } else if (active.aiState === 'telegraph') {
         // Bracing to fire: stop to aim and lock orientation directly onto target

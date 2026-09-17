@@ -29,6 +29,7 @@ export class PCGLBCharacterModel implements PCTargetable {
 
   // Animation controller
   private currentAnimState: string = 'idle';
+  private actionTimer: number = 0;
 
   // Hitboxes
   public localHitboxes: {
@@ -398,19 +399,37 @@ export class PCGLBCharacterModel implements PCTargetable {
     this.isSliding = sliding;
   }
 
-  public updateAnimation(speed: number, _dt: number): void {
+  public updateAnimation(speed: number, dt: number, strafeSpeed: number = 0, isJumping: boolean = false): void {
     const layer = this.modelEntity?.anim?.baseLayer;
     if (!layer) return;
+
+    // Preserve transient attack / reload actions until their duration expires
+    if (this.actionTimer > 0) {
+      this.actionTimer -= dt;
+      return;
+    }
 
     let targetState = 'idle';
     if (this.isDead) {
       targetState = 'death';
     } else if (this.isSliding) {
       targetState = 'slide';
-    } else if (speed > 7.5) {
-      targetState = 'sprint';
-    } else if (speed > 0.4) {
+    } else if (isJumping) {
       targetState = 'run';
+    } else if (Math.abs(strafeSpeed) > 1.5 && Math.abs(strafeSpeed) > Math.abs(speed) * 0.7) {
+      targetState = strafeSpeed > 0 ? 'strafe_right' : 'strafe_left';
+    } else if (Math.abs(speed) > 9.5) {
+      targetState = 'sprint';
+    } else if (Math.abs(speed) > 0.4 || Math.abs(strafeSpeed) > 0.4) {
+      targetState = 'run';
+    }
+
+    // Sync animation playback rate with actual ground velocity so feet do not slide
+    if (targetState === 'run' || targetState === 'sprint' || targetState.startsWith('strafe')) {
+      const totalSpeed = Math.hypot(speed, strafeSpeed);
+      (layer as any).speed = Math.max(0.65, Math.min(1.4, totalSpeed / 6.5));
+    } else {
+      (layer as any).speed = 1.0;
     }
 
     if (this.currentAnimState !== targetState) {
@@ -424,16 +443,19 @@ export class PCGLBCharacterModel implements PCTargetable {
     }
   }
 
-  public playAction(actionName: 'reload' | 'stab' | 'slash' | 'death'): void {
+  public playAction(actionName: 'reload' | 'stab' | 'slash' | 'death', duration: number = 0.45): void {
     const layer = this.modelEntity?.anim?.baseLayer;
     if (!layer) return;
     if (actionName === 'death') {
       this.isDead = true;
+      this.actionTimer = 9999;
     } else if (this.isDead) {
       return;
+    } else {
+      this.actionTimer = duration;
     }
     try {
-      layer.transition(actionName, 0.1);
+      layer.transition(actionName, 0.08);
       this.currentAnimState = actionName;
     } catch {
       layer.play(actionName);

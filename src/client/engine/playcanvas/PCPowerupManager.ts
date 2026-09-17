@@ -112,6 +112,12 @@ export const MAP_POWERUP_LOCATIONS: Record<string, { type: PowerupType; x: numbe
     { type: 'shield', x: -16, y: 4.8, z: 0 },
     { type: 'speed', x: 14, y: 1.2, z: 0 },
     { type: 'rapid_mag', x: -8, y: 2.0, z: 0 }
+  ],
+  'Sky Islands': [
+    { type: 'quad_damage', x: 0, y: 3.5, z: 0 },
+    { type: 'shield', x: -35, y: 32.0, z: 5 },
+    { type: 'speed', x: 0, y: 15.0, z: 35 },
+    { type: 'airstrike', x: 40, y: 17.0, z: 0 }
   ]
 };
 

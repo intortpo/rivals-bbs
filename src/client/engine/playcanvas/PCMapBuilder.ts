@@ -25,6 +25,7 @@ export interface SkyThemeConfig {
   fogDensity: number;
   sunColor?: string;
   ambientColor?: string;
+  skyboxTexture?: string;
 }
 
 export const SKY_THEMES: Record<string, SkyThemeConfig> = {
@@ -34,7 +35,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#031422',
     fogDensity: 0.0022,
     sunColor: '#ffe5b4',
-    ambientColor: '#1a233a'
+    ambientColor: '#1a233a',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-alien.png'
   },
   sunset: {
     id: 'sunset',
@@ -42,7 +44,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#d4501a',
     fogDensity: 0.002,
     sunColor: '#ffbb77',
-    ambientColor: '#2b1a1a'
+    ambientColor: '#2b1a1a',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-morning.png'
   },
   sage: {
     id: 'sage',
@@ -50,7 +53,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#1a2e26',
     fogDensity: 0.0025,
     sunColor: '#c8f5d0',
-    ambientColor: '#13221e'
+    ambientColor: '#13221e',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-day.png'
   },
   deepspace: {
     id: 'deepspace',
@@ -58,7 +62,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#050711',
     fogDensity: 0.0012,
     sunColor: '#99d5ff',
-    ambientColor: '#0a1020'
+    ambientColor: '#0a1020',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-space.png'
   },
   subzero: {
     id: 'subzero',
@@ -66,7 +71,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#c8d9ea',
     fogDensity: 0.0035,
     sunColor: '#ffffff',
-    ambientColor: '#7a8e9e'
+    ambientColor: '#7a8e9e',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-day.png'
   },
   biodome: {
     id: 'biodome',
@@ -74,7 +80,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#0d281e',
     fogDensity: 0.0022,
     sunColor: '#c8f5d0',
-    ambientColor: '#13281e'
+    ambientColor: '#13281e',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-day.png'
   },
   subway: {
     id: 'subway',
@@ -82,7 +89,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#0a0e18',
     fogDensity: 0.003,
     sunColor: '#00d2ff',
-    ambientColor: '#111827'
+    ambientColor: '#111827',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-night.png'
   },
   tropical: {
     id: 'tropical',
@@ -90,7 +98,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#164e63',
     fogDensity: 0.0018,
     sunColor: '#fef08a',
-    ambientColor: '#083344'
+    ambientColor: '#083344',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-morning.png'
   },
   canyon: {
     id: 'canyon',
@@ -98,7 +107,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#431407',
     fogDensity: 0.0022,
     sunColor: '#fdba74',
-    ambientColor: '#270e04'
+    ambientColor: '#270e04',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-morning.png'
   },
   solar: {
     id: 'solar',
@@ -106,7 +116,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#020617',
     fogDensity: 0.0012,
     sunColor: '#ffffff',
-    ambientColor: '#0f172a'
+    ambientColor: '#0f172a',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-space.png'
   },
   penthouse: {
     id: 'penthouse',
@@ -114,7 +125,8 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     bgColor: '#090514',
     fogDensity: 0.0019,
     sunColor: '#e879f9',
-    ambientColor: '#190a28'
+    ambientColor: '#190a28',
+    skyboxTexture: '/textures/skyboxes/kenney/skybox-night.png'
   }
 };
 
@@ -125,6 +137,22 @@ export interface PBROptions {
   emissiveIntensity?: number;
   opacity?: number;
   blendType?: number;
+  textureType?: 'panel' | 'metal' | 'floor' | 'none';
+  tiling?: [number, number];
+  bumpiness?: number;
+}
+
+export interface PlatformerAssetPlacement {
+  asset: string;
+  x: number;
+  y: number;
+  z: number;
+  scaleX?: number;
+  scaleY?: number;
+  scaleZ?: number;
+  rotX?: number;
+  rotY?: number;
+  rotZ?: number;
 }
 
 export class PCMapBuilder {
@@ -140,6 +168,253 @@ export class PCMapBuilder {
   public mapName: string;
   public skyTheme: string;
   public staticBatchGroupId?: number;
+  public platformerPlacements: PlatformerAssetPlacement[] = [];
+  public platformerEntities: pc.Entity[] = [];
+
+  private static _panelNormalTex?: pc.Texture;
+  private static _panelDetailTex?: pc.Texture;
+  private static _floorGridNormalTex?: pc.Texture;
+  private static _floorGridDetailTex?: pc.Texture;
+
+  private static getPanelNormalTexture(device: pc.GraphicsDevice): pc.Texture | undefined {
+    if (this._panelNormalTex) return this._panelNormalTex;
+    if (typeof document === 'undefined') return undefined;
+
+    try {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return undefined;
+
+      const imgData = ctx.createImageData(size, size);
+      const data = imgData.data;
+
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const idx = (y * size + x) * 4;
+          let nx = 128;
+          let ny = 128;
+          let nz = 255;
+
+          const borderDist = Math.min(x, y, size - 1 - x, size - 1 - y);
+          if (borderDist < 3) {
+            if (x < 3) nx = 75;
+            else if (x >= size - 3) nx = 181;
+            if (y < 3) ny = 181;
+            else if (y >= size - 3) ny = 75;
+            nz = 220;
+          }
+
+          const boltCenters = [[12, 12], [size - 13, 12], [12, size - 13], [size - 13, size - 13]];
+          for (let b = 0; b < boltCenters.length; b++) {
+            const bx = boltCenters[b][0];
+            const by = boltCenters[b][1];
+            const d = Math.hypot(x - bx, y - by);
+            if (d < 4.0) {
+              nx = Math.floor(128 + (x - bx) * 16);
+              ny = Math.floor(128 - (y - by) * 16);
+              nz = 210;
+            }
+          }
+
+          const noise = ((x * 19 + y * 29) % 7) - 3;
+          data[idx] = Math.max(0, Math.min(255, nx + noise));
+          data[idx + 1] = Math.max(0, Math.min(255, ny + noise));
+          data[idx + 2] = nz;
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const tex = new pc.Texture(device, {
+        width: size,
+        height: size,
+        format: pc.PIXELFORMAT_RGBA8,
+        mipmaps: true,
+        minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
+        magFilter: pc.FILTER_LINEAR,
+        addressU: pc.ADDRESS_REPEAT,
+        addressV: pc.ADDRESS_REPEAT
+      });
+      tex.setSource(canvas);
+      this._panelNormalTex = tex;
+      return tex;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private static getPanelDetailTexture(device: pc.GraphicsDevice): pc.Texture | undefined {
+    if (this._panelDetailTex) return this._panelDetailTex;
+    if (typeof document === 'undefined') return undefined;
+
+    try {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return undefined;
+
+      ctx.fillStyle = '#dcdde1';
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.strokeStyle = '#636e72';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, size - 2, size - 2);
+
+      ctx.strokeStyle = '#f5f6fa';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(4, 4, size - 8, size - 8);
+
+      ctx.fillStyle = '#2d3436';
+      const boltCenters = [[12, 12], [size - 13, 12], [12, size - 13], [size - 13, size - 13]];
+      for (let b = 0; b < boltCenters.length; b++) {
+        ctx.beginPath();
+        ctx.arc(boltCenters[b][0], boltCenters[b][1], 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const tex = new pc.Texture(device, {
+        width: size,
+        height: size,
+        format: pc.PIXELFORMAT_RGBA8,
+        mipmaps: true,
+        minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
+        magFilter: pc.FILTER_LINEAR,
+        addressU: pc.ADDRESS_REPEAT,
+        addressV: pc.ADDRESS_REPEAT
+      });
+      tex.setSource(canvas);
+      this._panelDetailTex = tex;
+      return tex;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private static getFloorGridNormalTexture(device: pc.GraphicsDevice): pc.Texture | undefined {
+    if (this._floorGridNormalTex) return this._floorGridNormalTex;
+    if (typeof document === 'undefined') return undefined;
+
+    try {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return undefined;
+
+      const imgData = ctx.createImageData(size, size);
+      const data = imgData.data;
+
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const idx = (y * size + x) * 4;
+          let nx = 128;
+          let ny = 128;
+          let nz = 255;
+
+          const gridX = x % 32;
+          const gridY = y % 32;
+          if (gridX < 2 || gridX >= 30) {
+            nx = gridX < 2 ? 80 : 176;
+            nz = 220;
+          }
+          if (gridY < 2 || gridY >= 30) {
+            ny = gridY < 2 ? 176 : 80;
+            nz = 220;
+          }
+
+          if ((x + y) % 16 < 3) {
+            nx = 145;
+            ny = 145;
+            nz = 230;
+          }
+
+          data[idx] = nx;
+          data[idx + 1] = ny;
+          data[idx + 2] = nz;
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const tex = new pc.Texture(device, {
+        width: size,
+        height: size,
+        format: pc.PIXELFORMAT_RGBA8,
+        mipmaps: true,
+        minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
+        magFilter: pc.FILTER_LINEAR,
+        addressU: pc.ADDRESS_REPEAT,
+        addressV: pc.ADDRESS_REPEAT
+      });
+      tex.setSource(canvas);
+      this._floorGridNormalTex = tex;
+      return tex;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private static getFloorGridDetailTexture(device: pc.GraphicsDevice): pc.Texture | undefined {
+    if (this._floorGridDetailTex) return this._floorGridDetailTex;
+    if (typeof document === 'undefined') return undefined;
+
+    try {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return undefined;
+
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 2;
+      for (let i = 0; i <= size; i += 32) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, size);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(size, i);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < size * 2; i += 16) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i - size, size);
+        ctx.stroke();
+      }
+
+      const tex = new pc.Texture(device, {
+        width: size,
+        height: size,
+        format: pc.PIXELFORMAT_RGBA8,
+        mipmaps: true,
+        minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
+        magFilter: pc.FILTER_LINEAR,
+        addressU: pc.ADDRESS_REPEAT,
+        addressV: pc.ADDRESS_REPEAT
+      });
+      tex.setSource(canvas);
+      this._floorGridDetailTex = tex;
+      return tex;
+    } catch {
+      return undefined;
+    }
+  }
 
   constructor(app: pc.Application | undefined, mapName: string = 'Facility', skyTheme: string = 'twilight') {
     this.app = app;
@@ -154,6 +429,10 @@ export class PCMapBuilder {
       c.fromString(theme.bgColor);
       app.scene.fogColor = c;
       app.scene.fogDensity = theme.fogDensity;
+
+      if (theme.skyboxTexture) {
+        this.createSkyDome(theme.skyboxTexture);
+      }
 
       if ((app as any).batcher) {
         try {
@@ -172,6 +451,45 @@ export class PCMapBuilder {
     this.buildMap(mapName);
   }
 
+  public skyDomeEntity?: pc.Entity;
+
+  public createSkyDome(textureUrl?: string): void {
+    if (!this.app || typeof document === 'undefined' || !textureUrl) return;
+
+    try {
+      const skyDome = new pc.Entity('KenneySkyDome');
+      const skyMat = new pc.StandardMaterial();
+      skyMat.cull = pc.CULLFACE_FRONT;
+      skyMat.useLighting = false;
+
+      const asset = new pc.Asset(`Skybox_${this.skyTheme}`, 'texture', { url: textureUrl });
+      this.app.assets.add(asset);
+      asset.ready((loaded) => {
+        if (loaded.resource) {
+          skyMat.diffuseMap = loaded.resource as pc.Texture;
+          skyMat.emissiveMap = loaded.resource as pc.Texture;
+          skyMat.emissiveIntensity = 1.0;
+          skyMat.update();
+        }
+      });
+      this.app.assets.load(asset);
+
+      skyDome.addComponent('render', { type: 'sphere', material: skyMat });
+      skyDome.setLocalScale(600, 600, 600);
+      skyDome.setPosition(0, 0, 0);
+      this.mapRoot.addChild(skyDome);
+      this.skyDomeEntity = skyDome;
+    } catch (e) {
+      console.warn('[PCMapBuilder] SkyDome initialization fallback:', e);
+    }
+  }
+
+  public updateSkyDome(camPos: pc.Vec3): void {
+    if (this.skyDomeEntity) {
+      this.skyDomeEntity.setPosition(camPos.x, camPos.y, camPos.z);
+    }
+  }
+
   public createPBRMaterial(colorHex: string, pbr?: PBROptions): pc.StandardMaterial {
     const mat = new pc.StandardMaterial();
     mat.diffuse = new pc.Color().fromString(colorHex);
@@ -187,6 +505,37 @@ export class PCMapBuilder {
     if (pbr?.opacity !== undefined) {
       mat.opacity = pbr.opacity;
       mat.blendType = pbr.blendType ?? pc.BLEND_NORMAL;
+    }
+
+    if (this.app?.graphicsDevice && typeof document !== 'undefined') {
+      const type = pbr?.textureType ?? (pbr?.emissive ? 'none' : 'panel');
+      if (type !== 'none') {
+        const dev = this.app.graphicsDevice;
+        if (type === 'floor') {
+          const norm = PCMapBuilder.getFloorGridNormalTexture(dev);
+          const detail = PCMapBuilder.getFloorGridDetailTexture(dev);
+          if (norm) {
+            mat.normalMap = norm;
+            mat.bumpiness = pbr?.bumpiness ?? 0.45;
+          }
+          if (detail) {
+            mat.diffuseMap = detail;
+          }
+        } else {
+          const norm = PCMapBuilder.getPanelNormalTexture(dev);
+          const detail = PCMapBuilder.getPanelDetailTexture(dev);
+          if (norm) {
+            mat.normalMap = norm;
+            mat.bumpiness = pbr?.bumpiness ?? 0.35;
+          }
+          if (detail) {
+            mat.diffuseMap = detail;
+          }
+        }
+        const tiling = pbr?.tiling ?? [2, 2];
+        mat.diffuseMapTiling = new pc.Vec2(tiling[0], tiling[1]);
+        mat.normalMapTiling = new pc.Vec2(tiling[0], tiling[1]);
+      }
     }
 
     mat.update();
@@ -225,6 +574,72 @@ export class PCMapBuilder {
     return box;
   }
 
+  public addPlatformerProp(
+    asset: string,
+    x: number,
+    y: number,
+    z: number,
+    scaleX: number = 1.0,
+    rotY: number = 0,
+    rotX: number = 0,
+    rotZ: number = 0,
+    scaleY?: number,
+    scaleZ?: number
+  ): void {
+    this.platformerPlacements.push({
+      asset,
+      x,
+      y,
+      z,
+      scaleX: scaleX,
+      scaleY: scaleY ?? scaleX,
+      scaleZ: scaleZ ?? scaleX,
+      rotX,
+      rotY,
+      rotZ
+    });
+  }
+
+  public async loadPlatformerAssets(loader: any): Promise<void> {
+    if (!this.app || !loader || this.platformerPlacements.length === 0) return;
+
+    const uniqueAssets = Array.from(new Set(this.platformerPlacements.map((p) => p.asset)));
+    await Promise.all(
+      uniqueAssets.map(async (assetName) => {
+        try {
+          const url = `/models/platformer/${assetName}`;
+          await loader.load(url);
+        } catch (err) {
+          console.warn(`[PCMapBuilder] Could not preload platformer asset ${assetName}:`, err);
+        }
+      })
+    );
+
+    for (const p of this.platformerPlacements) {
+      try {
+        const url = `/models/platformer/${p.asset}`;
+        const container = loader.get(url);
+        if (container) {
+          const ent = container.instantiateRenderEntity({ castShadows: true });
+          ent.setPosition(p.x, p.y, p.z);
+          ent.setLocalEulerAngles(p.rotX ?? 0, p.rotY ?? 0, p.rotZ ?? 0);
+          ent.setLocalScale(p.scaleX ?? 1, p.scaleY ?? 1, p.scaleZ ?? 1);
+          this.mapRoot.addChild(ent);
+          this.platformerEntities.push(ent);
+        }
+      } catch (err) {
+        console.warn(`[PCMapBuilder] Error instantiating platformer asset ${p.asset}:`, err);
+      }
+    }
+  }
+
+  public addLadder(x: number, y: number, z: number, h: number = 4.0, rotY: number = 0): pc.BoundingBox {
+    const box = new pc.BoundingBox(new pc.Vec3(x, y + h / 2, z), new pc.Vec3(0.5, h / 2, 0.5));
+    this.ladderBoxes.push(box);
+    this.addPlatformerProp(h > 3.0 ? 'ladder-long.glb' : 'ladder.glb', x, y, z, 1.2, rotY);
+    return box;
+  }
+
   public createJumpPad(
     x: number,
     y: number,
@@ -235,6 +650,7 @@ export class PCMapBuilder {
   ): void {
     const padBox = new pc.BoundingBox(new pc.Vec3(x, y + 0.35, z), new pc.Vec3(1.4, 0.45, 1.4));
     let padEnt: pc.Entity | undefined;
+    this.addPlatformerProp('spring.glb', x, y + 0.15, z, 1.6);
 
     if (this.app) {
       padEnt = new pc.Entity('JumpPad');
@@ -326,6 +742,7 @@ export class PCMapBuilder {
     this.ladderBoxes = [];
     this.jumpPads = [];
     this.teleportPorts = [];
+    this.platformerPlacements = [];
 
     switch (name) {
       case 'Facility':
@@ -456,6 +873,18 @@ export class PCMapBuilder {
     this.addBox(-27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true, { metalness: 0.5, gloss: 0.6 });
     this.addBox(27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true, { metalness: 0.5, gloss: 0.6 });
 
+    // 3D Kenney Platformer Props
+    this.addPlatformerProp('crate-strong.glb', -14.5, 2.2, -18.5, 1.5);
+    this.addPlatformerProp('crate.glb', 14.5, 2.2, -18.5, 1.5);
+    this.addPlatformerProp('crate.glb', -14.5, 2.2, 18.5, 1.5);
+    this.addPlatformerProp('crate-strong.glb', 14.5, 2.2, 18.5, 1.5);
+    this.addPlatformerProp('barrel.glb', -17, 0, -8, 1.3);
+    this.addPlatformerProp('barrel.glb', 17, 0, 8, 1.3);
+    this.addPlatformerProp('barrel.glb', -17, 0, 8, 1.3);
+    this.addPlatformerProp('barrel.glb', 17, 0, -8, 1.3);
+    this.addLadder(-3, 0, -10.5, 3.4, 0);
+    this.addLadder(3, 0, 10.5, 3.4, 180);
+
     // Jump Pads (launching up to upper catwalk)
     this.createJumpPad(-9, 0, 0, 18.0, 3.5, 0);
     this.createJumpPad(9, 0, 0, 18.0, -3.5, 0);
@@ -485,6 +914,16 @@ export class PCMapBuilder {
     this.addBox(14, 0.6, -10, 2.0, 1.2, 4.0, '#f59e0b', true, { metalness: 0.8, gloss: 0.75 });
     this.addBox(-12, 0.6, 12, 2.0, 1.2, 4.0, '#10b981', true, { metalness: 0.8, gloss: 0.75 });
 
+    // 3D Kenney Urban Platformer Props
+    this.addPlatformerProp('tree.glb', -12, 0, -12, 1.8);
+    this.addPlatformerProp('tree.glb', 12, 0, 12, 1.8);
+    this.addPlatformerProp('tree.glb', -12, 0, 12, 1.8);
+    this.addPlatformerProp('tree.glb', 12, 0, -12, 1.8);
+    this.addPlatformerProp('fence-straight.glb', -15, 0, 0, 1.5, 90);
+    this.addPlatformerProp('fence-straight.glb', 15, 0, 0, 1.5, 90);
+    this.addPlatformerProp('crate.glb', 8, 1.5, 4, 1.2);
+    this.addPlatformerProp('crate.glb', -8, 1.5, -6, 1.2);
+
     // Rooftop Jump Pads
     this.createJumpPad(-12, 0, -24, 18.0);
     this.createJumpPad(12, 0, -24, 19.5);
@@ -512,6 +951,12 @@ export class PCMapBuilder {
         this.addBox(x + (x > 0 ? -3 : 3), 1, z, 3, 2, 2, '#384260', true, { metalness: 0.4, gloss: 0.5 });
       });
     });
+
+    // 3D Kenney Arena Colosseum Props
+    this.addPlatformerProp('crate-strong.glb', -5, 2.6, -5, 1.4);
+    this.addPlatformerProp('crate-strong.glb', 5, 2.6, 5, 1.4);
+    this.addPlatformerProp('barrel.glb', -14, 0, 0, 1.4);
+    this.addPlatformerProp('barrel.glb', 14, 0, 0, 1.4);
 
     // 4 High-Velocity Central Jump Pads
     this.createJumpPad(-12, 0, 0, 19.0);
@@ -567,6 +1012,14 @@ export class PCMapBuilder {
     this.addBox(-3, 0.7, -4.5, 4, 1.4, 3, '#475569', true, { metalness: 0.3, gloss: 0.5 });
     this.addBox(3, 0.7, 4.5, 4, 1.4, 3, '#475569', true, { metalness: 0.3, gloss: 0.5 });
 
+    // 3D Kenney Industrial Warehouse Props
+    this.addPlatformerProp('crate-strong.glb', -13, 3.2, 0, 1.6);
+    this.addPlatformerProp('crate-strong.glb', 13, 3.2, 0, 1.6);
+    this.addPlatformerProp('barrel.glb', -15, 0, 10, 1.4);
+    this.addPlatformerProp('barrel.glb', 15, 0, -10, 1.4);
+    this.addPlatformerProp('conveyor-belt.glb', 0, 3.4, -6, 2.0);
+    this.addPlatformerProp('conveyor-belt.glb', 0, 3.4, 6, 2.0);
+
     // Dock Terminals
     this.addBox(-27, 1.25, 0, 2, 2.5, 16, '#1e293b', true, { metalness: 0.5, gloss: 0.6 });
     this.addBox(27, 1.25, 0, 2, 2.5, 16, '#1e293b', true, { metalness: 0.5, gloss: 0.6 });
@@ -603,6 +1056,11 @@ export class PCMapBuilder {
     this.addBox(-14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
     this.addBox(14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
 
+    // 3D Kenney Cyber Platforms & Spire Details
+    this.addPlatformerProp('platform-fortified.glb', 0, 7.0, 0, 2.0);
+    this.addPlatformerProp('poles.glb', -5, 7.0, -5, 1.5);
+    this.addPlatformerProp('poles.glb', 5, 7.0, 5, 1.5);
+
     // Jump pads launching players up to Tier 2 Terrace
     this.createJumpPad(0, 1.0, -8, 18.0, 0, 3.0);
     this.createJumpPad(0, 1.0, 8, 18.0, 0, -3.0);
@@ -635,6 +1093,12 @@ export class PCMapBuilder {
     this.addBox(-15, 3.5, 15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
     this.addBox(15, 3.5, -15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
 
+    // 3D Kenney Quantum Lab Props
+    this.addPlatformerProp('crate-item.glb', -15, 4.0, -15, 1.3);
+    this.addPlatformerProp('crate-item.glb', 15, 4.0, 15, 1.3);
+    this.addPlatformerProp('button-round.glb', 0, 0, -6, 2.0);
+    this.addPlatformerProp('button-round.glb', 0, 0, 6, 2.0);
+
     // Jump pads launching onto catwalk platforms
     this.createJumpPad(-15, 0, 0, 17.5);
     this.createJumpPad(15, 0, 0, 17.5);
@@ -657,6 +1121,13 @@ export class PCMapBuilder {
         this.addBox(x, 0.5, z, 12, 1.0, 12, '#2d1515', true, { metalness: 0.3, gloss: 0.4 });
       });
     });
+
+    // 3D Kenney Magma Foundry Props
+    this.addPlatformerProp('platform-fortified.glb', 0, 1.0, 0, 1.8);
+    this.addPlatformerProp('rocks.glb', -28, 1.0, -28, 1.5);
+    this.addPlatformerProp('rocks.glb', 28, 1.0, 28, 1.5);
+    this.addPlatformerProp('crate-strong.glb', -28, 1.0, 28, 1.4);
+    this.addPlatformerProp('crate-strong.glb', 28, 1.0, -28, 1.4);
 
     // Jump pads launching into central crucible
     this.createJumpPad(-24, 1.0, -24, 18.0, 12, 12);
@@ -691,6 +1162,14 @@ export class PCMapBuilder {
     this.addBox(0, 1.25, -20, 12, 2.5, 4, '#e2e8f0', true, { metalness: 0.1, gloss: 0.4 });
     this.addBox(0, 1.25, 20, 12, 2.5, 4, '#e2e8f0', true, { metalness: 0.1, gloss: 0.4 });
 
+    // 3D Kenney Subzero Props (Snow Pines & Winter Blocks)
+    this.addPlatformerProp('tree-snow.glb', -15, 0, -25, 1.8);
+    this.addPlatformerProp('tree-snow.glb', 15, 0, 25, 1.8);
+    this.addPlatformerProp('tree-pine-snow.glb', -25, 0, 25, 2.0);
+    this.addPlatformerProp('tree-pine-snow.glb', 25, 0, -25, 2.0);
+    this.addPlatformerProp('crate-strong.glb', -35, 2.0, -10, 1.5);
+    this.addPlatformerProp('crate.glb', -35, 2.0, 10, 1.5);
+
     // Jump pads
     this.createJumpPad(-22, 0, 0, 17.5);
     this.createJumpPad(22, 0, 0, 17.5);
@@ -717,6 +1196,14 @@ export class PCMapBuilder {
     this.addBox(26, 1.2, -26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
     this.addBox(-26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
     this.addBox(26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
+
+    // 3D Kenney Sanctuary Garden Props
+    this.addPlatformerProp('plant.glb', -5, 0, -5, 1.5);
+    this.addPlatformerProp('plant.glb', 5, 0, 5, 1.5);
+    this.addPlatformerProp('stones.glb', 0, 0, -8, 1.8);
+    this.addPlatformerProp('stones.glb', 0, 0, 8, 1.8);
+    this.addPlatformerProp('flowers.glb', -26, 2.4, -26, 1.5);
+    this.addPlatformerProp('flowers.glb', 26, 2.4, 26, 1.5);
 
     // Jump pads to Pagoda and terraces
     this.createJumpPad(0, 0, -10, 18.5);
@@ -754,6 +1241,12 @@ export class PCMapBuilder {
     // Elevated Sniper Vantage Decks (y=3.75m)
     this.addBox(-12, 3.75, -15, 6, 0.3, 6, '#38bdf8', true, { metalness: 0.7, gloss: 0.8, emissive: '#0284c7', emissiveIntensity: 1.5 });
     this.addBox(12, 3.75, 15, 6, 0.3, 6, '#f43f5e', true, { metalness: 0.7, gloss: 0.8, emissive: '#e11d48', emissiveIntensity: 1.5 });
+
+    // 3D Kenney Orbital Station Props
+    this.addPlatformerProp('barrel.glb', -14.5, 3.2, 18, 1.3);
+    this.addPlatformerProp('barrel.glb', 14.5, 3.2, -18, 1.3);
+    this.addPlatformerProp('crate-item.glb', -12, 3.9, -15, 1.4);
+    this.addPlatformerProp('crate-item.glb', 12, 3.9, 15, 1.4);
 
     // Gravity Lift Jump Pads
     this.createJumpPad(-12, 0, -8, 18.0, 0, -3.5);
@@ -837,6 +1330,14 @@ export class PCMapBuilder {
     this.addBox(-16, 1.5, -16, 6, 3, 6, '#f8fafc', true, { metalness: 0.2, gloss: 0.8 });
     this.addBox(16, 1.5, 16, 6, 3, 6, '#f8fafc', true, { metalness: 0.2, gloss: 0.8 });
 
+    // 3D Kenney Bio-Dome Arboretum Props
+    this.addPlatformerProp('plant.glb', 0, 1.2, -18, 1.8);
+    this.addPlatformerProp('plant.glb', 0, 1.2, 18, 1.8);
+    this.addPlatformerProp('mushrooms.glb', -18, 1.2, 0, 1.6);
+    this.addPlatformerProp('flowers-tall.glb', 18, 1.2, 0, 1.6);
+    this.addPlatformerProp('tree.glb', -16, 3.0, -16, 1.6);
+    this.addPlatformerProp('tree.glb', 16, 3.0, 16, 1.6);
+
     // Planter Jump Pads launching toward Upper Ring
     this.createJumpPad(0, 2.4, -18, 17.0, 0, 6);
     this.createJumpPad(0, 2.4, 18, 17.0, 0, -6);
@@ -876,6 +1377,12 @@ export class PCMapBuilder {
     this.addBox(0, 4.5, -24, 28, 0.4, 4, '#18181b', true);
     this.addBox(0, 4.5, 24, 28, 0.4, 4, '#18181b', true);
 
+    // 3D Kenney Metro Props
+    this.addPlatformerProp('crate.glb', -18, 1.2, -10, 1.4);
+    this.addPlatformerProp('crate.glb', 18, 1.2, 10, 1.4);
+    this.addPlatformerProp('barrel.glb', -18, 1.2, 10, 1.3);
+    this.addPlatformerProp('barrel.glb', 18, 1.2, -10, 1.3);
+
     // Track bed jump pads
     this.createJumpPad(0, 0.0, -4, 16.0, 0, -6);
     this.createJumpPad(0, 0.0, 4, 16.0, 0, 6);
@@ -906,6 +1413,13 @@ export class PCMapBuilder {
     this.addBox(-34, 3, 0, 2, 6, 70, '#155e75', false);
     this.addBox(34, 3, 0, 2, 6, 70, '#155e75', false);
 
+    // 3D Kenney Island Coral Props
+    this.addPlatformerProp('rocks.glb', -20, 2.0, -8, 1.8);
+    this.addPlatformerProp('rocks.glb', 20, 2.0, 8, 1.8);
+    this.addPlatformerProp('chest.glb', 0, 1.6, 0, 1.5);
+    this.addPlatformerProp('plant.glb', -20, 2.0, 8, 1.5);
+    this.addPlatformerProp('plant.glb', 20, 2.0, -8, 1.5);
+
     // Jump pads from sand dunes to temple altar
     this.createJumpPad(-14, 2.0, 0, 15.0, 8, 0);
     this.createJumpPad(14, 2.0, 0, 15.0, -8, 0);
@@ -935,6 +1449,14 @@ export class PCMapBuilder {
     this.addBox(-10, 1.5, 12, 8, 3, 6, '#b45309', true);
     this.addBox(10, 1.5, -12, 8, 3, 6, '#047857', true);
 
+    // 3D Kenney Scrapyard Props
+    this.addPlatformerProp('crate-strong.glb', -12, 3.0, -12, 1.5);
+    this.addPlatformerProp('crate-strong.glb', 12, 3.0, 12, 1.5);
+    this.addPlatformerProp('barrel.glb', 0, 0, -10, 1.4);
+    this.addPlatformerProp('barrel.glb', 0, 0, 10, 1.4);
+    this.addPlatformerProp('fence-broken.glb', -10, 0, 0, 1.6);
+    this.addPlatformerProp('fence-broken.glb', 10, 0, 0, 1.6);
+
     // Jump pads
     this.createJumpPad(0, 0.0, 8, 18.0, 0, -6);
     this.createJumpPad(-20, 0.0, -16, 17.0, 8, 6);
@@ -954,6 +1476,12 @@ export class PCMapBuilder {
     this.addBox(20, 2.0, 0, 12, 1, 20, '#0284c7', true, { metalness: 0.95, gloss: 0.95, emissive: '#38bdf8', emissiveIntensity: 0.5 });
     this.addBox(0, 3.0, -22, 14, 1, 8, '#1e293b', true);
     this.addBox(0, 3.0, 22, 14, 1, 8, '#1e293b', true);
+
+    // 3D Kenney Solar Relay Floating Props
+    this.addPlatformerProp('platform-fortified.glb', -20, 2.5, 0, 1.6);
+    this.addPlatformerProp('platform-fortified.glb', 20, 2.5, 0, 1.6);
+    this.addPlatformerProp('poles.glb', 0, 3.5, -22, 1.5);
+    this.addPlatformerProp('poles.glb', 0, 3.5, 22, 1.5);
 
     // Teleport Portals between Mirror Wings
     this.createTeleportPort('Port_W', 'Port_E', -18, 2.0, 0, new pc.Vec3(18, 2.5, 0), -Math.PI / 2, '#38bdf8');
@@ -988,6 +1516,12 @@ export class PCMapBuilder {
 
     // High Billboard Gantry
     this.addBox(18, 6.5, -18, 10, 0.4, 4, '#334155', true);
+
+    // 3D Kenney Penthouse Lounge Props
+    this.addPlatformerProp('plant.glb', -8, 1.2, -5, 1.4);
+    this.addPlatformerProp('plant.glb', -8, 1.2, 5, 1.4);
+    this.addPlatformerProp('crate-item.glb', 14, 0, -8, 1.4);
+    this.addPlatformerProp('crate-item.glb', 14, 0, 8, 1.4);
 
     // Jump Pads
     this.createJumpPad(18, 0.0, -10, 19.0, 0, -6);

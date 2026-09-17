@@ -255,14 +255,25 @@ export class PCCharacterModel {
     }
   }
 
-  public updateAnimation(speed: number, dt: number): void {
+  public updateAnimation(speed: number, dt: number, strafeSpeed: number = 0, isJumping: boolean = false): void {
     if (this.isSliding || this.isDead) return;
 
-    if (speed > 0.5) {
-      this.animTimer += dt * 10;
-      const swing = Math.sin(this.animTimer) * 28;
-      if (this.leftLegEntity) this.leftLegEntity.setLocalEulerAngles(swing, 0, 0);
-      if (this.rightLegEntity) this.rightLegEntity.setLocalEulerAngles(-swing, 0, 0);
+    if (isJumping) {
+      if (this.leftLegEntity) this.leftLegEntity.setLocalEulerAngles(-20, 0, 0);
+      if (this.rightLegEntity) this.rightLegEntity.setLocalEulerAngles(15, 0, 0);
+      if (this.leftArmEntity) this.leftArmEntity.setLocalEulerAngles(35, 0, 0);
+      if (this.rightArmEntity) this.rightArmEntity.setLocalEulerAngles(-30, 0, 0);
+      return;
+    }
+
+    const totalSpeed = Math.hypot(speed, strafeSpeed);
+    if (totalSpeed > 0.35) {
+      const stepRate = Math.max(4.0, Math.min(12.0, totalSpeed * 1.05));
+      this.animTimer += dt * stepRate;
+      const swing = Math.sin(this.animTimer) * 24;
+      const strafeTilt = Math.sin(this.animTimer) * 5 * Math.sign(strafeSpeed);
+      if (this.leftLegEntity) this.leftLegEntity.setLocalEulerAngles(swing, 0, strafeTilt);
+      if (this.rightLegEntity) this.rightLegEntity.setLocalEulerAngles(-swing, 0, -strafeTilt);
       if (this.leftArmEntity) this.leftArmEntity.setLocalEulerAngles(-swing * 0.7, 0, 0);
       if (this.rightArmEntity) this.rightArmEntity.setLocalEulerAngles(swing * 0.7, 0, 0);
     } else {

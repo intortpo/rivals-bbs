@@ -4,6 +4,7 @@ import { WEAPONS } from '../../../shared/constants.js';
 import { PCFXManager } from './PCFXManager.js';
 import { PCPlayerHitbox } from './PCCharacterModel.js';
 import { AudioManager } from '../AudioManager.js';
+import { PCGLBLoader } from './PCGLBLoader.js';
 
 export interface PCTargetable {
   playerId: string;
@@ -248,6 +249,49 @@ export class PCWeaponManager {
     arc.enabled = false;
     this.viewModelPivot.addChild(arc);
     this.weaponEntities.set('arc_disruptor', arc);
+  }
+
+  public async loadBlasterModels(loader: PCGLBLoader): Promise<void> {
+    if (!this.app || !this.viewModelPivot) return;
+
+    const blasterMap: Record<WeaponType, { url: string; pos: [number, number, number]; rot: [number, number, number]; scale: number }> = {
+      rifle: { url: '/models/blasters/blaster-a.glb', pos: [0.20, -0.22, -0.42], rot: [0, 180, 0], scale: 0.90 },
+      shotgun: { url: '/models/blasters/blaster-b.glb', pos: [0.20, -0.22, -0.38], rot: [0, 180, 0], scale: 0.95 },
+      sniper: { url: '/models/blasters/blaster-e.glb', pos: [0.20, -0.22, -0.45], rot: [0, 180, 0], scale: 0.85 },
+      katana: { url: '/models/blasters/blaster-c.glb', pos: [0.18, -0.18, -0.35], rot: [-10, 170, 5], scale: 0.85 },
+      needle_carbine: { url: '/models/blasters/blaster-g.glb', pos: [0.20, -0.22, -0.40], rot: [0, 180, 0], scale: 0.90 },
+      plasma_launcher: { url: '/models/blasters/blaster-o.glb', pos: [0.22, -0.22, -0.42], rot: [0, 180, 0], scale: 1.0 },
+      railgun: { url: '/models/blasters/blaster-j.glb', pos: [0.20, -0.22, -0.44], rot: [0, 180, 0], scale: 0.90 },
+      arc_disruptor: { url: '/models/blasters/blaster-m.glb', pos: [0.20, -0.22, -0.40], rot: [0, 180, 0], scale: 0.90 }
+    };
+
+    for (const [weaponType, cfg] of Object.entries(blasterMap) as [WeaponType, any][]) {
+      try {
+        const container = await loader.load(cfg.url);
+        if (container) {
+          const blasterEnt = container.instantiateRenderEntity({ castShadows: false });
+          blasterEnt.name = `Blaster_${weaponType}`;
+          blasterEnt.setLocalPosition(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
+          blasterEnt.setLocalEulerAngles(cfg.rot[0], cfg.rot[1], cfg.rot[2]);
+          blasterEnt.setLocalScale(cfg.scale, cfg.scale, cfg.scale);
+
+          // Replace or swap previous procedural entity
+          const prev = this.weaponEntities.get(weaponType);
+          if (prev) {
+            blasterEnt.enabled = prev.enabled;
+            this.viewModelPivot.removeChild(prev);
+            prev.destroy();
+          } else {
+            blasterEnt.enabled = weaponType === this.currentWeaponType;
+          }
+
+          this.viewModelPivot.addChild(blasterEnt);
+          this.weaponEntities.set(weaponType, blasterEnt);
+        }
+      } catch (err) {
+        console.warn(`[PCWeaponManager] Failed to load blaster GLB for ${weaponType}:`, err);
+      }
+    }
   }
 
   public selectWeapon(type: WeaponType): void {

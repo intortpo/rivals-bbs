@@ -20,12 +20,13 @@ import {
 import { PCCharacterModel } from '../engine/playcanvas/PCCharacterModel.js';
 import { PCGLBCharacterModel } from '../engine/playcanvas/PCGLBCharacterModel.js';
 import { PCGeometricBossModel } from '../engine/playcanvas/PCGeometricBossModel.js';
+import { PCKenneyCharacterModel, BOT_ROLE_SKIN_MAP, OUTFIT_SKIN_LIST } from '../engine/playcanvas/PCKenneyCharacterModel.js';
 import { AudioManager } from '../engine/AudioManager.js';
 import { PCFXManager } from '../engine/playcanvas/PCFXManager.js';
 import { PCWeaponManager, PCTargetable } from '../engine/playcanvas/PCWeaponManager.js';
 
 interface RemotePlayerEntry {
-  model: PCCharacterModel | PCGLBCharacterModel | PCGeometricBossModel;
+  model: PCCharacterModel | PCGLBCharacterModel | PCKenneyCharacterModel | PCGeometricBossModel;
   targetPos: pc.Vec3;
   prevPos: pc.Vec3;
   targetYaw: number;
@@ -34,6 +35,8 @@ interface RemotePlayerEntry {
   isJumping: boolean;
   isDead: boolean;
   moveSpeedSmoothed: number;
+  smoothVx: number;
+  smoothVz: number;
 }
 
 export class PCNetworkClient {
@@ -48,6 +51,7 @@ export class PCNetworkClient {
   private fx: PCFXManager;
   public weaponManager?: PCWeaponManager;
   public characterContainer?: pc.ContainerResource;
+  public kenneyCharacterContainer?: pc.ContainerResource;
 
   public remotePlayers: Map<string, RemotePlayerEntry> = new Map();
 
@@ -127,6 +131,10 @@ export class PCNetworkClient {
     this.socket.on('player_fired', (payload: RemoteFirePayload) => {
       if (payload.shooterId === this.myId) return;
       this.audio.playShoot(payload.weaponType);
+      const remote = this.remotePlayers.get(payload.shooterId);
+      if (remote && 'playAction' in remote.model) {
+        (remote.model as any).playAction(payload.weaponType === 'katana' ? 'slash' : 'stab', 0.35);
+      }
       this.onRemotePlayerFired?.(payload);
     });
 
@@ -176,6 +184,10 @@ export class PCNetworkClient {
     });
 
     this.socket.on('bot_fire_projectile', (payload: BotProjectilePayload) => {
+      const remote = this.remotePlayers.get(payload.botId);
+      if (remote && 'playAction' in remote.model) {
+        (remote.model as any).playAction(payload.pattern === 'beam' || payload.pattern === 'spiral' ? 'slash' : 'stab', 0.35);
+      }
       this.onBotProjectileSpawn?.(payload);
     });
 
@@ -188,6 +200,10 @@ export class PCNetworkClient {
     });
 
     this.socket.on('world_snapshot', (snapshot: WorldSnapshot) => {
+      this.handleSnapshot(snapshot);
+    });
+
+    this.socket.on('sync_snapshot', (snapshot: WorldSnapshot) => {
       this.handleSnapshot(snapshot);
     });
   }
@@ -364,9 +380,22 @@ export class PCNetworkClient {
     for (const [id, pState] of Object.entries(state.players)) {
       if (id === this.myId) continue;
       if (!this.remotePlayers.has(id)) {
-        let model: PCCharacterModel | PCGLBCharacterModel | PCGeometricBossModel;
+        let model: PCCharacterModel | PCGLBCharacterModel | PCKenneyCharacterModel | PCGeometricBossModel;
         if (pState.isBot && pState.botRole === 'boss') {
           model = new PCGeometricBossModel(this.app, id, pState.name, pState.color || '#f43f5e');
+        } else if (this.kenneyCharacterContainer) {
+          const skin = (pState.isBot && pState.botRole && BOT_ROLE_SKIN_MAP[pState.botRole])
+            ? BOT_ROLE_SKIN_MAP[pState.botRole]
+            : (OUTFIT_SKIN_LIST[(pState.outfitIndex ?? 0) % OUTFIT_SKIN_LIST.length] || 'cyborgFemaleA');
+          model = new PCKenneyCharacterModel(
+            this.app,
+            id,
+            pState.team || (pState.isBot ? 'red' : 'blue'),
+            this.kenneyCharacterContainer,
+            skin,
+            pState.botRole,
+            false
+          );
         } else if (this.characterContainer) {
           model = new PCGLBCharacterModel(
             this.app,
@@ -392,7 +421,9 @@ export class PCNetworkClient {
           isSliding: pState.isSliding,
           isJumping: pState.isJumping,
           isDead: pState.isDead,
-          moveSpeedSmoothed: 0
+          moveSpeedSmoothed: 0,
+          smoothVx: 0,
+          smoothVz: 0
         });
       }
     }
@@ -412,9 +443,22 @@ export class PCNetworkClient {
 
       let remote = this.remotePlayers.get(id);
       if (!remote) {
-        let model: PCCharacterModel | PCGLBCharacterModel | PCGeometricBossModel;
+        let model: PCCharacterModel | PCGLBCharacterModel | PCKenneyCharacterModel | PCGeometricBossModel;
         if (data.isBot && data.botRole === 'boss') {
           model = new PCGeometricBossModel(this.app, id, '💠 PRISM CONSTRUCT', '#f43f5e');
+        } else if (this.kenneyCharacterContainer) {
+          const skin = (data.isBot && data.botRole && BOT_ROLE_SKIN_MAP[data.botRole])
+            ? BOT_ROLE_SKIN_MAP[data.botRole]
+            : (OUTFIT_SKIN_LIST[((data as any).outfitIndex ?? 0) % OUTFIT_SKIN_LIST.length] || 'cyborgFemaleA');
+          model = new PCKenneyCharacterModel(
+            this.app,
+            id,
+            data.team || (data.isBot ? 'red' : 'blue'),
+            this.kenneyCharacterContainer,
+            skin,
+            data.botRole,
+            false
+          );
         } else if (this.characterContainer) {
           model = new PCGLBCharacterModel(
             this.app,
@@ -439,7 +483,9 @@ export class PCNetworkClient {
           isSliding: data.isSliding,
           isJumping: data.isJumping,
           isDead: data.isDead,
-          moveSpeedSmoothed: 0
+          moveSpeedSmoothed: 0,
+          smoothVx: 0,
+          smoothVz: 0
         };
         this.remotePlayers.set(id, remote);
       }
@@ -505,19 +551,35 @@ export class PCNetworkClient {
       const newYawRad = pc.math.lerp(curYawRad, remote.targetYaw, delta * 18);
       remote.model.setRotation((newYawRad * 180) / Math.PI);
 
-      // Distance and animation speed
-      const dist = curPos.distance(remote.targetPos);
-      const targetSpeed = dist > 0.03 ? 1.0 : 0.0;
-      remote.moveSpeedSmoothed = pc.math.lerp(remote.moveSpeedSmoothed, targetSpeed, delta * 10);
+      // Rendered world movement velocity (dx/dt, dz/dt) based on actual frame translation
+      const actualVx = (nx - curPos.x) / Math.max(0.0005, delta);
+      const actualVz = (nz - curPos.z) / Math.max(0.0005, delta);
+      remote.smoothVx = pc.math.lerp(remote.smoothVx, actualVx, Math.min(1, delta * 14));
+      remote.smoothVz = pc.math.lerp(remote.smoothVz, actualVz, Math.min(1, delta * 14));
+      const actualSpeed = Math.hypot(remote.smoothVx, remote.smoothVz);
+      remote.moveSpeedSmoothed = actualSpeed;
+
+      // Project onto character's local forward & right axes
+      const fwdX = -Math.sin(newYawRad);
+      const fwdZ = -Math.cos(newYawRad);
+      const rightX = Math.cos(newYawRad);
+      const rightZ = -Math.sin(newYawRad);
+
+      const fwdSpeed = remote.smoothVx * fwdX + remote.smoothVz * fwdZ;
+      const strafeSpeed = remote.smoothVx * rightX + remote.smoothVz * rightZ;
 
       if (remote.model instanceof PCCharacterModel) {
         remote.model.setAimPitch((remote.targetPitch * 180) / Math.PI);
         remote.model.setSliding(remote.isSliding);
-        remote.model.updateAnimation(remote.moveSpeedSmoothed, delta);
+        remote.model.updateAnimation(fwdSpeed, delta, strafeSpeed, remote.isJumping);
       } else if (remote.model instanceof PCGLBCharacterModel) {
         remote.model.setAimPitch((remote.targetPitch * 180) / Math.PI);
         remote.model.setSliding(remote.isSliding);
-        remote.model.updateAnimation(remote.moveSpeedSmoothed * 5.0, delta);
+        remote.model.updateAnimation(fwdSpeed, delta, strafeSpeed, remote.isJumping);
+      } else if (remote.model instanceof PCKenneyCharacterModel) {
+        remote.model.setAimPitch((remote.targetPitch * 180) / Math.PI);
+        remote.model.setSliding(remote.isSliding);
+        remote.model.updateAnimation(fwdSpeed, delta, strafeSpeed, remote.isJumping);
       } else if (remote.model instanceof PCGeometricBossModel) {
         remote.model.updateAnimation(delta);
       }
