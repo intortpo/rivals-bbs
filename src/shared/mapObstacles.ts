@@ -1497,6 +1497,47 @@ export const SKYLINE_PENTHOUSE_OBSTACLES: BoundingBox[] = [
   { min: [13, 6.3, -20], max: [23, 6.7, -16], name: 'BillboardGantry' }
 ];
 
-export function getMapObstacles(_mapName: string): BoundingBox[] {
-  return []; // Procedural maps do not use hardcoded server obstacles, allowing bullet hell projectile penetration.
+export function getMapObstacles(mapName: string): BoundingBox[] {
+  switch (mapName) {
+    case 'Facility':
+      return FACILITY_OBSTACLES;
+    case 'Cartoon City':
+      return CARTOON_CITY_OBSTACLES;
+    case 'Arena Classic':
+      return CLASSIC_ARENA_OBSTACLES;
+    case 'Neon Warehouse':
+      return NEON_WAREHOUSE_OBSTACLES;
+    case 'Cyber Spire':
+      return CYBER_SPIRE_OBSTACLES;
+    case 'Quantum Lab':
+      return QUANTUM_LAB_OBSTACLES;
+    case 'Magma Foundry':
+      return MAGMA_FOUNDRY_OBSTACLES;
+    case 'Subzero Station':
+      return SUBZERO_STATION_OBSTACLES;
+    case 'Sky Sanctuary':
+      return SKY_SANCTUARY_OBSTACLES;
+    case 'Orbital Station':
+      return ORBITAL_STATION_OBSTACLES;
+    case 'Bio-Dome':
+    case 'Bio-Dome (Neo Arboretum)':
+      return BIODOME_OBSTACLES;
+    case 'Metro Underpass':
+    case 'Metro Underpass (Neon Subways)':
+      return METRO_UNDERPASS_OBSTACLES;
+    case 'Sunken Atoll':
+    case 'Sunken Atoll (Ancient Coral Ruins)':
+      return SUNKEN_ATOLL_OBSTACLES;
+    case 'Scrapyard Canyon':
+    case 'Scrapyard Canyon (Rust Basin)':
+      return SCRAPYARD_CANYON_OBSTACLES;
+    case 'Solar Relay':
+    case 'Solar Relay (Helios Mirror Array)':
+      return SOLAR_RELAY_OBSTACLES;
+    case 'Skyline Penthouse':
+    case 'Skyline Penthouse (Vertigo Lounge)':
+      return SKYLINE_PENTHOUSE_OBSTACLES;
+    default:
+      return FACILITY_OBSTACLES;
+  }
 }
