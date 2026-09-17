@@ -257,7 +257,22 @@ class GameApp {
       },
       () => {
         this.input.unlockCursor();
-        this.dashboardUI.open(this.authUI?.currentUser || null);
+        // AUTO JOIN GLOBAL BULLET HELL SERVER
+        const name = this.authUI?.currentUser?.displayName || 'InvaderHunter_' + Math.floor(Math.random() * 1000);
+        
+        // Attempt to join the persistent GLOBAL room
+        this.networkClient.joinRoom('GLOBAL', name, 0, undefined).then(res => {
+          if (!res.success) {
+            // Room does not exist yet; create the global room. 
+            // We'll let the server randomly name the room, but everyone else will see it in the open rooms list and can join.
+            // Wait, we can modify the roomID on the server, but for now we'll just create a wave mode game and auto-start it.
+            this.networkClient.createRoom(name, 'wave', 99, 'Sky Islands', 0, undefined).then(createRes => {
+                if (createRes.success && createRes.roomId) {
+                   this.networkClient.startMatch(createRes.roomId);
+                }
+            });
+          }
+        });
       }
     );
     this.grammarReloadUI = new GrammarReloadUI(this.appContainer);
@@ -275,7 +290,7 @@ class GameApp {
 
     // 7. Interactive Asset Loading Screen
     await this.loadingScreenUI.preloadGameAssets(this.audio, this.glbLoader);
-    const kenneyContainer = this.glbLoader.get('/models/characters/kenney/kenney_character.glb');
+    const kenneyContainer = this.glbLoader.get('/models/platformer/character-oobi.glb');
     if (kenneyContainer) {
       this.networkClient.kenneyCharacterContainer = kenneyContainer;
     }

@@ -352,7 +352,7 @@ describe('Bot AI Variants & Inter-Level Geometric Boss', () => {
     const ringProjectiles = Array.from((wm as any).activeProjectiles.values()).filter(
       (p: any) => p.pattern === 'ring'
     );
-    assert.equal(ringProjectiles.length, 16, 'Nova ring must spawn exactly 16 radial projectiles');
+    assert.equal(ringProjectiles.length, 32, 'Nova ring must spawn exactly 32 radial projectiles');
 
     // Pattern 2: Twin Spiral Stream
     active.bossPhase = 2;

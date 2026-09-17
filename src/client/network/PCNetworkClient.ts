@@ -381,32 +381,32 @@ export class PCNetworkClient {
       if (id === this.myId) continue;
       if (!this.remotePlayers.has(id)) {
         let model: PCCharacterModel | PCGLBCharacterModel | PCKenneyCharacterModel | PCGeometricBossModel;
-        if (pState.isBot && pState.botRole === 'boss') {
+        if (pState.isBot) {
           model = new PCGeometricBossModel(this.app, id, pState.name, pState.color || '#f43f5e');
+          if (pState.botRole !== 'boss') {
+            model.root.setLocalScale(0.4, 0.4, 0.4); // Scale down invader bots
+          }
         } else if (this.kenneyCharacterContainer) {
-          const skin = (pState.isBot && pState.botRole && BOT_ROLE_SKIN_MAP[pState.botRole])
-            ? BOT_ROLE_SKIN_MAP[pState.botRole]
-            : (OUTFIT_SKIN_LIST[(pState.outfitIndex ?? 0) % OUTFIT_SKIN_LIST.length] || 'cyborgFemaleA');
           model = new PCKenneyCharacterModel(
             this.app,
             id,
-            pState.team || (pState.isBot ? 'red' : 'blue'),
+            pState.team || 'blue',
             this.kenneyCharacterContainer,
-            skin,
-            pState.botRole,
+            'cyborgFemaleA', // dummy skin, ignored by our override
+            undefined,
             false
           );
         } else if (this.characterContainer) {
           model = new PCGLBCharacterModel(
             this.app,
             id,
-            pState.team || (pState.isBot ? 'red' : 'blue'),
+            pState.team || 'blue',
             this.characterContainer,
-            pState.botRole,
+            undefined,
             false
           );
         } else {
-          model = new PCCharacterModel(this.app, id, pState.team || (pState.isBot ? 'red' : 'blue'), false, pState.botRole);
+          model = new PCCharacterModel(this.app, id, pState.team || 'blue', false);
         }
 
         model.setPosition(pState.x, pState.y, pState.z);
@@ -444,32 +444,32 @@ export class PCNetworkClient {
       let remote = this.remotePlayers.get(id);
       if (!remote) {
         let model: PCCharacterModel | PCGLBCharacterModel | PCKenneyCharacterModel | PCGeometricBossModel;
-        if (data.isBot && data.botRole === 'boss') {
-          model = new PCGeometricBossModel(this.app, id, '💠 PRISM CONSTRUCT', '#f43f5e');
+        if (data.isBot) {
+          model = new PCGeometricBossModel(this.app, id, '💠 INVADER CONSTRUCT', '#f43f5e');
+          if (data.botRole !== 'boss') {
+             model.root.setLocalScale(0.4, 0.4, 0.4);
+          }
         } else if (this.kenneyCharacterContainer) {
-          const skin = (data.isBot && data.botRole && BOT_ROLE_SKIN_MAP[data.botRole])
-            ? BOT_ROLE_SKIN_MAP[data.botRole]
-            : (OUTFIT_SKIN_LIST[((data as any).outfitIndex ?? 0) % OUTFIT_SKIN_LIST.length] || 'cyborgFemaleA');
           model = new PCKenneyCharacterModel(
             this.app,
             id,
-            data.team || (data.isBot ? 'red' : 'blue'),
+            data.team || 'blue',
             this.kenneyCharacterContainer,
-            skin,
-            data.botRole,
+            'cyborgFemaleA',
+            undefined,
             false
           );
         } else if (this.characterContainer) {
           model = new PCGLBCharacterModel(
             this.app,
             id,
-            data.team || (data.isBot ? 'red' : 'blue'),
+            data.team || 'blue',
             this.characterContainer,
-            data.botRole,
+            undefined,
             false
           );
         } else {
-          model = new PCCharacterModel(this.app, id, data.team || (data.isBot ? 'red' : 'blue'), false, data.botRole);
+          model = new PCCharacterModel(this.app, id, data.team || 'blue', false);
         }
         model.setPosition(data.x, data.y, data.z);
         model.setRotation((data.yaw * 180) / Math.PI);

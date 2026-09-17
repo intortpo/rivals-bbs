@@ -827,42 +827,50 @@ export class WaveManager {
     const color = archetype.projectileColor || '#ffaa00';
 
     if (archetype.role === 'scout') {
-      // 2-round burst
+      // BULLET HELL: 6-round burst
       this.spawnProjectile(bot, origin, direction, speed, radius, damage, color, 'plasma');
-      active.burstQueue = 1;
-      active.burstTimer = 0.12;
+      active.burstQueue = 5;
+      active.burstTimer = 0.08;
     } else if (archetype.role === 'rusher') {
-      // 3-shard fan spread (center, -11°, +11°)
+      // BULLET HELL: 9-shard fan spread
       const yaw = bot.yaw;
-      const spreadAngles = [-0.19, 0, 0.19];
+      const spreadAngles = [-0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3, 0.45, 0.6];
       for (const offset of spreadAngles) {
         const angle = yaw + offset;
         const sDir: [number, number, number] = [-Math.sin(angle), direction[1], -Math.cos(angle)];
         const mag = Math.hypot(sDir[0], sDir[1], sDir[2]) || 1;
-        this.spawnProjectile(bot, origin, [sDir[0] / mag, sDir[1] / mag, sDir[2] / mag], speed, radius, damage, color, 'shard', 3.0);
+        this.spawnProjectile(bot, origin, [sDir[0] / mag, sDir[1] / mag, sDir[2] / mag], speed * 0.8, radius, damage, color, 'shard', 4.0);
       }
     } else if (archetype.role === 'heavy') {
-      // 5-way shotgun scatter
+      // BULLET HELL: 15-way shotgun scatter in 3 vertical tiers
       const yaw = bot.yaw;
-      const offsets = [-0.28, -0.14, 0, 0.14, 0.28];
-      for (let i = 0; i < offsets.length; i++) {
-        const angle = yaw + offsets[i];
-        const pitchJitter = (Math.random() - 0.5) * 0.08;
-        const sDir: [number, number, number] = [-Math.sin(angle), direction[1] + pitchJitter, -Math.cos(angle)];
-        const mag = Math.hypot(sDir[0], sDir[1], sDir[2]) || 1;
-        this.spawnProjectile(bot, origin, [sDir[0] / mag, sDir[1] / mag, sDir[2] / mag], speed, radius, damage, color, 'plasma', 3.5);
+      const offsets = [-0.4, -0.2, 0, 0.2, 0.4];
+      const pitches = [-0.1, 0, 0.1];
+      for (let p of pitches) {
+        for (let o of offsets) {
+          const angle = yaw + o;
+          const sDir: [number, number, number] = [-Math.sin(angle), direction[1] + p, -Math.cos(angle)];
+          const mag = Math.hypot(sDir[0], sDir[1], sDir[2]) || 1;
+          this.spawnProjectile(bot, origin, [sDir[0] / mag, sDir[1] / mag, sDir[2] / mag], speed * 0.7, radius * 1.5, damage, color, 'plasma', 3.5);
+        }
       }
     } else if (archetype.role === 'sniper') {
-      // Supersonic piercing beam
-      this.spawnProjectile(bot, origin, direction, speed, radius, damage, color, 'beam', 5.0);
+      // BULLET HELL: Triple piercing beam
+      const yaw = bot.yaw;
+      for (let offset of [-0.08, 0, 0.08]) {
+          const angle = yaw + offset;
+          const sDir: [number, number, number] = [-Math.sin(angle), direction[1], -Math.cos(angle)];
+          const mag = Math.hypot(sDir[0], sDir[1], sDir[2]) || 1;
+          this.spawnProjectile(bot, origin, [sDir[0] / mag, sDir[1] / mag, sDir[2] / mag], speed * 1.5, radius, damage, color, 'beam', 5.0);
+      }
     } else if (archetype.role === 'boss') {
       // Inter-level Geometric Boss: Cycle through 3 bullet-hell patterns
       const currentPattern = active.bossPhase;
       active.bossPhase = (active.bossPhase % 3) + 1;
 
       if (currentPattern === 1) {
-        // Pattern 1: 360-degree Nova Ring (16 projectiles in circle)
-        const count = 16;
+        // Pattern 1: 360-degree Nova Ring (32 projectiles in circle)
+        const count = 32;
         for (let i = 0; i < count; i++) {
           const theta = (i / count) * Math.PI * 2;
           const ringDir: [number, number, number] = [Math.cos(theta), 0.02, Math.sin(theta)];

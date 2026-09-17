@@ -573,34 +573,63 @@ export class PCMapBuilder {
         this.mapRoot.addChild(ent);
       } else {
         // Use Kenney platformer blocks for structural walls/floors
-        let assetName = 'platform.glb';
-        if (this.skyTheme === 'subzero') assetName = 'block-snow.glb';
-        else if (this.skyTheme === 'magma') assetName = 'block-moving.glb';
-        else if (this.skyTheme === 'neon') assetName = 'block-moving-blue.glb';
-        else if (this.skyTheme === 'tropical' || this.skyTheme === 'biodome') assetName = 'block-grass.glb';
+        let assetName = 'block-grass.glb';
+        
+        // Bullet Hell Theme Setup: Floors vs Wooden Panels
+        const isWall = h > 2.0 || (h > w && h > d);
+        if (isWall) {
+          assetName = 'crate.glb'; // Wooden tiles for panels
+        } else {
+          if (this.skyTheme === 'subzero') assetName = 'block-snow.glb';
+          else if (this.skyTheme === 'magma') assetName = 'block-moving.glb';
+          else if (this.skyTheme === 'neon') assetName = 'block-moving-blue.glb';
+          else assetName = 'block-grass.glb'; // Default to ground/floor tiles
+        }
+
+        // Procedural Bullet Hell Cover: Scatter trees on large bottom layers
+        if (!isWall && y <= 2.0 && w > 8 && d > 8) {
+           const numTrees = Math.floor((w * d) / 100);
+           for (let i = 0; i < numTrees; i++) {
+               const tx = x - w/2 + Math.random() * w;
+               const tz = z - d/2 + Math.random() * d;
+               this.addPlatformerProp(Math.random() > 0.5 ? 'tree.glb' : 'tree-pine.glb', tx, y + h/2, tz, 2.0);
+               
+               // NOTE: We don't add server colliders here because this is client-side, 
+               // but the bullet hell projectiles can be configured to collide or pierce visually.
+               // Actually, let's keep it simple. Visual cover is fine.
+           }
+        }
 
         // Tile the blocks across X and Z to avoid horrible stretching on large surfaces
         const BLOCK_SIZE = 2; // Assuming Kenney blocks are ~2x2
         const nx = Math.max(1, Math.round(w / BLOCK_SIZE));
         const nz = Math.max(1, Math.round(d / BLOCK_SIZE));
         
+        // For walls, we should also tile vertically!
+        const ny = isWall ? Math.max(1, Math.round(h / BLOCK_SIZE)) : 1;
+        
         const actualBlockW = w / nx;
+        const actualBlockH = h / ny;
         const actualBlockD = d / nz;
         
         const startX = x - w / 2 + actualBlockW / 2;
+        const startY = isWall ? (y - h / 2 + actualBlockH / 2) : y;
         const startZ = z - d / 2 + actualBlockD / 2;
         
         for (let ix = 0; ix < nx; ix++) {
-          for (let iz = 0; iz < nz; iz++) {
-            const px = startX + ix * actualBlockW;
-            const pz = startZ + iz * actualBlockD;
-            this.addPlatformerProp(
-              assetName,
-              px, y, pz,
-              actualBlockW,
-              0, 0, 0,
-              h, actualBlockD
-            );
+          for (let iy = 0; iy < ny; iy++) {
+            for (let iz = 0; iz < nz; iz++) {
+              const px = startX + ix * actualBlockW;
+              const py = isWall ? startY + iy * actualBlockH : startY;
+              const pz = startZ + iz * actualBlockD;
+              this.addPlatformerProp(
+                assetName,
+                px, py, pz,
+                actualBlockW,
+                0, 0, 0,
+                isWall ? actualBlockH : h, actualBlockD
+              );
+            }
           }
         }
       }

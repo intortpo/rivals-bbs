@@ -32,7 +32,7 @@ export class RoomManager {
     outfitIndex: number = 0,
     customization?: CharacterCustomization
   ): { roomId: string; session: GameSession; hostSecret: string } {
-    const roomId = this.generateRoomId();
+    const roomId = (mapName === "Sky Islands" && mode === "wave") ? "GLOBAL" : this.generateRoomId();
     const color = PLAYER_COLORS[0];
     const defaultFrag = mode === '4v4' ? 20 : mode === 'wave' ? (fragLimit || 10) : (fragLimit || NETWORK.DEFAULT_FRAG_LIMIT);
 

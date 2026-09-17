@@ -182,7 +182,8 @@ export class PCKenneyCharacterModel implements PCTargetable {
     this.weaponHolder = new pc.Entity('KenneyWeaponHolder');
     const rightHand = this.modelEntity.findByName('RightHand') ||
                       this.modelEntity.findByName('RightWrist') ||
-                      this.modelEntity.findByName('RightArm');
+                      this.modelEntity.findByName('RightArm') ||
+                      this.modelEntity.findByName('arm-right');
     if (rightHand) {
       this.weaponHolder.setLocalPosition(0, 20, 10);
       this.weaponHolder.setLocalEulerAngles(0, 90, 0);
@@ -198,40 +199,7 @@ export class PCKenneyCharacterModel implements PCTargetable {
   }
 
   private applySkinTexture(skinName: KenneySkin): void {
-    if (!this.app || !this.modelEntity) return;
-
-    const textureUrl = `/models/characters/kenney/skins/${skinName}.png`;
-    const asset = new pc.Asset(`Skin_${skinName}`, 'texture', { url: textureUrl });
-    this.app.assets.add(asset);
-
-    asset.ready((loaded) => {
-      if (loaded.resource && this.modelEntity) {
-        const renders = this.modelEntity.findComponents('render') as pc.RenderComponent[];
-        for (const rc of renders) {
-          if (rc.meshInstances) {
-            for (const mi of rc.meshInstances) {
-              // If material already exists, mutate diffuseMap so shader skinning setup is preserved
-              if (mi.material && mi.material instanceof pc.StandardMaterial) {
-                mi.material.diffuseMap = loaded.resource as pc.Texture;
-                mi.material.useMetalness = true;
-                mi.material.metalness = 0.1;
-                mi.material.gloss = 0.6;
-                mi.material.update();
-              } else {
-                const mat = new pc.StandardMaterial();
-                mat.diffuseMap = loaded.resource as pc.Texture;
-                mat.useMetalness = true;
-                mat.metalness = 0.1;
-                mat.gloss = 0.6;
-                mat.update();
-                mi.material = mat;
-              }
-            }
-          }
-        }
-      }
-    });
-    this.app.assets.load(asset);
+    return;
   }
 
   private setupAnimations(container: pc.ContainerResource): void {

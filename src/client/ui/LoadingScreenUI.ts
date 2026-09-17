@@ -202,7 +202,7 @@ export class LoadingScreenUI {
       this.setProgress(0.5, 'Loading 3D Animated Arena Characters...');
       try {
         await Promise.all([
-          glbLoader.load('/models/characters/kenney/kenney_character.glb').catch(() => null),
+          glbLoader.load('/models/platformer/character-oobi.glb').catch(() => null),
           glbLoader.load('/models/characters/arena_character.glb').catch(() => null)
         ]);
       } catch (err) {
