@@ -1326,12 +1326,75 @@ export const FACILITY_OBSTACLES: BoundingBox[] = [
   { min: [27, 0, -6], max: [28, 2.5, 6], name: 'DepotCoverRed' }
 ];
 
+export const NEON_WAREHOUSE_OBSTACLES: BoundingBox[] = [
+  // Perimeter Containment Walls
+  { min: [-33, 0, 31], max: [33, 8, 33], name: 'WallNorth' },
+  { min: [-33, 0, -33], max: [33, 8, -31], name: 'WallSouth' },
+  { min: [-33, 0, -33], max: [-31, 8, 33], name: 'WallWest' },
+  { min: [31, 0, -33], max: [33, 8, 33], name: 'WallEast' },
+
+  // Overhead Conveyor Bridge & Gantry (y=3.3m)
+  { min: [-4, 3.1, -15], max: [4, 3.4, 15], name: 'GantryCatwalk' },
+  { min: [-4.1, 3.4, -15], max: [-3.9, 4.2, 15], name: 'GantryRailWest' },
+  { min: [3.9, 3.4, -15], max: [4.1, 4.2, 15], name: 'GantryRailEast' },
+
+  // Industrial Shelving Racks (North & South Wings)
+  { min: [-20, 0, -18], max: [-14, 5.5, -15], name: 'ShelvingNW' },
+  { min: [14, 0, -18], max: [20, 5.5, -15], name: 'ShelvingNE' },
+  { min: [-20, 0, 15], max: [-14, 5.5, 18], name: 'ShelvingSW' },
+  { min: [14, 0, 15], max: [20, 5.5, 18], name: 'ShelvingSE' },
+
+  // Shipping Container Stacks
+  { min: [-16, 0, -4], max: [-10, 3.2, 4], name: 'ContainerBayWest' },
+  { min: [10, 0, -4], max: [16, 3.2, 4], name: 'ContainerBayEast' },
+
+  // Pallet Stacks and Low Barriers
+  { min: [-5, 0, -6], max: [-1, 1.4, -3], name: 'PalletsMidNorth' },
+  { min: [1, 0, 3], max: [5, 1.4, 6], name: 'PalletsMidSouth' },
+
+  // Loading Dock Terminals
+  { min: [-28, 0, -8], max: [-26, 2.5, 8], name: 'DockCoverBlue' },
+  { min: [26, 0, -8], max: [28, 2.5, 8], name: 'DockCoverRed' }
+];
+
+export const ORBITAL_STATION_OBSTACLES: BoundingBox[] = [
+  // Hull Containment Bulkheads
+  { min: [-36, 0, 34], max: [36, 10, 36], name: 'HullNorth' },
+  { min: [-36, 0, -36], max: [36, 10, -34], name: 'HullSouth' },
+  { min: [-36, 0, -36], max: [-34, 10, 36], name: 'HullWest' },
+  { min: [34, 0, -36], max: [36, 10, 36], name: 'HullEast' },
+
+  // Central Gravity Core & Observation Spire
+  { min: [-5, 0, -5], max: [5, 5.0, 5], name: 'GravityCore' },
+  { min: [-8, 0, -8], max: [8, 0.8, 8], name: 'CorePlatform' },
+
+  // Solar Control Terminal Wings
+  { min: [-18, 0, 14], max: [-11, 3.2, 22], name: 'SolarTerminalNW' },
+  { min: [11, 0, -22], max: [18, 3.2, -14], name: 'SolarTerminalSE' },
+
+  // Airlock Pressure Chambers
+  { min: [-28, 0, -6], max: [-22, 3.6, 6], name: 'AirlockWest' },
+  { min: [22, 0, -6], max: [28, 3.6, 6], name: 'AirlockEast' },
+
+  // Elevated Sniper Vantage Platforms (y=3.8m)
+  { min: [-15, 3.6, -18], max: [-9, 3.9, -12], name: 'VantageDeckNorth' },
+  { min: [9, 3.6, 12], max: [15, 3.9, 18], name: 'VantageDeckSouth' },
+
+  // Low Console Barriers
+  { min: [-3, 0, -12], max: [3, 1.4, -10], name: 'ConsoleNorth' },
+  { min: [-3, 0, 10], max: [3, 1.4, 12], name: 'ConsoleSouth' }
+];
+
 export function getMapObstacles(mapName: string): BoundingBox[] {
   switch (mapName) {
     case 'Facility':
       return FACILITY_OBSTACLES;
     case 'Cartoon City':
       return CARTOON_CITY_OBSTACLES;
+    case 'Arena Classic':
+      return CLASSIC_ARENA_OBSTACLES;
+    case 'Neon Warehouse':
+      return NEON_WAREHOUSE_OBSTACLES;
     case 'Cyber Spire':
       return CYBER_SPIRE_OBSTACLES;
     case 'Quantum Lab':
@@ -1342,7 +1405,9 @@ export function getMapObstacles(mapName: string): BoundingBox[] {
       return SUBZERO_STATION_OBSTACLES;
     case 'Sky Sanctuary':
       return SKY_SANCTUARY_OBSTACLES;
+    case 'Orbital Station':
+      return ORBITAL_STATION_OBSTACLES;
     default:
-      return CLASSIC_ARENA_OBSTACLES;
+      return FACILITY_OBSTACLES;
   }
 }

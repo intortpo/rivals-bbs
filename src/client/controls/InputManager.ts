@@ -1,8 +1,10 @@
-import { TouchControls } from './TouchControls.js';
+import { TouchControls, isTouchDevice } from './TouchControls.js';
 
 export class InputManager {
   public touch: TouchControls;
   public powerupRequested: boolean = false;
+  public mouseSensitivity: number = 1.0;
+  public invertY: boolean = false;
   private keys: Record<string, boolean> = {};
   private mouseDeltaX: number = 0;
   private mouseDeltaY: number = 0;
@@ -92,7 +94,7 @@ export class InputManager {
         this.isRightMouseDown = true;
       }
 
-      if (!this.isPointerLocked && !('ontouchstart' in window)) {
+      if (!this.isPointerLocked && !isTouchDevice()) {
         document.body.requestPointerLock?.();
       }
     });
@@ -117,9 +119,9 @@ export class InputManager {
         return;
       }
       if (this.isPointerLocked) {
-        const sensitivity = 0.0022 * this.touch.sensitivity;
+        const sensitivity = 0.0022 * this.mouseSensitivity;
         this.mouseDeltaX += e.movementX * sensitivity;
-        this.mouseDeltaY += e.movementY * sensitivity;
+        this.mouseDeltaY += (this.invertY ? -1 : 1) * e.movementY * sensitivity;
       }
     });
   }
@@ -239,7 +241,7 @@ export class InputManager {
   }
 
   public lockCursor(): void {
-    if (!('ontouchstart' in window) && !document.pointerLockElement) {
+    if (!isTouchDevice() && !document.pointerLockElement) {
       document.body.requestPointerLock?.();
     }
   }

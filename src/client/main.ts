@@ -11,14 +11,15 @@ import { QRManager } from './ui/QRManager.js';
 import { LobbyUI } from './ui/LobbyUI.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { GrammarReloadUI } from './ui/GrammarReloadUI.js';
-import { SettingsUI } from './ui/SettingsUI.js';
+import { SettingsUI, GameSettings } from './ui/SettingsUI.js';
 import { DashboardUI } from './ui/DashboardUI.js';
 import { CharacterBuilderUI } from './ui/CharacterBuilderUI.js';
 import { LoadingScreenUI } from './ui/LoadingScreenUI.js';
 import { PCNetworkClient } from './network/PCNetworkClient.js';
 import { PCProjectileManager } from './engine/playcanvas/PCProjectileManager.js';
+import { PCGLBLoader } from './engine/playcanvas/PCGLBLoader.js';
 import { MOVEMENT, NETWORK, WEAPON_ORDER, getMapSpawns } from '../shared/constants.js';
-import { TeamColor } from '../shared/types.js';
+import { TeamColor, RemoteFirePayload } from '../shared/types.js';
 
 function damp(current: number, target: number, lambda: number, dt: number): number {
   return pc.math.lerp(current, target, 1 - Math.exp(-lambda * dt));
@@ -44,6 +45,7 @@ class GameApp {
   private grammarReloadUI!: GrammarReloadUI;
   private networkClient!: PCNetworkClient;
   private mapBuilder!: PCMapBuilder;
+  private glbLoader!: PCGLBLoader;
 
   // Local player physics state
   private playerPos = new pc.Vec3(0, 0, 0);
@@ -103,18 +105,16 @@ class GameApp {
     this.input = new InputManager(this.appContainer);
     this.hud = new TouchHUD(this.appContainer);
     this.settingsUI = new SettingsUI(this.appContainer, (settings) => {
-      this.audio.setMasterVolume(settings.masterVolume);
-      this.audio.setSfxVolume(settings.sfxVolume);
-      this.audio.setVoiceVolume(settings.voiceVolume);
-      this.audio.setMuted(settings.isMuted);
-      this.input.touch.sensitivity = settings.touchSensitivity;
-      this.renderer.applyGraphicsQuality(settings.graphicsQuality);
+      this.applySettings(settings);
     });
-    this.renderer.applyGraphicsQuality(this.settingsUI.settings.graphicsQuality);
+    this.applySettings(this.settingsUI.settings);
+
     this.dashboardUI = new DashboardUI(this.appContainer);
     this.loadingScreenUI = new LoadingScreenUI(this.appContainer);
+    this.glbLoader = new PCGLBLoader(this.renderer.app);
     this.qrManager = new QRManager();
     this.mapBuilder = new PCMapBuilder(this.renderer.app, 'Facility', 'twilight');
+    this.powerupManager.spawnWorldPickups(this.mapBuilder.mapName);
 
     // Wire HUD top-right quick access and powerup buttons
     this.hud.onPowerupClick = () => {
@@ -125,6 +125,10 @@ class GameApp {
       this.dashboardUI.open(this.authUI?.currentUser || null);
     };
     this.hud.onOpenSettings = () => {
+      this.input.unlockCursor();
+      this.settingsUI.open();
+    };
+    this.input.touch.onOpenSettings = () => {
       this.input.unlockCursor();
       this.settingsUI.open();
     };
@@ -144,6 +148,7 @@ class GameApp {
         if (this.mapBuilder.mapName !== mapName || this.mapBuilder.skyTheme !== skyTheme) {
           this.mapBuilder.dispose();
           this.mapBuilder = new PCMapBuilder(this.renderer.app, mapName, skyTheme);
+          this.powerupManager.spawnWorldPickups(mapName);
         }
         const res = await this.networkClient.createRoom(name, mode, fragLimit, mapName, outfitIndex, customization);
         if (res.success && res.roomId) {
@@ -277,10 +282,58 @@ class GameApp {
     }
 
     // 7. Interactive Asset Loading Screen
-    await this.loadingScreenUI.preloadGameAssets(this.audio);
+    await this.loadingScreenUI.preloadGameAssets(this.audio, this.glbLoader);
+    const charContainer = this.glbLoader.get('/models/characters/arena_character.glb');
+    if (charContainer) {
+      this.networkClient.characterContainer = charContainer;
+    }
 
     // 8. Start Render & Game Loop
     requestAnimationFrame(this.gameLoop.bind(this));
+  }
+
+  private applySettings(settings: GameSettings): void {
+    this.audio.setMasterVolume(settings.masterVolume);
+    this.audio.setSfxVolume(settings.sfxVolume);
+    this.audio.setVoiceVolume(settings.voiceVolume);
+    this.audio.setMuted(settings.isMuted);
+    this.input.mouseSensitivity = settings.mouseSensitivity;
+    this.input.invertY = settings.invertY;
+    this.input.touch.sensitivity = settings.touchSensitivity;
+    this.input.touch.invertY = settings.invertY;
+    this.input.touch.autoFireEnabled = settings.autoFire;
+    this.renderer.applyGraphicsQuality(settings.graphicsQuality);
+    this.renderer.setFov(settings.fov);
+
+    const hudEl = document.getElementById('touch-hud');
+    if (hudEl) hudEl.style.opacity = `${settings.hudOpacity}`;
+    const actionsEl = document.getElementById('touch-actions-overlay');
+    if (actionsEl) actionsEl.style.opacity = `${settings.hudOpacity}`;
+  }
+
+  private checkAutoFireTarget(): boolean {
+    if (!this.renderer.cameraEntity) return false;
+    const targetables = this.networkClient.getTargetables();
+    if (!targetables || targetables.length === 0) return false;
+    const camPos = this.renderer.cameraEntity.getPosition();
+    const camDir = this.renderer.cameraEntity.forward;
+    const maxRange = this.weaponManager.currentStats.range || 50;
+
+    for (const t of targetables) {
+      if (t.isDead) continue;
+      const hitboxes = t.getHitboxes();
+      for (const hb of hitboxes) {
+        const c = hb.box.center;
+        const dx = c.x - camPos.x;
+        const dy = c.y - camPos.y;
+        const dz = c.z - camPos.z;
+        const dist = Math.hypot(dx, dy, dz);
+        if (dist > maxRange || dist < 0.5) continue;
+        const dot = (dx * camDir.x + dy * camDir.y + dz * camDir.z) / dist;
+        if (dot > 0.985) return true;
+      }
+    }
+    return false;
   }
 
   private setupNetworkCallbacks(): void {
@@ -333,6 +386,7 @@ class GameApp {
     };
 
     this.networkClient.onLocalPlayerDamaged = (remainingHp, _maxHp, remainingShield) => {
+      this.audio.playHit(false);
       this.currentHp = remainingHp;
       if (remainingShield !== undefined) {
         this.currentShield = remainingShield;
@@ -343,6 +397,7 @@ class GameApp {
 
       if (remainingHp <= 0) {
         this.isDead = true;
+        this.audio.playOofDeath();
       }
     };
 
@@ -396,12 +451,37 @@ class GameApp {
       }
     };
 
+    this.networkClient.onRemotePlayerFired = (payload: RemoteFirePayload) => {
+      this.audio.playShoot(payload.weaponType);
+      if (!payload.hitPoint) return;
+      const originVec = new pc.Vec3(...payload.origin);
+      const hitVec = new pc.Vec3(...payload.hitPoint);
+
+      if (payload.weaponType === 'plasma_launcher') {
+        this.fx.spawnPlasmaExplosion(hitVec);
+      } else if (payload.weaponType === 'railgun') {
+        this.fx.spawnRailgunTracer(originVec, hitVec);
+      } else if (payload.weaponType === 'arc_disruptor') {
+        this.fx.spawnTeslaArc(originVec, hitVec);
+      } else {
+        this.fx.spawnHitSparks(hitVec, undefined, false);
+      }
+    };
+
     this.networkClient.onBotProjectileSpawn = (payload) => {
       this.projectileManager.onProjectileSpawn(payload);
+      if (payload.pattern === 'ring' || payload.pattern === 'spiral') {
+        this.audio.playPlasmaExplosion();
+      } else {
+        this.audio.playShoot('plasma_launcher');
+      }
     };
 
     this.networkClient.onBotProjectileImpact = (payload) => {
       this.projectileManager.onProjectileImpact(payload);
+      if (payload.hitPlayerId === this.networkClient.myId) {
+        this.audio.playHit(false);
+      }
     };
 
     this.networkClient.onBossState = (payload) => {
@@ -515,6 +595,7 @@ class GameApp {
     if (this.mapBuilder.mapName !== chosenMap) {
       this.mapBuilder.dispose();
       this.mapBuilder = new PCMapBuilder(this.renderer.app, chosenMap);
+      this.powerupManager.spawnWorldPickups(chosenMap);
     }
 
     const myState = state.players[this.networkClient.myId];
@@ -923,12 +1004,19 @@ class GameApp {
       this.activateCurrentPowerup();
     }
 
+    const baseFov = this.settingsUI?.settings?.fov || 75;
     const isAiming = this.input.isAiming();
-    const targetFov = isAiming ? this.weaponManager.currentStats.adsZoomFov : 75;
-    this.renderer.setFov(pc.math.lerp(this.renderer.cameraEntity?.camera?.fov || 75, targetFov, 0.2));
+    const targetFov = isAiming ? this.weaponManager.currentStats.adsZoomFov : baseFov;
+    this.renderer.setFov(pc.math.lerp(this.renderer.cameraEntity?.camera?.fov || baseFov, targetFov, 0.2));
     this.hud.setAdsScope(isAiming, this.weaponManager.currentWeaponType);
 
-    if (this.input.isFiring()) {
+    const isAutoFiring = Boolean(
+      this.settingsUI?.settings?.autoFire &&
+      !this.input.isAnyModalOpen() &&
+      this.checkAutoFireTarget()
+    );
+
+    if (this.input.isFiring() || isAutoFiring) {
       if (
         this.weaponManager.ammoInMag[this.weaponManager.currentWeaponType] <= 0 &&
         this.weaponManager.currentStats.type !== 'katana'

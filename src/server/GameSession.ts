@@ -194,8 +194,9 @@ export class GameSession {
       index++;
     }
 
-    // Start WaveManager if wave mode
-    if (isWave) {
+    // Start WaveManager if wave mode or if solo match (1 human player)
+    const humanCount = Object.values(this.roomState.players).filter((p) => !p.isBot).length;
+    if (isWave || humanCount === 1) {
       this.waveManager = new WaveManager(
         this.io,
         this.roomState,
@@ -648,6 +649,10 @@ export class GameSession {
     player.powerupExpiresAt = 0;
     player.isDead = false;
 
+    if (player.isBot && this.waveManager) {
+      this.waveManager.notifyBotRespawned(player.id);
+    }
+
     this.broadcastRoomState();
   }
 
@@ -723,7 +728,8 @@ export class GameSession {
         team: p.team,
         isDead: p.isDead,
         currentWeapon: p.currentWeapon,
-        isBot: p.isBot
+        isBot: p.isBot,
+        botRole: p.botRole
       };
     }
 

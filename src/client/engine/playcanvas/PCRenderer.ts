@@ -46,7 +46,7 @@ export class PCRenderer {
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
 
     // Initial background color & fog
-    this.app.scene.ambientLight = new pc.Color(0.2, 0.22, 0.28);
+    this.app.scene.ambientLight = new pc.Color(0.22, 0.25, 0.32);
     this.app.scene.fog.type = pc.FOG_EXP2;
     this.app.scene.fog.color = new pc.Color(0.01, 0.08, 0.13); // Twilight #031422
     this.app.scene.fog.density = 0.0025;
@@ -68,7 +68,9 @@ export class PCRenderer {
       fov: 75,
       nearClip: 0.1,
       farClip: 500,
-      frustumCulling: true
+      frustumCulling: true,
+      toneMapping: pc.TONEMAP_ACES,
+      gammaCorrection: pc.GAMMA_SRGB
     });
     this.playerEntity.addChild(this.cameraPitchEntity);
 
@@ -108,19 +110,20 @@ export class PCRenderer {
   }
 
   private setupLighting(): void {
-    // Directional Sun Light
+    // Directional Sun Light with soft PCF5 cascaded shadows
     this.sunEntity = new pc.Entity('SunLight');
     this.sunEntity.addComponent('light', {
       type: 'directional',
       color: new pc.Color(1.0, 0.96, 0.88),
-      intensity: 1.8,
+      intensity: 1.85,
       castShadows: true,
-      shadowDistance: 65,
-      shadowResolution: 1024,
-      shadowBias: 0.05,
+      shadowDistance: 70,
+      shadowResolution: 2048,
+      shadowType: pc.SHADOW_PCF5,
+      shadowBias: 0.02,
       normalOffsetBias: 0.05
     });
-    this.sunEntity.setPosition(30, 45, 20);
+    this.sunEntity.setPosition(30, 48, 22);
     this.sunEntity.lookAt(new pc.Vec3(0, 0, 0));
     this.app.root.addChild(this.sunEntity);
   }
@@ -133,7 +136,10 @@ export class PCRenderer {
   public onResize(): void {
     if (!this.app || !this.canvas) return;
     this.app.resizeCanvas();
-    const dpr = this.currentQuality === 'low' ? 1.0 : this.currentQuality === 'medium' ? 1.25 : Math.min(window.devicePixelRatio, 1.5);
+    // Tablet and mobile Retina optimization: clamp DPR to max 1.5 to guarantee solid 60 FPS
+    const isTouch = 'ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0);
+    const maxDpr = isTouch ? 1.5 : 2.0;
+    const dpr = this.currentQuality === 'low' ? 1.0 : this.currentQuality === 'medium' ? 1.25 : Math.min(window.devicePixelRatio || 1, maxDpr);
     this.canvas.width = window.innerWidth * dpr;
     this.canvas.height = window.innerHeight * dpr;
   }
@@ -148,9 +154,11 @@ export class PCRenderer {
     } else if (quality === 'medium') {
       this.sunEntity.light.castShadows = true;
       this.sunEntity.light.shadowResolution = 1024;
+      this.sunEntity.light.shadowType = pc.SHADOW_PCF3;
     } else {
       this.sunEntity.light.castShadows = true;
       this.sunEntity.light.shadowResolution = 2048;
+      this.sunEntity.light.shadowType = pc.SHADOW_PCF5;
     }
 
     this.onResize();

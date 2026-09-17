@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Airsoft BBS - Google Cloud Run Deployment Script
+# Arena BBS - Google Cloud Run Deployment Script
 # Usage: ./scripts/deploy-cloudrun.sh <PROJECT_ID> [REGION]
 
 set -euo pipefail
@@ -11,7 +11,7 @@ REGION="${2:-asia-southeast1}"
 SERVICE_NAME="${3:-rivals-bbs}"
 
 echo "=============================================="
-echo "🚀 Deploying Airsoft BBS to Google Cloud Run"
+echo "🚀 Deploying Arena BBS to Google Cloud Run"
 echo "Project: $PROJECT_ID"
 echo "Region:  $REGION"
 echo "Service: $SERVICE_NAME"

@@ -18,13 +18,14 @@ import {
   WorldSnapshot
 } from '../../shared/types.js';
 import { PCCharacterModel } from '../engine/playcanvas/PCCharacterModel.js';
+import { PCGLBCharacterModel } from '../engine/playcanvas/PCGLBCharacterModel.js';
 import { PCGeometricBossModel } from '../engine/playcanvas/PCGeometricBossModel.js';
 import { AudioManager } from '../engine/AudioManager.js';
 import { PCFXManager } from '../engine/playcanvas/PCFXManager.js';
 import { PCWeaponManager, PCTargetable } from '../engine/playcanvas/PCWeaponManager.js';
 
 interface RemotePlayerEntry {
-  model: PCCharacterModel | PCGeometricBossModel;
+  model: PCCharacterModel | PCGLBCharacterModel | PCGeometricBossModel;
   targetPos: pc.Vec3;
   prevPos: pc.Vec3;
   targetYaw: number;
@@ -46,6 +47,7 @@ export class PCNetworkClient {
   private audio: AudioManager;
   private fx: PCFXManager;
   public weaponManager?: PCWeaponManager;
+  public characterContainer?: pc.ContainerResource;
 
   public remotePlayers: Map<string, RemotePlayerEntry> = new Map();
 
@@ -64,6 +66,7 @@ export class PCNetworkClient {
   public onBotProjectileSpawn?: (payload: BotProjectilePayload) => void;
   public onBotProjectileImpact?: (payload: ProjectileImpactPayload) => void;
   public onBossState?: (payload: BossStatePayload) => void;
+  public onRemotePlayerFired?: (payload: RemoteFirePayload) => void;
 
   constructor(
     app: pc.Application | undefined,
@@ -124,6 +127,7 @@ export class PCNetworkClient {
     this.socket.on('player_fired', (payload: RemoteFirePayload) => {
       if (payload.shooterId === this.myId) return;
       this.audio.playShoot(payload.weaponType);
+      this.onRemotePlayerFired?.(payload);
     });
 
     this.socket.on('player_hit', (payload: HitNotificationPayload) => {
@@ -142,7 +146,14 @@ export class PCNetworkClient {
       const remote = this.remotePlayers.get(payload.victimId);
       if (remote) {
         remote.isDead = true;
-        remote.model.setVisible(false);
+        if ('playAction' in remote.model) {
+          (remote.model as any).playAction('death');
+          setTimeout(() => {
+            if (remote.isDead) remote.model.setVisible(false);
+          }, 2200);
+        } else {
+          remote.model.setVisible(false);
+        }
       }
       this.onPlayerEliminated?.(payload);
     });
@@ -212,10 +223,10 @@ export class PCNetworkClient {
 
   public saveHostedRoom(roomId: string, hostSecret: string): void {
     try {
-      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      const raw = localStorage.getItem('arena_hosted_rooms') || localStorage.getItem('airsoft_hosted_rooms');
       const records = raw ? JSON.parse(raw) : {};
       records[roomId.toUpperCase()] = { hostSecret, createdAt: Date.now() };
-      localStorage.setItem('airsoft_hosted_rooms', JSON.stringify(records));
+      localStorage.setItem('arena_hosted_rooms', JSON.stringify(records));
     } catch (e) {
       console.warn('Failed to save hosted room:', e);
     }
@@ -223,7 +234,7 @@ export class PCNetworkClient {
 
   public getHostSecret(roomId: string): string | undefined {
     try {
-      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      const raw = localStorage.getItem('arena_hosted_rooms') || localStorage.getItem('airsoft_hosted_rooms');
       if (!raw) return undefined;
       const records = JSON.parse(raw);
       return records[roomId.toUpperCase()]?.hostSecret;
@@ -234,11 +245,11 @@ export class PCNetworkClient {
 
   public removeHostedRoom(roomId: string): void {
     try {
-      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      const raw = localStorage.getItem('arena_hosted_rooms') || localStorage.getItem('airsoft_hosted_rooms');
       if (!raw) return;
       const records = JSON.parse(raw);
       delete records[roomId.toUpperCase()];
-      localStorage.setItem('airsoft_hosted_rooms', JSON.stringify(records));
+      localStorage.setItem('arena_hosted_rooms', JSON.stringify(records));
     } catch {}
   }
 
@@ -353,11 +364,20 @@ export class PCNetworkClient {
     for (const [id, pState] of Object.entries(state.players)) {
       if (id === this.myId) continue;
       if (!this.remotePlayers.has(id)) {
-        let model: PCCharacterModel | PCGeometricBossModel;
+        let model: PCCharacterModel | PCGLBCharacterModel | PCGeometricBossModel;
         if (pState.isBot && pState.botRole === 'boss') {
           model = new PCGeometricBossModel(this.app, id, pState.name, pState.color || '#f43f5e');
+        } else if (this.characterContainer) {
+          model = new PCGLBCharacterModel(
+            this.app,
+            id,
+            pState.team || (pState.isBot ? 'red' : 'blue'),
+            this.characterContainer,
+            pState.botRole,
+            false
+          );
         } else {
-          model = new PCCharacterModel(this.app, id, pState.team || 'blue', false);
+          model = new PCCharacterModel(this.app, id, pState.team || (pState.isBot ? 'red' : 'blue'), false);
         }
 
         model.setPosition(pState.x, pState.y, pState.z);
@@ -379,16 +399,33 @@ export class PCNetworkClient {
   }
 
   private handleSnapshot(snapshot: WorldSnapshot): void {
+    const activeSnapshotIds = new Set(Object.keys(snapshot.players));
+    for (const [id, entry] of this.remotePlayers.entries()) {
+      if (id !== this.myId && !activeSnapshotIds.has(id)) {
+        entry.model.destroy();
+        this.remotePlayers.delete(id);
+      }
+    }
+
     for (const [id, data] of Object.entries(snapshot.players)) {
       if (id === this.myId) continue;
 
       let remote = this.remotePlayers.get(id);
       if (!remote) {
-        let model: PCCharacterModel | PCGeometricBossModel;
-        if (data.isBot && (data as any).botRole === 'boss') {
-          model = new PCGeometricBossModel(this.app, id, 'Boss', '#f43f5e');
+        let model: PCCharacterModel | PCGLBCharacterModel | PCGeometricBossModel;
+        if (data.isBot && data.botRole === 'boss') {
+          model = new PCGeometricBossModel(this.app, id, '💠 PRISM CONSTRUCT', '#f43f5e');
+        } else if (this.characterContainer) {
+          model = new PCGLBCharacterModel(
+            this.app,
+            id,
+            data.team || (data.isBot ? 'red' : 'blue'),
+            this.characterContainer,
+            data.botRole,
+            false
+          );
         } else {
-          model = new PCCharacterModel(this.app, id, data.team || 'blue', false);
+          model = new PCCharacterModel(this.app, id, data.team || (data.isBot ? 'red' : 'blue'), false);
         }
         model.setPosition(data.x, data.y, data.z);
         model.setRotation((data.yaw * 180) / Math.PI);
@@ -420,7 +457,14 @@ export class PCNetworkClient {
         remote.model.setPosition(data.x, data.y, data.z);
       } else if (!remote.isDead && data.isDead) {
         remote.isDead = true;
-        remote.model.setVisible(false);
+        if ('playAction' in remote.model) {
+          (remote.model as any).playAction('death');
+          setTimeout(() => {
+            if (remote.isDead) remote.model.setVisible(false);
+          }, 2200);
+        } else {
+          remote.model.setVisible(false);
+        }
       }
 
       if (data.currentWeapon) {
@@ -454,10 +498,18 @@ export class PCNetworkClient {
         remote.model.setAimPitch((remote.targetPitch * 180) / Math.PI);
         remote.model.setSliding(remote.isSliding);
         remote.model.updateAnimation(remote.moveSpeedSmoothed, delta);
+      } else if (remote.model instanceof PCGLBCharacterModel) {
+        remote.model.setAimPitch((remote.targetPitch * 180) / Math.PI);
+        remote.model.setSliding(remote.isSliding);
+        remote.model.updateAnimation(remote.moveSpeedSmoothed * 5.0, delta);
       } else if (remote.model instanceof PCGeometricBossModel) {
         remote.model.updateAnimation(delta);
       }
     }
+  }
+
+  public getRemotePlayer(id: string) {
+    return this.remotePlayers.get(id);
   }
 
   public getTargetables(): PCTargetable[] {

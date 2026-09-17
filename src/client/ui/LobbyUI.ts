@@ -50,7 +50,7 @@ export class LobbyUI {
   }
 
   private buildLobbyDOM(): void {
-    const savedName = localStorage.getItem('rivals_player_name') || `Airsoft_${Math.floor(100 + Math.random() * 900)}`;
+    const savedName = localStorage.getItem('rivals_player_name') || `Arena_${Math.floor(100 + Math.random() * 900)}`;
 
     const screen = document.createElement('div');
     screen.id = 'lobby-screen';
@@ -86,7 +86,7 @@ export class LobbyUI {
       <div id="section-main-menu" style="width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; text-align: center;">
         <div style="margin-bottom: 2px;">
           <h1 style="font-size: 34px; font-weight: 900; margin: 0; background: linear-gradient(135deg, #00d2ff, #ff2a55); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px;">
-            🎯 AIRSOFT BBS
+            🎯 ARENA BBS
           </h1>
           <p style="font-size: 12px; color: #8da2c0; margin: 2px 0 0 0; letter-spacing: 1px;">
             TACTICAL 3D MULTIPLAYER & WAVE SURVIVAL
@@ -167,12 +167,13 @@ export class LobbyUI {
           <div style="display: flex; gap: 10px;">
             <div style="flex: 1; text-align: left;">
               <label style="font-size: 11px; font-weight: bold; color: #8da2c0;">GAME MODE</label>
-              <select id="select-game-mode" class="lobby-select">
-                <option value="1v1" selected>⚔️ 1v1 Duel (Goal: 5)</option>
-                <option value="4v4">🛡️ 4v4 Team DM (Goal: 20)</option>
-                <option value="ffa">💥 Free For All (Goal: 10)</option>
-                <option value="wave">🧟 Wave Survival (Bots / Co-op)</option>
+              <select id="select-game-mode" class="lobby-select" style="display: none;">
+                <option value="wave" selected>🧟 Wave Survival</option>
               </select>
+              <div style="margin-top: 5px; padding: 8px 10px; background: rgba(0, 210, 255, 0.12); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 8px; font-size: 12px; font-weight: 700; color: #00e5ff; display: flex; align-items: center; gap: 6px;">
+                <span>🧟</span>
+                <span>Wave Survival</span>
+              </div>
             </div>
             <div style="flex: 1; text-align: left;">
               <label style="font-size: 11px; font-weight: bold; color: #8da2c0;">MAP</label>
@@ -186,6 +187,7 @@ export class LobbyUI {
                 <option value="Magma Foundry">🌋 Magma Foundry</option>
                 <option value="Subzero Station">❄️ Subzero Station</option>
                 <option value="Sky Sanctuary">⛩️ Sky Sanctuary</option>
+                <option value="Orbital Station">🛰️ Orbital Station</option>
               </select>
             </div>
           </div>
@@ -459,8 +461,8 @@ export class LobbyUI {
       const isCustom = outfitSelect?.value === 'custom';
       const outfitIdx = isCustom ? 0 : parseInt(outfitSelect?.value || '0', 10);
       const skyTheme = skySelect?.value || 'twilight';
-      const mode = (modeSelect?.value as GameMode) || '1v1';
-      const fragGoal = mode === '4v4' ? 20 : mode === 'wave' ? 10 : 5;
+      const mode: GameMode = (modeSelect?.value as GameMode) || 'wave';
+      const fragGoal = mode === 'wave' ? 10 : 5;
 
       this.selectedOutfit = outfitIdx;
       this.selectedSky = skyTheme;

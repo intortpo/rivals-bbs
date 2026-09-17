@@ -23,7 +23,7 @@ import {
   SKY_SANCTUARY_OBSTACLES
 } from '../src/shared/mapObstacles.js';
 
-console.log('🧪 Starting Airsoft BBS 5 New Arena Maps & Portal Integration Tests...');
+console.log('🧪 Starting Arena BBS 5 New Arena Maps & Portal Integration Tests...');
 
 describe('5 New Arena Maps Architecture & Geometry', () => {
   const scene = new THREE.Scene();

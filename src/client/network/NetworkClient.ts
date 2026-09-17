@@ -256,10 +256,10 @@ export class NetworkClient {
 
   public saveHostedRoom(roomId: string, hostSecret: string): void {
     try {
-      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      const raw = localStorage.getItem('arena_hosted_rooms') || localStorage.getItem('airsoft_hosted_rooms');
       const records = raw ? JSON.parse(raw) : {};
       records[roomId.toUpperCase()] = { hostSecret, createdAt: Date.now() };
-      localStorage.setItem('airsoft_hosted_rooms', JSON.stringify(records));
+      localStorage.setItem('arena_hosted_rooms', JSON.stringify(records));
     } catch (e) {
       console.warn('Failed to save hosted room:', e);
     }
@@ -267,7 +267,7 @@ export class NetworkClient {
 
   public getHostSecret(roomId: string): string | undefined {
     try {
-      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      const raw = localStorage.getItem('arena_hosted_rooms') || localStorage.getItem('airsoft_hosted_rooms');
       if (!raw) return undefined;
       const records = JSON.parse(raw);
       return records[roomId.toUpperCase()]?.hostSecret;
@@ -278,11 +278,11 @@ export class NetworkClient {
 
   public removeHostedRoom(roomId: string): void {
     try {
-      const raw = localStorage.getItem('airsoft_hosted_rooms');
+      const raw = localStorage.getItem('arena_hosted_rooms') || localStorage.getItem('airsoft_hosted_rooms');
       if (!raw) return;
       const records = JSON.parse(raw);
       delete records[roomId.toUpperCase()];
-      localStorage.setItem('airsoft_hosted_rooms', JSON.stringify(records));
+      localStorage.setItem('arena_hosted_rooms', JSON.stringify(records));
     } catch {}
   }
 

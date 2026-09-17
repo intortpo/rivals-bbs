@@ -8,7 +8,7 @@ import { EliminationPayload, HitNotificationPayload, WaveClearedPayload, WaveSta
 const PORT = 3457;
 
 async function runWaveTest() {
-  console.log('🧪 Starting Airsoft BBS Wave Survival & Bot AI Integration Test...');
+  console.log('🧪 Starting Arena BBS Wave Survival & Bot AI Integration Test...');
 
   // Step 0: Spin up test server
   const app = express();

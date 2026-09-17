@@ -274,11 +274,13 @@ export class WaveManager {
       totalBots: this.activeBots.size
     });
 
+    this.io.to(this.roomState.roomId).emit('room_state_update', this.roomState);
+
     if (this.onStateChange) this.onStateChange();
   }
 
 
-  private getTerrainHeight(x: number, z: number): number {
+  private getTerrainHeight(x: number, z: number, currentY: number = 0.0): number {
     let groundY = 0.0;
     const botRadius = 0.4;
     for (let i = 0; i < this.mapObstacles.length; i++) {
@@ -289,8 +291,29 @@ export class WaveManager {
         z + botRadius > obs.min[2] &&
         z - botRadius < obs.max[2]
       ) {
-        if (obs.max[1] > groundY && obs.max[1] <= 12.0) {
-          groundY = Math.max(groundY, obs.max[1]);
+        const obsName = obs.name || '';
+        const isWalkableStructure =
+          obsName.includes('Catwalk') ||
+          obsName.includes('Platform') ||
+          obsName.includes('Ramp') ||
+          obsName.includes('Bridge') ||
+          obsName.includes('Walkway') ||
+          (obs.max[1] - obs.min[1] <= 0.6);
+
+        const isBlockingWallOrContainer =
+          obsName.includes('Wall') ||
+          obsName.includes('Pillar') ||
+          obsName.includes('Container') ||
+          obsName.includes('Crate') ||
+          obsName.includes('Cover') ||
+          obsName.includes('Rail');
+
+        if (isWalkableStructure && !isBlockingWallOrContainer) {
+          if (currentY >= obs.max[1] - 0.5) {
+            if (obs.max[1] > groundY && obs.max[1] <= 12.0) {
+              groundY = Math.max(groundY, obs.max[1]);
+            }
+          }
         }
       }
     }
@@ -346,7 +369,10 @@ export class WaveManager {
     const isCity = this.mapName === 'Cartoon City';
     let boundX = 42;
     let boundZ = 42;
-    if (isCity) {
+    if (this.mapName === 'Facility') {
+      boundX = 30.5;
+      boundZ = 30.5;
+    } else if (isCity) {
       boundX = 76;
       boundZ = 95;
     } else if (this.mapName === 'Neon Warehouse') {
@@ -382,11 +408,16 @@ export class WaveManager {
 
       // Ground clamping or boss hover levitation
       if (archetype.role === 'boss') {
-        const groundY = this.getTerrainHeight(bot.x, bot.z);
+        const groundY = this.getTerrainHeight(bot.x, bot.z, bot.y);
         const hoverOffset = 1.6 + Math.sin((now / 1000) * 2.0 + seed) * 0.35;
         bot.y = groundY + hoverOffset;
       } else {
-        bot.y = this.getTerrainHeight(bot.x, bot.z);
+        const targetGroundY = this.getTerrainHeight(bot.x, bot.z, bot.y);
+        if (bot.y > targetGroundY) {
+          bot.y = Math.max(targetGroundY, bot.y - 14.0 * dt);
+        } else {
+          bot.y = targetGroundY;
+        }
       }
 
       // 1. Target selection: nearest living human player
@@ -643,15 +674,27 @@ export class WaveManager {
           if (min === dx1) {
             bot.x = obs.min[0] - botRadius;
             if (bot.vx > 0) bot.vx = 0;
+            const zDir = dz !== 0 ? Math.sign(dz) : (bot.z >= (obs.min[2] + obs.max[2]) / 2 ? 1 : -1);
+            bot.vz = zDir * archetype.speed;
+            bot.z += bot.vz * dt;
           } else if (min === dx2) {
             bot.x = obs.max[0] + botRadius;
             if (bot.vx < 0) bot.vx = 0;
+            const zDir = dz !== 0 ? Math.sign(dz) : (bot.z >= (obs.min[2] + obs.max[2]) / 2 ? 1 : -1);
+            bot.vz = zDir * archetype.speed;
+            bot.z += bot.vz * dt;
           } else if (min === dz1) {
             bot.z = obs.min[2] - botRadius;
             if (bot.vz > 0) bot.vz = 0;
+            const xDir = dx !== 0 ? Math.sign(dx) : (bot.x >= (obs.min[0] + obs.max[0]) / 2 ? 1 : -1);
+            bot.vx = xDir * archetype.speed;
+            bot.x += bot.vx * dt;
           } else if (min === dz2) {
             bot.z = obs.max[2] + botRadius;
             if (bot.vz < 0) bot.vz = 0;
+            const xDir = dx !== 0 ? Math.sign(dx) : (bot.x >= (obs.min[0] + obs.max[0]) / 2 ? 1 : -1);
+            bot.vx = xDir * archetype.speed;
+            bot.x += bot.vx * dt;
           }
         }
       }
@@ -1045,10 +1088,37 @@ export class WaveManager {
       this.roomState.waveState.aliveBotsCount = this.activeBots.size;
     }
 
+    this.io.to(this.roomState.roomId).emit('room_state_update', this.roomState);
+
     // Check for wave clear
-    if (this.activeBots.size === 0) {
+    if (this.activeBots.size === 0 && this.roomState.mode === 'wave') {
       this.handleWaveCleared(killer);
     }
+  }
+
+  public notifyBotRespawned(botId: string): void {
+    const bot = this.roomState.players[botId];
+    if (!bot || !bot.isBot) return;
+    bot.isDead = false;
+    const arch = BOT_ARCHETYPES[bot.botRole || 'scout'] || BOT_ARCHETYPES['scout'];
+    this.activeBots.set(botId, {
+      bot,
+      archetype: arch,
+      lastFireTime: Date.now() + 1500,
+      seed: Math.random() * 100,
+      aiState: 'attack',
+      stateTimer: 0,
+      lastSeenTargetPos: null,
+      patrolNode: [bot.x, bot.y, bot.z],
+      telegraphUntil: 0,
+      coverPosition: null,
+      burstQueue: 0,
+      burstTimer: 0,
+      bossPhase: 1,
+      bossAttackPattern: 'ring',
+      bossSpiralAngle: 0,
+      bossSpiralShotsRemaining: 0
+    });
   }
 
   private handleWaveCleared(lastKiller: PlayerNetworkState): void {
@@ -1090,6 +1160,8 @@ export class WaveManager {
       nextWaveInSec: WAVE_INTERMISSION_SECONDS,
       totalWaves: this.maxWaves
     });
+
+    this.io.to(this.roomState.roomId).emit('room_state_update', this.roomState);
 
     if (this.onStateChange) this.onStateChange();
 

@@ -6,7 +6,7 @@ import { WEAPONS, WEAPON_ORDER, WEAPON_CATEGORIES } from '../src/shared/constant
 import { WeaponType, RoomNetworkState, PlayerNetworkState } from '../src/shared/types.js';
 import { GameSession } from '../src/server/GameSession.js';
 
-console.log('🧪 Starting Airsoft BBS Experimental Weapons Array Integration Tests...');
+console.log('🧪 Starting Arena BBS Experimental Weapons Array Integration Tests...');
 
 describe('Experimental Weapon Stats & Archetype Integrity', () => {
   it('should define complete stats for all 8 weapons in WEAPONS registry', () => {

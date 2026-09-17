@@ -23,6 +23,8 @@ export interface SkyThemeConfig {
   name: string;
   bgColor: string;
   fogDensity: number;
+  sunColor?: string;
+  ambientColor?: string;
 }
 
 export const SKY_THEMES: Record<string, SkyThemeConfig> = {
@@ -30,21 +32,52 @@ export const SKY_THEMES: Record<string, SkyThemeConfig> = {
     id: 'twilight',
     name: '🌆 Cyber Twilight',
     bgColor: '#031422',
-    fogDensity: 0.0025
+    fogDensity: 0.0022,
+    sunColor: '#ffe5b4',
+    ambientColor: '#1a233a'
   },
   sunset: {
     id: 'sunset',
     name: '🌇 Golden Sunset',
     bgColor: '#d4501a',
-    fogDensity: 0.002
+    fogDensity: 0.002,
+    sunColor: '#ffbb77',
+    ambientColor: '#2b1a1a'
   },
   sage: {
     id: 'sage',
     name: '🏙️ Emerald Sage',
-    bgColor: '#374732',
-    fogDensity: 0.0025
+    bgColor: '#1a2e26',
+    fogDensity: 0.0025,
+    sunColor: '#c8f5d0',
+    ambientColor: '#13221e'
+  },
+  deepspace: {
+    id: 'deepspace',
+    name: '🌌 Deep Orbital Space',
+    bgColor: '#050711',
+    fogDensity: 0.0012,
+    sunColor: '#99d5ff',
+    ambientColor: '#0a1020'
+  },
+  subzero: {
+    id: 'subzero',
+    name: '❄️ Subzero Blizzard',
+    bgColor: '#c8d9ea',
+    fogDensity: 0.0035,
+    sunColor: '#ffffff',
+    ambientColor: '#7a8e9e'
   }
 };
+
+export interface PBROptions {
+  metalness?: number;
+  gloss?: number;
+  emissive?: string;
+  emissiveIntensity?: number;
+  opacity?: number;
+  blendType?: number;
+}
 
 export class PCMapBuilder {
   public app?: pc.Application;
@@ -55,9 +88,10 @@ export class PCMapBuilder {
   public jumpPads: PCJumpPad[] = [];
   public teleportPorts: PCTeleportPort[] = [];
   public hasGroundPlane: boolean = true;
-  public bounds = { minX: -28, maxX: 28, minZ: -28, maxZ: 28 };
+  public bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
   public mapName: string;
   public skyTheme: string;
+  public staticBatchGroupId?: number;
 
   constructor(app: pc.Application | undefined, mapName: string = 'Facility', skyTheme: string = 'twilight') {
     this.app = app;
@@ -72,9 +106,43 @@ export class PCMapBuilder {
       c.fromString(theme.bgColor);
       app.scene.fogColor = c;
       app.scene.fogDensity = theme.fogDensity;
+
+      if ((app as any).batcher) {
+        try {
+          const batcher = (app as any).batcher;
+          let group = batcher.getGroupByName('LevelStatic');
+          if (!group) {
+            group = batcher.addGroup('LevelStatic', false, 150);
+          }
+          this.staticBatchGroupId = group?.id;
+        } catch (err) {
+          console.warn('[PCMapBuilder] BatchGroup init skipped:', err);
+        }
+      }
     }
 
     this.buildMap(mapName);
+  }
+
+  public createPBRMaterial(colorHex: string, pbr?: PBROptions): pc.StandardMaterial {
+    const mat = new pc.StandardMaterial();
+    mat.diffuse = new pc.Color().fromString(colorHex);
+    mat.useMetalness = true;
+    mat.metalness = pbr?.metalness ?? 0.15;
+    mat.gloss = pbr?.gloss ?? 0.55;
+
+    if (pbr?.emissive) {
+      mat.emissive = new pc.Color().fromString(pbr.emissive);
+      mat.emissiveIntensity = pbr.emissiveIntensity ?? 1.5;
+    }
+
+    if (pbr?.opacity !== undefined) {
+      mat.opacity = pbr.opacity;
+      mat.blendType = pbr.blendType ?? pc.BLEND_NORMAL;
+    }
+
+    mat.update();
+    return mat;
   }
 
   public addBox(
@@ -85,7 +153,8 @@ export class PCMapBuilder {
     h: number,
     d: number,
     colorHex: string = '#28314e',
-    isWalkableRoof: boolean = false
+    isWalkableRoof: boolean = false,
+    pbr?: PBROptions
   ): pc.BoundingBox {
     const box = new pc.BoundingBox(new pc.Vec3(x, y, z), new pc.Vec3(w / 2, h / 2, d / 2));
     this.collisionBoxes.push(box);
@@ -95,10 +164,11 @@ export class PCMapBuilder {
 
     if (this.app) {
       const ent = new pc.Entity('MapBox');
-      const mat = new pc.StandardMaterial();
-      mat.diffuse = new pc.Color().fromString(colorHex);
-      mat.update();
+      const mat = this.createPBRMaterial(colorHex, pbr);
       ent.addComponent('render', { type: 'box', material: mat });
+      if (this.staticBatchGroupId !== undefined && ent.render) {
+        ent.render.batchGroupId = this.staticBatchGroupId;
+      }
       ent.setPosition(x, y, z);
       ent.setLocalScale(w, h, d);
       this.mapRoot.addChild(ent);
@@ -120,15 +190,13 @@ export class PCMapBuilder {
 
     if (this.app) {
       padEnt = new pc.Entity('JumpPad');
-      const baseMat = new pc.StandardMaterial();
-      baseMat.diffuse = new pc.Color(0.1, 0.15, 0.25);
-      baseMat.update();
-
-      const glowMat = new pc.StandardMaterial();
-      glowMat.diffuse = new pc.Color(0.0, 0.9, 1.0);
-      glowMat.emissive = new pc.Color(0.0, 0.9, 1.0);
-      glowMat.emissiveIntensity = 2.5;
-      glowMat.update();
+      const baseMat = this.createPBRMaterial('#111827', { metalness: 0.8, gloss: 0.7 });
+      const glowMat = this.createPBRMaterial('#00f0ff', {
+        metalness: 0.2,
+        gloss: 0.8,
+        emissive: '#00f0ff',
+        emissiveIntensity: 3.5
+      });
 
       const base = new pc.Entity('Base');
       base.addComponent('render', { type: 'cylinder', material: baseMat });
@@ -169,14 +237,14 @@ export class PCMapBuilder {
 
     if (this.app) {
       portEnt = new pc.Entity(`Port_${id}`);
-      const mat = new pc.StandardMaterial();
-      const c = new pc.Color().fromString(colorHex);
-      mat.diffuse = c;
-      mat.emissive = c;
-      mat.emissiveIntensity = 3.0;
-      mat.opacity = 0.85;
-      mat.blendType = pc.BLEND_ADDITIVE;
-      mat.update();
+      const mat = this.createPBRMaterial(colorHex, {
+        metalness: 0.1,
+        gloss: 0.9,
+        emissive: colorHex,
+        emissiveIntensity: 3.5,
+        opacity: 0.85,
+        blendType: pc.BLEND_ADDITIVE
+      });
 
       const ring = new pc.Entity('PortRing');
       ring.addComponent('render', { type: 'cylinder', material: mat });
@@ -215,136 +283,161 @@ export class PCMapBuilder {
       case 'Facility':
         this.buildFacilityArena();
         break;
+      case 'Cartoon City':
+        this.buildCartoonCity();
+        break;
       case 'Arena Classic':
         this.buildClassicArena();
         break;
+      case 'Neon Warehouse':
+        this.buildNeonWarehouse();
+        break;
+      case 'Cyber Spire':
+        this.buildCyberSpire();
+        break;
+      case 'Quantum Lab':
       case 'Quantum Lab (Dimension)':
         this.buildQuantumLab();
         break;
+      case 'Magma Foundry':
       case 'Magma Foundry (Onyx)':
         this.buildMagmaFoundry();
         break;
       case 'Subzero Station':
         this.buildSubzeroStation();
         break;
-      case 'Cartoon City':
-        this.buildCartoonCity();
+      case 'Sky Sanctuary':
+        this.buildSkySanctuary();
+        break;
+      case 'Orbital Station':
+        this.buildOrbitalStation();
         break;
       default:
         this.buildFacilityArena();
         break;
     }
+
+    if (this.app && (this.app as any).batcher && this.staticBatchGroupId !== undefined) {
+      try {
+        (this.app as any).batcher.generate([this.staticBatchGroupId]);
+      } catch (err) {
+        // Safe fallback in headless/test environments
+      }
+    }
   }
 
+  // 1. Facility Arena (PlayCanvas FPS Starter Kit level)
   private buildFacilityArena(): void {
     this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
     this.hasGroundPlane = true;
 
-    // Heavy concrete floor grid
-    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#181b24');
+    // Heavy concrete floor grid with specular PBR sheen
+    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#181b24', false, { metalness: 0.15, gloss: 0.45 });
 
     // Blue and Red Depot floor accents
-    this.addBox(-22, 0.02, 0, 8, 0.05, 16, '#00d2ff');
-    this.addBox(22, 0.02, 0, 8, 0.05, 16, '#ff2a55');
+    this.addBox(-22, 0.02, 0, 8, 0.05, 16, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 1.2 });
+    this.addBox(22, 0.02, 0, 8, 0.05, 16, '#ff2a55', false, { emissive: '#ff2a55', emissiveIntensity: 1.2 });
 
     // Perimeter Containment Walls
-    this.addBox(0, 4, 32, 66, 8, 2, '#1e2230');
-    this.addBox(0, 4, -32, 66, 8, 2, '#1e2230');
-    this.addBox(-32, 4, 0, 2, 8, 66, '#1e2230');
-    this.addBox(32, 4, 0, 2, 8, 66, '#1e2230');
+    this.addBox(0, 4, 32, 66, 8, 2, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
+    this.addBox(0, 4, -32, 66, 8, 2, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
+    this.addBox(-32, 4, 0, 2, 8, 66, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
+    this.addBox(32, 4, 0, 2, 8, 66, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
 
     // Central Catwalk (at Y=3.35m, width 6m, length 24m)
-    this.addBox(0, 3.35, 0, 6, 0.3, 24, '#2d3748', true);
+    this.addBox(0, 3.35, 0, 6, 0.3, 24, '#2d3748', true, { metalness: 0.6, gloss: 0.65 });
 
     // Catwalk High Safety Railings
-    this.addBox(-3, 3.9, 0, 0.2, 0.8, 24, '#ff9900');
-    this.addBox(3, 3.9, 0, 0.2, 0.8, 24, '#ff9900');
+    this.addBox(-3, 3.9, 0, 0.2, 0.8, 24, '#ff9900', false, { emissive: '#ff9900', emissiveIntensity: 2.0 });
+    this.addBox(3, 3.9, 0, 0.2, 0.8, 24, '#ff9900', false, { emissive: '#ff9900', emissiveIntensity: 2.0 });
 
     // Access Ramps (North & South)
-    this.addBox(0, 0.6, -16.5, 5, 1.2, 3, '#3a4454', true);
-    this.addBox(0, 1.8, -13.5, 5, 1.2, 3, '#3a4454', true);
-    this.addBox(0, 3.0, -10.5, 5, 1.2, 3, '#3a4454', true);
+    this.addBox(0, 0.6, -16.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 1.8, -13.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 3.0, -10.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
 
-    this.addBox(0, 0.6, 16.5, 5, 1.2, 3, '#3a4454', true);
-    this.addBox(0, 1.8, 13.5, 5, 1.2, 3, '#3a4454', true);
-    this.addBox(0, 3.0, 10.5, 5, 1.2, 3, '#3a4454', true);
+    this.addBox(0, 0.6, 16.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 1.8, 13.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 3.0, 10.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
 
     // 4 Structural Support Pillars
-    this.addBox(-8, 5, -10, 2, 10, 2, '#1a202c');
-    this.addBox(8, 5, -10, 2, 10, 2, '#1a202c');
-    this.addBox(-8, 5, 10, 2, 10, 2, '#1a202c');
-    this.addBox(8, 5, 10, 2, 10, 2, '#1a202c');
+    this.addBox(-8, 5, -10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
+    this.addBox(8, 5, -10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
+    this.addBox(-8, 5, 10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
+    this.addBox(8, 5, 10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
 
     // Shipping Containers
-    this.addBox(-15, 1.5, -6.5, 6, 3, 3, '#2b4c7e', true);
-    this.addBox(-15, 1.5, 6.5, 6, 3, 3, '#2b4c7e', true);
-    this.addBox(15, 1.5, -6.5, 6, 3, 3, '#7e2b2b', true);
-    this.addBox(15, 1.5, 6.5, 6, 3, 3, '#7e2b2b', true);
+    this.addBox(-15, 1.5, -6.5, 6, 3, 3, '#2b4c7e', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(-15, 1.5, 6.5, 6, 3, 3, '#2b4c7e', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(15, 1.5, -6.5, 6, 3, 3, '#7e2b2b', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(15, 1.5, 6.5, 6, 3, 3, '#7e2b2b', true, { metalness: 0.5, gloss: 0.6 });
 
     // Cargo Crate Clusters
-    this.addBox(-14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true);
-    this.addBox(14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true);
-    this.addBox(-14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true);
-    this.addBox(14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true);
-    this.addBox(0, 0.75, -5, 4, 1.5, 2, '#3182ce', true);
-    this.addBox(0, 0.75, 5, 4, 1.5, 2, '#e53e3e', true);
+    this.addBox(-14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(-14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(0, 0.75, -5, 4, 1.5, 2, '#3182ce', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 0.75, 5, 4, 1.5, 2, '#e53e3e', true, { metalness: 0.4, gloss: 0.5 });
 
     // Team Depot Bunker Covers
-    this.addBox(-27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true);
-    this.addBox(27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true);
+    this.addBox(-27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true, { metalness: 0.5, gloss: 0.6 });
 
     // Jump Pads (launching up to upper catwalk)
     this.createJumpPad(-9, 0, 0, 18.0, 3.5, 0);
     this.createJumpPad(9, 0, 0, 18.0, -3.5, 0);
   }
 
+  // 2. Cartoon City (Urban Metropolis)
   private buildCartoonCity(): void {
     this.bounds = { minX: -60, maxX: 60, minZ: -60, maxZ: 60 };
     this.hasGroundPlane = true;
 
-    // Base ground
-    this.addBox(0, -0.1, 0, 130, 0.2, 130, '#141824');
+    // Asphalt Street Grid
+    this.addBox(0, -0.1, 0, 130, 0.2, 130, '#11141e', false, { metalness: 0.05, gloss: 0.4 });
 
-    // Central Plaza fountain / cover
-    this.addBox(0, 0.5, 0, 6, 1.0, 6, '#28314e', true);
-    this.addBox(0, 1.5, 0, 3, 1.0, 3, '#00d2ff', true);
+    // Central Plaza Fountain & Marble Rim
+    this.addBox(0, 0.5, 0, 6, 1.0, 6, '#28314e', true, { metalness: 0.3, gloss: 0.7 });
+    this.addBox(0, 1.5, 0, 3, 1.0, 3, '#00d2ff', true, { emissive: '#00d2ff', emissiveIntensity: 2.0 });
 
     // City Buildings (North, South, East, West blocks)
-    this.addBox(-24, 6, -24, 18, 12, 18, '#1e2438', true);
-    this.addBox(24, 7, -24, 18, 14, 18, '#1e2438', true);
-    this.addBox(-24, 5, 24, 18, 10, 18, '#1e2438', true);
-    this.addBox(24, 8, 24, 18, 16, 18, '#1e2438', true);
+    this.addBox(-24, 6, -24, 18, 12, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
+    this.addBox(24, 7, -24, 18, 14, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
+    this.addBox(-24, 5, 24, 18, 10, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
+    this.addBox(24, 8, 24, 18, 16, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
 
-    // Vehicles / Low cover
-    this.addBox(8, 0.75, 4, 2.2, 1.5, 4.5, '#ef4444', true);
-    this.addBox(-8, 0.75, -6, 2.2, 1.5, 4.5, '#3b82f6', true);
-    this.addBox(14, 0.6, -10, 2.0, 1.2, 4.0, '#f59e0b', true);
-    this.addBox(-12, 0.6, 12, 2.0, 1.2, 4.0, '#10b981', true);
+    // Vehicles / Low tactical cover
+    this.addBox(8, 0.75, 4, 2.2, 1.5, 4.5, '#ef4444', true, { metalness: 0.8, gloss: 0.75 });
+    this.addBox(-8, 0.75, -6, 2.2, 1.5, 4.5, '#3b82f6', true, { metalness: 0.8, gloss: 0.75 });
+    this.addBox(14, 0.6, -10, 2.0, 1.2, 4.0, '#f59e0b', true, { metalness: 0.8, gloss: 0.75 });
+    this.addBox(-12, 0.6, 12, 2.0, 1.2, 4.0, '#10b981', true, { metalness: 0.8, gloss: 0.75 });
 
-    // Jump pads to rooftops
+    // Rooftop Jump Pads
     this.createJumpPad(-12, 0, -24, 18.0);
     this.createJumpPad(12, 0, -24, 19.5);
     this.createJumpPad(-12, 0, 24, 17.5);
     this.createJumpPad(12, 0, 24, 20.5);
   }
 
+  // 3. Arena Classic (Symmetrical Cyber Colosseum)
   private buildClassicArena(): void {
     this.bounds = { minX: -46, maxX: 46, minZ: -46, maxZ: 46 };
     this.hasGroundPlane = true;
 
     // Floor
-    this.addBox(0, -0.1, 0, 96, 0.2, 96, '#1a1d2e');
+    this.addBox(0, -0.1, 0, 96, 0.2, 96, '#1a1d2e', false, { metalness: 0.2, gloss: 0.5 });
 
     // Central Platform
-    this.addBox(0, 1.25, 0, 12, 2.5, 12, '#28314e', true);
-    this.addBox(0, 2.6, 0, 8, 0.2, 8, '#00d2ff', true);
+    this.addBox(0, 1.25, 0, 12, 2.5, 12, '#28314e', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(0, 2.6, 0, 8, 0.2, 8, '#00d2ff', true, { emissive: '#00d2ff', emissiveIntensity: 2.5 });
 
     // 4 Symmetrical Cover Pillars around center
     const d = 14;
     [-d, d].forEach((x) => {
       [-d, d].forEach((z) => {
-        this.addBox(x, 2.5, z, 3, 5, 3, '#ff2a55');
-        this.addBox(x + (x > 0 ? -3 : 3), 1, z, 3, 2, 2, '#384260', true);
+        this.addBox(x, 2.5, z, 3, 5, 3, '#ff2a55', false, { metalness: 0.6, gloss: 0.7, emissive: '#ff2a55', emissiveIntensity: 1.2 });
+        this.addBox(x + (x > 0 ? -3 : 3), 1, z, 3, 2, 2, '#384260', true, { metalness: 0.4, gloss: 0.5 });
       });
     });
 
@@ -357,7 +450,7 @@ export class PCMapBuilder {
     // 4 Corner Bastions and Pads
     [-32, 32].forEach((bx) => {
       [-32, 32].forEach((bz) => {
-        this.addBox(bx, 1.5, bz, 10, 3.0, 10, '#242b44', true);
+        this.addBox(bx, 1.5, bz, 10, 3.0, 10, '#242b44', true, { metalness: 0.5, gloss: 0.6 });
       });
     });
 
@@ -367,47 +460,129 @@ export class PCMapBuilder {
     this.createJumpPad(-24, 0, -24, 17.0, -6, -6);
   }
 
+  // 4. Neon Warehouse (High-Bay Storage & Conveyor Gantry)
+  private buildNeonWarehouse(): void {
+    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
+    this.hasGroundPlane = true;
+
+    // Floor with cyber reflective sheen
+    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#10141f', false, { metalness: 0.2, gloss: 0.55 });
+
+    // Perimeter Containment Walls
+    this.addBox(0, 4, 32, 66, 8, 2, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 4, -32, 66, 8, 2, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(-32, 4, 0, 2, 8, 66, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(32, 4, 0, 2, 8, 66, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
+
+    // Overhead Conveyor Gantry Catwalk (y=3.25m, width 8m, length 30m)
+    this.addBox(0, 3.25, 0, 8, 0.3, 30, '#2b3548', true, { metalness: 0.7, gloss: 0.65 });
+
+    // Glowing Neon Safety Railings
+    this.addBox(-4, 3.8, 0, 0.2, 0.8, 30, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 2.5 });
+    this.addBox(4, 3.8, 0, 0.2, 0.8, 30, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 2.5 });
+
+    // Industrial Shelving Racks (North & South Wings)
+    this.addBox(-17, 2.75, -16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
+    this.addBox(17, 2.75, -16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
+    this.addBox(-17, 2.75, 16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
+    this.addBox(17, 2.75, 16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
+
+    // Shipping Container Bays
+    this.addBox(-13, 1.6, 0, 6, 3.2, 8, '#2563eb', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(13, 1.6, 0, 6, 3.2, 8, '#dc2626', true, { metalness: 0.5, gloss: 0.6 });
+
+    // Pallets and Low Barriers
+    this.addBox(-3, 0.7, -4.5, 4, 1.4, 3, '#475569', true, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(3, 0.7, 4.5, 4, 1.4, 3, '#475569', true, { metalness: 0.3, gloss: 0.5 });
+
+    // Dock Terminals
+    this.addBox(-27, 1.25, 0, 2, 2.5, 16, '#1e293b', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(27, 1.25, 0, 2, 2.5, 16, '#1e293b', true, { metalness: 0.5, gloss: 0.6 });
+
+    // Jump pads launching onto conveyor bridge
+    this.createJumpPad(-9, 0, 0, 18.0, 3.5, 0);
+    this.createJumpPad(9, 0, 0, 18.0, -3.5, 0);
+  }
+
+  // 5. Cyber Spire (Floating Multi-tier Skyscraper)
+  private buildCyberSpire(): void {
+    this.bounds = { minX: -36, maxX: 36, minZ: -36, maxZ: 36 };
+    // Void fall abyss
+    this.hasGroundPlane = false;
+
+    // Tier 1 Base Plaza
+    this.addBox(0, 0.5, 0, 20, 1.0, 20, '#1a1e2e', true, { metalness: 0.4, gloss: 0.6 });
+
+    // Tier 2 Central Tower Terrace
+    this.addBox(0, 4.0, 0, 12, 6.0, 12, '#242a42', true, { metalness: 0.6, gloss: 0.7 });
+
+    // Glowing Central Spire Needle
+    this.addBox(0, 12.0, 0, 4, 10.0, 4, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 3.5 });
+
+    // Outer Satellite Platforms
+    this.addBox(0, 3.0, -22, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 3.0, 22, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(-22, 2.0, 0, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(22, 2.0, 0, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
+
+    // Sky Bridge walkways
+    this.addBox(0, 2.8, -14, 4, 0.4, 8, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(0, 2.8, 14, 4, 0.4, 8, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(-14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
+
+    // Jump pads launching players up to Tier 2 Terrace
+    this.createJumpPad(0, 1.0, -8, 18.0, 0, 3.0);
+    this.createJumpPad(0, 1.0, 8, 18.0, 0, -3.0);
+    this.createJumpPad(-8, 1.0, 0, 18.0, 3.0, 0);
+    this.createJumpPad(8, 1.0, 0, 18.0, -3.0, 0);
+
+    // Cross-spire teleporters
+    this.createTeleportPort('SpireNorth', 'SpireSouth', 0, 3.0, -25, new pc.Vec3(0, 3.5, 20), Math.PI, '#00f0ff');
+    this.createTeleportPort('SpireSouth', 'SpireNorth', 0, 3.0, 25, new pc.Vec3(0, 3.5, -20), 0, '#ff2a55');
+  }
+
+  // 6. Quantum Lab (Dimension Research & Teleport Slipstream)
   private buildQuantumLab(): void {
     this.bounds = { minX: -55, maxX: 55, minZ: -55, maxZ: 55 };
     this.hasGroundPlane = true;
 
-    // Floor
-    this.addBox(0, -0.1, 0, 110, 0.2, 110, '#0a101d');
+    // High-tech floor
+    this.addBox(0, -0.1, 0, 110, 0.2, 110, '#0a101d', false, { metalness: 0.3, gloss: 0.65 });
 
     // Central Core Reactor
-    this.addBox(0, 3, 0, 8, 6, 8, '#00f0ff', true);
+    this.addBox(0, 3, 0, 8, 6, 8, '#00f0ff', true, { emissive: '#00f0ff', emissiveIntensity: 3.5 });
 
     // Quantum Teleport Slipstream Gates (Port A <-> Port B)
-    // Port A at (-22, 0, 0) exits at (+22, 1.0, 0) with yaw +PI/2
     this.createTeleportPort('PortA', 'PortB', -22, 0, 0, new pc.Vec3(22, 1.0, 0), Math.PI / 2, '#00f0ff');
-    // Port B at (22, 0, 0) exits at (-22, 1.0, 0) with yaw -PI/2
     this.createTeleportPort('PortB', 'PortA', 22, 0, 0, new pc.Vec3(-22, 1.0, 0), -Math.PI / 2, '#d946ef');
 
-    // Floating Platforms
-    this.addBox(-15, 3.5, -15, 8, 0.5, 8, '#1f293d', true);
-    this.addBox(15, 3.5, 15, 8, 0.5, 8, '#1f293d', true);
-    this.addBox(-15, 3.5, 15, 8, 0.5, 8, '#1f293d', true);
-    this.addBox(15, 3.5, -15, 8, 0.5, 8, '#1f293d', true);
+    // Floating Observation Platforms
+    this.addBox(-15, 3.5, -15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
+    this.addBox(15, 3.5, 15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
+    this.addBox(-15, 3.5, 15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
+    this.addBox(15, 3.5, -15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
 
-    // Jump pads launching onto platforms
+    // Jump pads launching onto catwalk platforms
     this.createJumpPad(-15, 0, 0, 17.5);
     this.createJumpPad(15, 0, 0, 17.5);
   }
 
+  // 7. Magma Foundry (Onyx Crucible over Molten Abyss)
   private buildMagmaFoundry(): void {
     this.bounds = { minX: -50, maxX: 50, minZ: -50, maxZ: 50 };
     // Void hazard below y = 0
     this.hasGroundPlane = false;
 
     // Central Floating Crucible
-    this.addBox(0, 0.5, 0, 16, 1.0, 16, '#3a1a1a', true);
-    this.addBox(0, 2.0, 0, 6, 2.0, 6, '#ef4444', true);
+    this.addBox(0, 0.5, 0, 16, 1.0, 16, '#3a1a1a', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(0, 2.0, 0, 6, 2.0, 6, '#ef4444', true, { emissive: '#ff3b00', emissiveIntensity: 3.0 });
 
     // 4 Corner Spawn Islands
     const d = 30;
     [-d, d].forEach((x) => {
       [-d, d].forEach((z) => {
-        this.addBox(x, 0.5, z, 12, 1.0, 12, '#2d1515', true);
+        this.addBox(x, 0.5, z, 12, 1.0, 12, '#2d1515', true, { metalness: 0.3, gloss: 0.4 });
       });
     });
 
@@ -418,24 +593,99 @@ export class PCMapBuilder {
     this.createJumpPad(24, 1.0, 24, 18.0, -12, -12);
   }
 
+  // 8. Subzero Station (Arctic Freight Terminal)
   private buildSubzeroStation(): void {
     this.bounds = { minX: -60, maxX: 60, minZ: -45, maxZ: 45 };
     this.hasGroundPlane = true;
 
-    // Snow Ground
-    this.addBox(0, -0.1, 0, 120, 0.2, 90, '#dbeafe');
+    // Snow Ground with icy gloss
+    this.addBox(0, -0.1, 0, 120, 0.2, 90, '#dbeafe', false, { metalness: 0.1, gloss: 0.8 });
 
     // Train Station Tracks & Cargo Trains
-    this.addBox(0, 1.5, -12, 35, 3.0, 4.5, '#475569', true); // Train 1
-    this.addBox(10, 1.5, 12, 30, 3.0, 4.5, '#334155', true); // Train 2
+    this.addBox(0, 1.5, -12, 35, 3.0, 4.5, '#475569', true, { metalness: 0.6, gloss: 0.6 }); // Train 1
+    this.addBox(10, 1.5, 12, 30, 3.0, 4.5, '#334155', true, { metalness: 0.6, gloss: 0.6 }); // Train 2
 
     // Station Depot Platform & Roof
-    this.addBox(-35, 1.0, 0, 16, 2.0, 40, '#1e293b', true);
-    this.addBox(-35, 5.5, 0, 14, 0.4, 38, '#0f172a', true);
+    this.addBox(-35, 1.0, 0, 16, 2.0, 40, '#1e293b', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(-35, 5.5, 0, 14, 0.4, 38, '#0f172a', true, { metalness: 0.7, gloss: 0.7 });
+
+    // 4 Outer Satellite Radar Outposts matching SUBZERO_STATION_OBSTACLES
+    this.addBox(40, 1.5, 40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(40, 1.5, -40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(-40, 1.5, 40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(-40, 1.5, -40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
+
+    // Snow Berms
+    this.addBox(0, 1.25, -20, 12, 2.5, 4, '#e2e8f0', true, { metalness: 0.1, gloss: 0.4 });
+    this.addBox(0, 1.25, 20, 12, 2.5, 4, '#e2e8f0', true, { metalness: 0.1, gloss: 0.4 });
 
     // Jump pads
     this.createJumpPad(-22, 0, 0, 17.5);
     this.createJumpPad(22, 0, 0, 17.5);
+  }
+
+  // 9. Sky Sanctuary (Floating Temple Shrines in Clouds)
+  private buildSkySanctuary(): void {
+    this.bounds = { minX: -60, maxX: 60, minZ: -60, maxZ: 60 };
+    this.hasGroundPlane = true;
+
+    // Sacred Cloud Platform
+    this.addBox(0, -0.1, 0, 120, 0.2, 120, '#1e2638', false, { metalness: 0.1, gloss: 0.4 });
+
+    // Central Shrine Pagoda
+    this.addBox(0, 2.0, 0, 10, 4.0, 10, '#7f1d1d', true, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(0, 4.5, 0, 8, 0.8, 8, '#dc2626', true, { emissive: '#dc2626', emissiveIntensity: 1.5 });
+
+    // Torii Arches (North & South)
+    this.addBox(0, 2.5, -18, 8, 5.0, 0.8, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.2 });
+    this.addBox(0, 2.5, 18, 8, 5.0, 0.8, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.2 });
+
+    // Meditation Terraces (NW, NE, SW, SE)
+    this.addBox(-26, 1.2, -26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(26, 1.2, -26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(-26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
+
+    // Jump pads to Pagoda and terraces
+    this.createJumpPad(0, 0, -10, 18.5);
+    this.createJumpPad(0, 0, 10, 18.5);
+    this.createJumpPad(-16, 0, 0, 17.0);
+    this.createJumpPad(16, 0, 0, 17.0);
+  }
+
+  // 10. Orbital Station (Zero-G Space Hangar & Vantage Decks)
+  private buildOrbitalStation(): void {
+    this.bounds = { minX: -36, maxX: 36, minZ: -36, maxZ: 36 };
+    this.hasGroundPlane = true;
+
+    // Metallic Hull Grid
+    this.addBox(0, -0.1, 0, 72, 0.2, 72, '#0c101c', false, { metalness: 0.7, gloss: 0.8 });
+
+    // Perimeter Containment Bulkheads
+    this.addBox(0, 5, 35, 72, 10, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(0, 5, -35, 72, 10, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(-35, 5, 0, 2, 10, 72, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(35, 5, 0, 2, 10, 72, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+
+    // Central Gravity Core & Observation Spire
+    this.addBox(0, 2.5, 0, 10, 5.0, 10, '#00f0ff', true, { emissive: '#00f0ff', emissiveIntensity: 3.5 });
+    this.addBox(0, 0.4, 0, 16, 0.8, 16, '#1e293b', true, { metalness: 0.6, gloss: 0.7 });
+
+    // Solar Control Terminal Wings
+    this.addBox(-14.5, 1.6, 18, 7, 3.2, 8, '#2563eb', true, { metalness: 0.6, gloss: 0.7 });
+    this.addBox(14.5, 1.6, -18, 7, 3.2, 8, '#dc2626', true, { metalness: 0.6, gloss: 0.7 });
+
+    // Airlock Chambers
+    this.addBox(-25, 1.8, 0, 6, 3.6, 12, '#1e293b', true, { metalness: 0.6, gloss: 0.6 });
+    this.addBox(25, 1.8, 0, 6, 3.6, 12, '#1e293b', true, { metalness: 0.6, gloss: 0.6 });
+
+    // Elevated Sniper Vantage Decks (y=3.75m)
+    this.addBox(-12, 3.75, -15, 6, 0.3, 6, '#38bdf8', true, { metalness: 0.7, gloss: 0.8, emissive: '#0284c7', emissiveIntensity: 1.5 });
+    this.addBox(12, 3.75, 15, 6, 0.3, 6, '#f43f5e', true, { metalness: 0.7, gloss: 0.8, emissive: '#e11d48', emissiveIntensity: 1.5 });
+
+    // Gravity Lift Jump Pads
+    this.createJumpPad(-12, 0, -8, 18.0, 0, -3.5);
+    this.createJumpPad(12, 0, 8, 18.0, 0, 3.5);
   }
 
   public checkJumpPads(pos: { x: number; y: number; z: number } | pc.Vec3): { impulseY: number; impulseX: number; impulseZ: number } | null {

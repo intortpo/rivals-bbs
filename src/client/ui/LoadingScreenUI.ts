@@ -1,4 +1,5 @@
 import { AudioManager } from '../engine/AudioManager.js';
+import { PCGLBLoader } from '../engine/playcanvas/PCGLBLoader.js';
 export class LoadingScreenUI {
   private container: HTMLElement;
   private overlay: HTMLDivElement;
@@ -183,19 +184,30 @@ export class LoadingScreenUI {
    * 4. Three.js Scene Shaders
    */
   public async preloadGameAssets(
-    audio?: AudioManager
+    audio?: AudioManager,
+    glbLoader?: PCGLBLoader
   ): Promise<void> {
     this.show('Connecting to BBS Asset Matrix...');
 
     // 1. Audio buffers warmup
-    this.setProgress(0.5, 'Preloading Audio & Weapon Buffers...');
+    this.setProgress(0.3, 'Preloading Audio & Weapon Buffers...');
     if (audio) {
       try {
         audio.touchUnlock();
       } catch {}
     }
 
-    // 2. PlayCanvas WebGL pipelines
+    // 2. Preload 3D Character GLB container with animations
+    if (glbLoader) {
+      this.setProgress(0.6, 'Loading 3D Animated Arena Characters...');
+      try {
+        await glbLoader.load('/models/characters/arena_character.glb');
+      } catch (err) {
+        console.warn('[LoadingScreenUI] Failed to preload arena_character.glb:', err);
+      }
+    }
+
+    // 3. PlayCanvas WebGL pipelines ready
     this.setProgress(1.0, 'Match Ready. Engaging Arena...');
     await this.hide(350);
   }

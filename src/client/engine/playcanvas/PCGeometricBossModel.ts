@@ -28,8 +28,8 @@ export class PCGeometricBossModel {
     this.playerColor = color;
     this.root = new pc.Entity(`Boss_${playerId}`);
 
-    this.coreBox = new pc.BoundingBox(new pc.Vec3(0, 3.5, 0), new pc.Vec3(0.7, 0.7, 0.7));
-    this.hullBox = new pc.BoundingBox(new pc.Vec3(0, 3.5, 0), new pc.Vec3(1.6, 1.6, 1.6));
+    this.coreBox = new pc.BoundingBox(new pc.Vec3(0, 1.1, 0), new pc.Vec3(0.7, 0.7, 0.7));
+    this.hullBox = new pc.BoundingBox(new pc.Vec3(0, 1.1, 0), new pc.Vec3(1.6, 1.6, 1.6));
 
     for (let i = 0; i < 4; i++) {
       this.satelliteBoxes.push(new pc.BoundingBox(new pc.Vec3(), new pc.Vec3(0.4, 0.4, 0.4)));
@@ -57,14 +57,14 @@ export class PCGeometricBossModel {
     // Central Core
     this.coreEntity = new pc.Entity('BossCore');
     this.coreEntity.addComponent('render', { type: 'sphere', material: coreMat });
-    this.coreEntity.setLocalPosition(0, 3.5, 0);
+    this.coreEntity.setLocalPosition(0, 1.1, 0);
     this.coreEntity.setLocalScale(1.4, 1.4, 1.4);
     this.root.addChild(this.coreEntity);
 
     // Orbiting Ring
     this.ringEntity = new pc.Entity('BossRing');
     this.ringEntity.addComponent('render', { type: 'cylinder', material: hullMat });
-    this.ringEntity.setLocalPosition(0, 3.5, 0);
+    this.ringEntity.setLocalPosition(0, 1.1, 0);
     this.ringEntity.setLocalScale(3.6, 0.3, 3.6);
     this.root.addChild(this.ringEntity);
 
@@ -97,8 +97,8 @@ export class PCGeometricBossModel {
     }
 
     const rootPos = this.root.getPosition();
-    this.coreBox.center.set(rootPos.x, rootPos.y + 3.5, rootPos.z);
-    this.hullBox.center.set(rootPos.x, rootPos.y + 3.5, rootPos.z);
+    this.coreBox.center.set(rootPos.x, rootPos.y + 1.1, rootPos.z);
+    this.hullBox.center.set(rootPos.x, rootPos.y + 1.1, rootPos.z);
 
     // Update satellites in orbital circle
     for (let i = 0; i < this.satelliteBoxes.length; i++) {
@@ -106,7 +106,7 @@ export class PCGeometricBossModel {
       const radius = 3.2;
       const sx = Math.cos(angle) * radius;
       const sz = Math.sin(angle) * radius;
-      const sy = 3.5 + Math.sin(this.animTime * 3.0 + i) * 0.5;
+      const sy = 1.1 + Math.sin(this.animTime * 3.0 + i) * 0.5;
 
       const sat = this.satellites[i];
       if (sat) {
@@ -120,8 +120,8 @@ export class PCGeometricBossModel {
 
   public getHitboxes(): PCPlayerHitbox[] {
     const rootPos = this.root.getPosition();
-    this.coreBox.center.set(rootPos.x, rootPos.y + 3.5, rootPos.z);
-    this.hullBox.center.set(rootPos.x, rootPos.y + 3.5, rootPos.z);
+    this.coreBox.center.set(rootPos.x, rootPos.y + 1.1, rootPos.z);
+    this.hullBox.center.set(rootPos.x, rootPos.y + 1.1, rootPos.z);
 
     const hitboxes: PCPlayerHitbox[] = [
       {

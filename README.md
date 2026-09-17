@@ -1,4 +1,4 @@
-# 🎯 Airsoft BBS
+# 🎯 Arena BBS
 
 A fast-paced, touch-first 3D multiplayer arena shooter built with Three.js, TypeScript, Express, and Socket.IO. Features Roblox R6-style avatar physics, tactile mobile controls, PvE Wave Survival mode, and instant QR-code room joining.
 

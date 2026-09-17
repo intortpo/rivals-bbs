@@ -1,6 +1,6 @@
-# Context & Domain Model: Airsoft BBS
+# Context & Domain Model: Arena BBS
 
-This document defines the ubiquitous language, architectural boundaries, and core design principles for the Airsoft BBS multiplayer game.
+This document defines the ubiquitous language, architectural boundaries, and core design principles for the Arena BBS multiplayer game.
 
 ## Ubiquitous Language
 
@@ -18,10 +18,16 @@ This document defines the ubiquitous language, architectural boundaries, and cor
 - **ADS (Aim Down Sights)**: Toggling camera zoom (reducing Field of View) and reducing touch look sensitivity for precise ranged shooting.
 - **QR Match Link**: An encoded URL (`http://<lan-ip>:3000/?room=<ROOM_ID>`) rendered as a scannable QR code on the host's screen.
 - **Room / Match Session**: A server-side state machine managing connected players, round state (`WAITING`, `STARTING`, `PLAYING`, `ROUND_OVER`), score, and snapshot replication.
+- **PBR Render Pipeline**: High-performance PlayCanvas ACES tonemapped renderer with cascaded PCF soft shadows, metallic-roughness PBR materials, and dynamic tablet DPR clamping (1.5x max) for locked 60 FPS.
+- **Mixamo Animated Characters & Bots**: Full 3D skinned mesh models with 11 unified animation tracks (`idle`, `run`, `sprint`, `slide`, `jump`, `death`, `reload`, `stab`, `slash`, `turn180`, `strafe`), procedural head/spine aim pitching, and right-hand weapon socket binding.
+- **World Powerup Pickups**: In-world rotating, bobbing 3D pickups (Shield, Speed, Quad Damage, Rapid Mag) placed at tactical map locations with proximity collection and timed respawns.
+- **Static Mesh Batching**: PlayCanvas `BatchGroup` combining static level geometry into single draw calls via `app.batcher` to maximize mobile/tablet throughput.
+- **In-Game Settings**: Real-time adjustments of FOV, sensitivity, invert-Y, auto-fire, and HUD opacity accessible at any time during gameplay.
 
 ## System Boundaries
 
-1. **Client Engine (`src/client/engine/`)**: Three.js rendering, lighting, map geometry, procedural animations, particle effects, and synthesized audio.
-2. **Controls Layer (`src/client/controls/`)**: Touch and pointer event processing, normalizing inputs into standard motion vectors and actions.
-3. **Networking Layer (`src/client/network/` & `src/server/`)**: Socket.IO transport, client-side snapshot interpolation, server-side room lifecycle and damage verification.
-4. **UI Layer (`src/client/ui/`)**: Touch HUD, QR generator, camera QR scanner, lobby management, and scoreboards.
+1. **Client Engine (`src/client/engine/playcanvas/`)**: PlayCanvas PBR rendering, ACES tonemapping, lighting, 10 arena map architectures, static mesh batching, particle effects, GLB character animation controller, and synthesized Web Audio.
+2. **Controls Layer (`src/client/controls/`)**: TouchControls with fire-button aim dragging, deadzone-curved joystick, inverted-Y support, and InputManager normalizing inputs across desktop and mobile.
+3. **Networking Layer (`src/client/network/` & `src/server/`)**: Socket.IO transport, client-side snapshot interpolation, server-side room lifecycle, wave survival orchestration, and obstacle line-of-sight damage verification.
+4. **UI Layer (`src/client/ui/`)**: Touch HUD, SettingsUI, QR generator, camera QR scanner, lobby management, account auth, and match dashboards.
+

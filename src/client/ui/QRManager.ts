@@ -25,7 +25,7 @@ export class QRManager {
           <h2>📱 SCAN TO JOIN ROOM</h2>
           <button id="btn-close-qr-modal" class="modal-close-btn">&times;</button>
         </div>
-        <p class="modal-desc">Point another phone's camera or Airsoft scanner at this code to join instantly!</p>
+        <p class="modal-desc">Point another phone's camera or Arena scanner at this code to join instantly!</p>
 
         <div class="qr-canvas-wrapper">
           <canvas id="qr-code-canvas"></canvas>

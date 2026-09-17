@@ -179,6 +179,7 @@ export interface WorldSnapshot {
     isDead: boolean;
     currentWeapon: WeaponType;
     isBot?: boolean;
+    botRole?: 'scout' | 'rusher' | 'heavy' | 'sniper' | 'boss';
   }>;
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "rivals-bbs",
   "version": "1.0.0",
-  "description": "Multiplayer Airsoft BBS arena with touch-first mobile controls, wave survival, and QR code room joining",
+  "description": "Multiplayer Arena BBS with touch-first mobile controls, wave survival, and QR code room joining",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server/server.ts",
@@ -9,7 +9,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build": "vite build && tsc --noEmit",
     "start": "tsx src/server/server.ts",
-    "test": "tsx tests/character-builder-collision.test.ts && tsx tests/arena-maps.test.ts && tsx tests/experimental-weapons.test.ts && tsx tests/wave-mode.test.ts && tsx tests/server-room.test.ts && tsx tests/grammar.test.ts && tsx tests/auth.test.ts && tsx tests/auth-e2e.test.ts && tsx tests/ai-hitbox-overhaul.test.ts && tsx tests/bullet-hell-boss-aircontrol.test.ts && tsx tests/momentum-portal.test.ts && tsx tests/spawn-void-safety.test.ts && tsx tests/playcanvas-shooting.test.ts && tsx tests/facility-map-shooting.test.ts"
+    "test": "tsx tests/character-builder-collision.test.ts && tsx tests/arena-maps.test.ts && tsx tests/experimental-weapons.test.ts && tsx tests/wave-mode.test.ts && tsx tests/server-room.test.ts && tsx tests/grammar.test.ts && tsx tests/auth.test.ts && tsx tests/auth-e2e.test.ts && tsx tests/ai-hitbox-overhaul.test.ts && tsx tests/bullet-hell-boss-aircontrol.test.ts && tsx tests/momentum-portal.test.ts && tsx tests/spawn-void-safety.test.ts && tsx tests/playcanvas-shooting.test.ts && tsx tests/facility-map-shooting.test.ts && tsx tests/enemy-ai-rework.test.ts && tsx tests/glb-character-model.test.ts && tsx tests/maps-pbr-tablet.test.ts"
   },
   "dependencies": {
     "express": "^4.21.2",

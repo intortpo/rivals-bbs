@@ -246,12 +246,38 @@ export const FACILITY_SPAWNS = [
   { x: 0, y: 0.0, z: 0, yaw: Math.PI / 2 }    // Ground central arena
 ];
 
+export const NEON_WAREHOUSE_SPAWNS = [
+  { x: -22, y: 0.0, z: -22, yaw: Math.PI / 4 },
+  { x: 22, y: 0.0, z: 22, yaw: -3 * Math.PI / 4 },
+  { x: -22, y: 0.0, z: 22, yaw: 3 * Math.PI / 4 },
+  { x: 22, y: 0.0, z: -22, yaw: -Math.PI / 4 },
+  { x: 0, y: 3.7, z: 0, yaw: 0 },              // Central conveyor gantry
+  { x: 0, y: 3.7, z: -8, yaw: Math.PI },       // North gantry overlook
+  { x: 0, y: 3.7, z: 8, yaw: 0 },              // South gantry overlook
+  { x: 0, y: 0.0, z: 0, yaw: Math.PI / 2 }     // Central ground bay
+];
+
+export const ORBITAL_STATION_SPAWNS = [
+  { x: -20, y: 0.0, z: 0, yaw: Math.PI / 2 },
+  { x: 20, y: 0.0, z: 0, yaw: -Math.PI / 2 },
+  { x: 0, y: 0.0, z: -20, yaw: 0 },
+  { x: 0, y: 0.0, z: 20, yaw: Math.PI },
+  { x: -12, y: 3.9, z: -15, yaw: Math.PI / 4 },   // Vantage deck North
+  { x: 12, y: 3.9, z: 15, yaw: -3 * Math.PI / 4 }, // Vantage deck South
+  { x: 0, y: 0.0, z: -16, yaw: 0 },              // North observation walkway
+  { x: -15, y: 0.0, z: 15, yaw: Math.PI / 3 }     // West corridor
+];
+
 export function getMapSpawns(mapName?: string) {
   switch (mapName) {
     case 'Facility':
       return FACILITY_SPAWNS;
     case 'Cartoon City':
       return CITY_SPAWNS;
+    case 'Arena Classic':
+      return MAP_SPAWNS;
+    case 'Neon Warehouse':
+      return NEON_WAREHOUSE_SPAWNS;
     case 'Cyber Spire':
       return CYBER_SPIRE_SPAWNS;
     case 'Quantum Lab':
@@ -262,8 +288,10 @@ export function getMapSpawns(mapName?: string) {
       return SUBZERO_STATION_SPAWNS;
     case 'Sky Sanctuary':
       return SKY_SANCTUARY_SPAWNS;
+    case 'Orbital Station':
+      return ORBITAL_STATION_SPAWNS;
     default:
-      return MAP_SPAWNS;
+      return FACILITY_SPAWNS;
   }
 }
 
@@ -447,6 +475,23 @@ export function getTeamSpawn(team: 'blue' | 'red', index: number, mapName?: stri
           { x: 3, y: 0.0, z: -26, yaw: 0 },
           { x: 0, y: 0.0, z: -24, yaw: 0 },
           { x: 0, y: 0.0, z: -28, yaw: 0 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Orbital Station') {
+    const list = team === 'blue'
+      ? [
+          { x: -22, y: 0.0, z: -4, yaw: Math.PI / 2 },
+          { x: -22, y: 0.0, z: 4, yaw: Math.PI / 2 },
+          { x: -18, y: 0.0, z: 0, yaw: Math.PI / 2 },
+          { x: -24, y: 0.0, z: 0, yaw: Math.PI / 2 }
+        ]
+      : [
+          { x: 22, y: 0.0, z: 4, yaw: -Math.PI / 2 },
+          { x: 22, y: 0.0, z: -4, yaw: -Math.PI / 2 },
+          { x: 18, y: 0.0, z: 0, yaw: -Math.PI / 2 },
+          { x: 24, y: 0.0, z: 0, yaw: -Math.PI / 2 }
         ];
     return list[index % list.length];
   }

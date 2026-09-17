@@ -6,7 +6,7 @@ import { RoomManager } from '../src/server/RoomManager.js';
 import { FireWeaponPayload, PlayerInputPayload } from '../src/shared/types.js';
 
 async function runTest() {
-  console.log('🧪 Starting Airsoft BBS Server & Room Lifecycle Test...');
+  console.log('🧪 Starting Arena BBS Server & Room Lifecycle Test...');
   const app = express();
   const server = http.createServer(app);
   const io = new Server(server, { cors: { origin: '*' } });

@@ -3,6 +3,82 @@ import { POWERUPS } from '../../../shared/constants.js';
 import { PowerupType } from '../../../shared/types.js';
 import { AudioManager } from '../AudioManager.js';
 
+export interface WorldPickupItem {
+  id: string;
+  type: PowerupType;
+  x: number;
+  baseY: number;
+  z: number;
+  entity?: pc.Entity;
+  crystalEntity?: pc.Entity;
+  ringEntity?: pc.Entity;
+  isAvailable: boolean;
+  respawnsAt: number;
+}
+
+export const MAP_POWERUP_LOCATIONS: Record<string, { type: PowerupType; x: number; y: number; z: number }[]> = {
+  Facility: [
+    { type: 'speed', x: 0, y: 1.2, z: 0 },
+    { type: 'shield', x: -14, y: 1.2, z: 12 },
+    { type: 'quad_damage', x: 14, y: 1.2, z: -12 },
+    { type: 'rapid_mag', x: 0, y: 3.8, z: 18 }
+  ],
+  'Cartoon City': [
+    { type: 'speed', x: 0, y: 1.2, z: 0 },
+    { type: 'shield', x: -16, y: 1.2, z: -14 },
+    { type: 'quad_damage', x: 16, y: 1.2, z: 14 },
+    { type: 'rapid_mag', x: 0, y: 1.2, z: -22 }
+  ],
+  'Arena Classic': [
+    { type: 'quad_damage', x: 0, y: 3.8, z: 0 },
+    { type: 'speed', x: -18, y: 1.2, z: 0 },
+    { type: 'shield', x: 18, y: 1.2, z: 0 },
+    { type: 'rapid_mag', x: 0, y: 1.2, z: -18 }
+  ],
+  'Neon Warehouse': [
+    { type: 'speed', x: 0, y: 4.2, z: 0 },
+    { type: 'shield', x: -15, y: 1.2, z: 15 },
+    { type: 'quad_damage', x: 15, y: 1.2, z: -15 },
+    { type: 'rapid_mag', x: 0, y: 1.2, z: 18 }
+  ],
+  'Cyber Spire': [
+    { type: 'quad_damage', x: 0, y: 12.2, z: 0 },
+    { type: 'shield', x: -12, y: 6.2, z: 0 },
+    { type: 'speed', x: 12, y: 6.2, z: 0 },
+    { type: 'rapid_mag', x: 0, y: 6.2, z: 12 }
+  ],
+  'Quantum Lab': [
+    { type: 'quad_damage', x: 0, y: 3.2, z: 0 },
+    { type: 'shield', x: -16, y: 1.2, z: -14 },
+    { type: 'speed', x: 16, y: 1.2, z: 14 },
+    { type: 'rapid_mag', x: 0, y: 5.2, z: -16 }
+  ],
+  'Magma Foundry': [
+    { type: 'quad_damage', x: 0, y: 1.2, z: 0 },
+    { type: 'shield', x: -14, y: 1.2, z: -14 },
+    { type: 'speed', x: 14, y: 1.2, z: 14 },
+    { type: 'rapid_mag', x: 14, y: 1.2, z: -14 }
+  ],
+  'Subzero Station': [
+    { type: 'shield', x: 0, y: 1.2, z: 0 },
+    { type: 'speed', x: -18, y: 1.2, z: 12 },
+    { type: 'quad_damage', x: 18, y: 1.2, z: -12 },
+    { type: 'rapid_mag', x: 0, y: 4.8, z: -16 }
+  ],
+  'Sky Sanctuary': [
+    { type: 'quad_damage', x: 0, y: 4.2, z: 0 },
+    { type: 'speed', x: -15, y: 2.2, z: -12 },
+    { type: 'shield', x: 15, y: 2.2, z: 12 },
+    { type: 'rapid_mag', x: 0, y: 1.2, z: 18 }
+  ],
+  'Orbital Station': [
+    { type: 'quad_damage', x: 0, y: 6.2, z: 0 },
+    { type: 'speed', x: -16, y: 1.2, z: 0 },
+    { type: 'shield', x: 16, y: 1.2, z: 0 },
+    { type: 'rapid_mag', x: 0, y: 1.2, z: 16 }
+  ]
+};
+
 export class PCPowerupManager {
   private app?: pc.Application;
   private audio: AudioManager;
@@ -12,6 +88,10 @@ export class PCPowerupManager {
   public expiresAt: number = 0;
   public shieldHp: number = 0;
   public powerupsUsedInMatch: number = 0;
+
+  // In-world 3D pickups
+  public worldPickups: WorldPickupItem[] = [];
+  private hoverTime: number = 0;
 
   // Visual effects
   private shieldEntity: pc.Entity | null = null;
@@ -166,6 +246,88 @@ export class PCPowerupManager {
     }
   }
 
+  private getPowerupColor(type: PowerupType): pc.Color {
+    switch (type) {
+      case 'shield':
+        return new pc.Color(0, 0.82, 1.0);
+      case 'speed':
+        return new pc.Color(1.0, 0.67, 0);
+      case 'quad_damage':
+        return new pc.Color(1.0, 0.16, 0.33);
+      case 'rapid_mag':
+        return new pc.Color(0, 1.0, 0.53);
+      case 'airstrike':
+        return new pc.Color(0.96, 0.25, 0.37);
+      case 'phase_shift':
+        return new pc.Color(0.66, 0.33, 0.97);
+      default:
+        return new pc.Color(0.23, 0.51, 0.96);
+    }
+  }
+
+  public spawnWorldPickups(mapName: string): void {
+    this.clearWorldPickups();
+
+    const locs = MAP_POWERUP_LOCATIONS[mapName] || MAP_POWERUP_LOCATIONS['Facility'];
+    if (!locs) return;
+
+    for (let i = 0; i < locs.length; i++) {
+      const def = locs[i];
+      const item: WorldPickupItem = {
+        id: `${mapName}_${def.type}_${i}`,
+        type: def.type,
+        x: def.x,
+        baseY: def.y,
+        z: def.z,
+        isAvailable: true,
+        respawnsAt: 0
+      };
+
+      if (this.app) {
+        const root = new pc.Entity(`WorldPickup_${item.id}`);
+        root.setPosition(def.x, def.y, def.z);
+
+        const color = this.getPowerupColor(def.type);
+        const pbrMat = new pc.StandardMaterial();
+        pbrMat.diffuse = color;
+        pbrMat.emissive = color;
+        pbrMat.emissiveIntensity = 2.4;
+        pbrMat.useLighting = false;
+        pbrMat.update();
+
+        // 3D Diamond / Crystal
+        const crystal = new pc.Entity('Crystal');
+        crystal.addComponent('render', { type: 'box', material: pbrMat });
+        crystal.setLocalScale(0.48, 0.48, 0.48);
+        crystal.setLocalEulerAngles(45, 45, 0);
+        root.addChild(crystal);
+
+        // 3D Orbital Halo Ring
+        const ring = new pc.Entity('Ring');
+        ring.addComponent('render', { type: 'cylinder', material: pbrMat });
+        ring.setLocalScale(0.9, 0.04, 0.9);
+        root.addChild(ring);
+
+        this.app.root.addChild(root);
+
+        item.entity = root;
+        item.crystalEntity = crystal;
+        item.ringEntity = ring;
+      }
+
+      this.worldPickups.push(item);
+    }
+  }
+
+  public clearWorldPickups(): void {
+    for (const p of this.worldPickups) {
+      if (p.entity) {
+        p.entity.destroy();
+      }
+    }
+    this.worldPickups = [];
+  }
+
   public reset(): void {
     this.storedPowerup = null;
     this.activePowerup = null;
@@ -183,10 +345,11 @@ export class PCPowerupManager {
 
   public update(delta: number, playerPos: pc.Vec3 | [number, number, number]): void {
     const now = Date.now();
+    const px = Array.isArray(playerPos) ? playerPos[0] : playerPos.x;
+    const py = Array.isArray(playerPos) ? playerPos[1] : playerPos.y;
+    const pz = Array.isArray(playerPos) ? playerPos[2] : playerPos.z;
+
     if (this.shieldEntity && this.shieldEntity.enabled) {
-      const px = Array.isArray(playerPos) ? playerPos[0] : playerPos.x;
-      const py = Array.isArray(playerPos) ? playerPos[1] : playerPos.y;
-      const pz = Array.isArray(playerPos) ? playerPos[2] : playerPos.z;
       this.shieldEntity.setPosition(px, py + 1.0, pz);
       this.shieldEntity.rotateLocal(45 * delta, 60 * delta, 0);
     }
@@ -200,6 +363,50 @@ export class PCPowerupManager {
     } else if (this.activePowerup && this.onActiveChanged) {
       const rem = Math.max(0, (this.expiresAt - now) / 1000);
       this.onActiveChanged(this.activePowerup, rem);
+    }
+
+    // World pickup hover animation and collision collection
+    this.hoverTime += delta;
+    for (const pickup of this.worldPickups) {
+      if (!pickup.isAvailable) {
+        if (now >= pickup.respawnsAt) {
+          pickup.isAvailable = true;
+          if (pickup.entity) pickup.entity.enabled = true;
+          this.audio.playPowerupInstantRefill();
+        }
+        continue;
+      }
+
+      if (pickup.entity) {
+        const floatY = pickup.baseY + Math.sin(this.hoverTime * 2.8 + pickup.x) * 0.16;
+        pickup.entity.setPosition(pickup.x, floatY, pickup.z);
+        if (pickup.crystalEntity) {
+          pickup.crystalEntity.rotateLocal(0, 80 * delta, 40 * delta);
+        }
+        if (pickup.ringEntity) {
+          pickup.ringEntity.rotateLocal(30 * delta, 0, 60 * delta);
+        }
+      }
+
+      const dist = Math.hypot(px - pickup.x, py - pickup.baseY, pz - pickup.z);
+      if (dist < 1.85) {
+        pickup.isAvailable = false;
+        pickup.respawnsAt = now + 25000;
+        if (pickup.entity) pickup.entity.enabled = false;
+
+        if (!this.storedPowerup) {
+          this.storePowerup(pickup.type);
+        } else if (!this.hasActivePowerup()) {
+          this.activatePowerup(pickup.type);
+        } else {
+          this.storePowerup(pickup.type);
+        }
+
+        this.triggerRemoteAura(pickup.type);
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(35);
+        }
+      }
     }
   }
 
@@ -218,6 +425,7 @@ export class PCPowerupManager {
   }
 
   public dispose(): void {
+    this.clearWorldPickups();
     if (this.shieldEntity) this.shieldEntity.destroy();
     if (this.airstrikeEntity) this.airstrikeEntity.destroy();
   }
