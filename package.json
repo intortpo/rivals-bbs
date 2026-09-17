@@ -9,7 +9,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build": "vite build && tsc --noEmit",
     "start": "tsx src/server/server.ts",
-    "test": "tsx tests/character-builder-collision.test.ts && tsx tests/arena-maps.test.ts && tsx tests/experimental-weapons.test.ts && tsx tests/wave-mode.test.ts && tsx tests/server-room.test.ts && tsx tests/grammar.test.ts && tsx tests/auth.test.ts && tsx tests/ai-hitbox-overhaul.test.ts && tsx tests/bullet-hell-boss-aircontrol.test.ts && tsx tests/spawn-void-safety.test.ts"
+    "test": "tsx tests/character-builder-collision.test.ts && tsx tests/arena-maps.test.ts && tsx tests/experimental-weapons.test.ts && tsx tests/wave-mode.test.ts && tsx tests/server-room.test.ts && tsx tests/grammar.test.ts && tsx tests/auth.test.ts && tsx tests/auth-e2e.test.ts && tsx tests/ai-hitbox-overhaul.test.ts && tsx tests/bullet-hell-boss-aircontrol.test.ts && tsx tests/momentum-portal.test.ts && tsx tests/spawn-void-safety.test.ts"
   },
   "dependencies": {
     "express": "^4.21.2",

@@ -254,9 +254,16 @@ class GameApp {
       } catch {}
     }
 
-    this.authUI = new AuthUI(this.appContainer, (user) => {
-      this.lobbyUI.updateAccountDisplay(user);
-    });
+    this.authUI = new AuthUI(
+      this.appContainer,
+      (user) => {
+        this.lobbyUI.updateAccountDisplay(user);
+      },
+      () => {
+        this.input.unlockCursor();
+        this.dashboardUI.open(this.authUI?.currentUser || null);
+      }
+    );
     this.grammarReloadUI = new GrammarReloadUI(this.appContainer);
 
     // 5. Hook Network Callbacks
@@ -470,21 +477,36 @@ class GameApp {
 
       // Record match result to dashboard if logged in
       try {
-        const myScoreEntry = payload.scores.find((s) => s.id === this.networkClient.myId);
-        const won =
-          payload.winnerId === this.networkClient.myId ||
-          (payload.winningTeam && payload.winningTeam === this.myTeam);
-        await fetch('/api/stats/match', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mode: this.networkClient.currentRoomState?.mode || '1v1',
-            kills: myScoreEntry?.kills || 0,
-            deaths: myScoreEntry?.deaths || 0,
-            won: Boolean(won),
-            powerupsUsed: this.powerupManager.powerupsUsedInMatch
-          })
-        });
+        const token = this.authUI.getToken();
+        if (token) {
+          const myScoreEntry = payload.scores.find((s) => s.id === this.networkClient.myId);
+          const won =
+            payload.winnerId === this.networkClient.myId ||
+            (payload.winningTeam && payload.winningTeam === this.myTeam);
+          const res = await fetch('/api/stats/match', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              mode: this.networkClient.currentRoomState?.mode || '1v1',
+              mapName: this.networkClient.currentRoomState?.mapName || 'Arena Classic',
+              kills: myScoreEntry?.kills || 0,
+              deaths: myScoreEntry?.deaths || 0,
+              won: Boolean(won),
+              score: myScoreEntry?.score || (myScoreEntry?.kills || 0) * 100,
+              powerupsUsed: this.powerupManager.powerupsUsedInMatch
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.user) {
+              this.authUI.currentUser = data.user;
+              this.lobbyUI.updateAccountDisplay(data.user);
+            }
+          }
+        }
       } catch (err) {
         console.error('Failed to log match result:', err);
       }
@@ -767,11 +789,20 @@ class GameApp {
 
     // Check jump pads (Vertical Launchers and Directional Aerial Boosters)
     const pad = this.mapBuilder.checkJumpPads(this.playerPos);
-    if (pad !== null && this.playerVel.y <= 0) {
-      this.playerVel.y = pad.impulseY;
-      if (pad.impulseX !== 0) this.playerVel.x = pad.impulseX;
-      if (pad.impulseZ !== 0) this.playerVel.z = pad.impulseZ;
+    if (pad !== null && this.playerVel.y <= 2.5) {
+      this.playerVel.y = Math.max(pad.impulseY, this.playerVel.y + pad.impulseY * 0.5);
+      if (pad.impulseX !== 0 || pad.impulseZ !== 0) {
+        // Directional booster: preserve and enhance momentum along launch vector
+        const currentHorizSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
+        const padSpeed = Math.hypot(pad.impulseX, pad.impulseZ);
+        const launchSpeed = Math.max(currentHorizSpeed, padSpeed);
+        const padDirX = pad.impulseX / padSpeed;
+        const padDirZ = pad.impulseZ / padSpeed;
+        this.playerVel.x = padDirX * launchSpeed;
+        this.playerVel.z = padDirZ * launchSpeed;
+      }
       this.isGrounded = false;
+      this.hasJumpedThisAirtime = true;
       this.audio.playJump();
     }
 
@@ -781,7 +812,16 @@ class GameApp {
       this.lastTeleportTime = performance.now();
       this.playerPos.copy(hitPort.exitPos);
       this.playerYaw = hitPort.exitYaw;
-      this.playerVel.set(0, 0, 0); // Cancel exit velocity
+
+      // Preserve full vector momentum & redirect forward along exitYaw
+      const inSpeed = Math.hypot(this.playerVel.x, this.playerVel.z);
+      const exitSpeed = Math.max(inSpeed, 14.0); // Minimum 14 m/s launch burst through portal
+      this.playerVel.x = Math.sin(hitPort.exitYaw) * exitSpeed;
+      this.playerVel.z = Math.cos(hitPort.exitYaw) * exitSpeed;
+      this.playerVel.y = Math.max(this.playerVel.y, 3.5); // Vertical clearance to prevent ground snagging
+      this.isGrounded = false;
+      this.hasJumpedThisAirtime = true;
+
       this.audio.playTeleport();
       this.hud.showTeleportEffect();
     }
