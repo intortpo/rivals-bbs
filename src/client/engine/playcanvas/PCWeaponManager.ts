@@ -255,14 +255,14 @@ export class PCWeaponManager {
     if (!this.app || !this.viewModelPivot) return;
 
     const blasterMap: Record<WeaponType, { url: string; pos: [number, number, number]; rot: [number, number, number]; scale: number }> = {
-      rifle: { url: '/models/blasters/blaster-a.glb', pos: [0.20, -0.22, -0.42], rot: [0, 180, 0], scale: 0.90 },
-      shotgun: { url: '/models/blasters/blaster-b.glb', pos: [0.20, -0.22, -0.38], rot: [0, 180, 0], scale: 0.95 },
-      sniper: { url: '/models/blasters/blaster-e.glb', pos: [0.20, -0.22, -0.45], rot: [0, 180, 0], scale: 0.85 },
-      katana: { url: '/models/blasters/blaster-c.glb', pos: [0.18, -0.18, -0.35], rot: [-10, 170, 5], scale: 0.85 },
-      needle_carbine: { url: '/models/blasters/blaster-g.glb', pos: [0.20, -0.22, -0.40], rot: [0, 180, 0], scale: 0.90 },
-      plasma_launcher: { url: '/models/blasters/blaster-o.glb', pos: [0.22, -0.22, -0.42], rot: [0, 180, 0], scale: 1.0 },
-      railgun: { url: '/models/blasters/blaster-j.glb', pos: [0.20, -0.22, -0.44], rot: [0, 180, 0], scale: 0.90 },
-      arc_disruptor: { url: '/models/blasters/blaster-m.glb', pos: [0.20, -0.22, -0.40], rot: [0, 180, 0], scale: 0.90 }
+      rifle: { url: '/models/blasters/blaster-a.glb', pos: [0.15, -0.15, -0.20], rot: [0, 180, 0], scale: 0.70 },
+      shotgun: { url: '/models/blasters/blaster-b.glb', pos: [0.15, -0.15, -0.18], rot: [0, 180, 0], scale: 0.75 },
+      sniper: { url: '/models/blasters/blaster-e.glb', pos: [0.15, -0.15, -0.25], rot: [0, 180, 0], scale: 0.65 },
+      katana: { url: '/models/blasters/blaster-c.glb', pos: [0.12, -0.12, -0.15], rot: [-10, 170, 5], scale: 0.65 },
+      needle_carbine: { url: '/models/blasters/blaster-g.glb', pos: [0.15, -0.15, -0.20], rot: [0, 180, 0], scale: 0.70 },
+      plasma_launcher: { url: '/models/blasters/blaster-o.glb', pos: [0.18, -0.18, -0.22], rot: [0, 180, 0], scale: 0.80 },
+      railgun: { url: '/models/blasters/blaster-j.glb', pos: [0.15, -0.15, -0.24], rot: [0, 180, 0], scale: 0.70 },
+      arc_disruptor: { url: '/models/blasters/blaster-m.glb', pos: [0.15, -0.15, -0.20], rot: [0, 180, 0], scale: 0.70 }
     };
 
     for (const [weaponType, cfg] of Object.entries(blasterMap) as [WeaponType, any][]) {
