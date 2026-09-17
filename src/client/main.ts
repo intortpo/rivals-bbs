@@ -114,7 +114,7 @@ class GameApp {
     this.dashboardUI = new DashboardUI(this.appContainer);
     this.loadingScreenUI = new LoadingScreenUI(this.appContainer);
     this.qrManager = new QRManager();
-    this.mapBuilder = new PCMapBuilder(this.renderer.app, 'Cartoon City', 'twilight');
+    this.mapBuilder = new PCMapBuilder(this.renderer.app, 'Facility', 'twilight');
 
     // Wire HUD top-right quick access and powerup buttons
     this.hud.onPowerupClick = () => {
@@ -511,7 +511,7 @@ class GameApp {
     this.hud.setVisible(true);
     this.lobbyUI.hideLobby();
 
-    const chosenMap = state.mapName || 'Cartoon City';
+    const chosenMap = state.mapName || 'Facility';
     if (this.mapBuilder.mapName !== chosenMap) {
       this.mapBuilder.dispose();
       this.mapBuilder = new PCMapBuilder(this.renderer.app, chosenMap);
@@ -831,7 +831,16 @@ class GameApp {
     const bobOffset = this.isGrounded && isMovingInput ? Math.sin(this.bobTimer) * 0.035 : 0;
 
     const eyeHeight = (this.isSliding ? MOVEMENT.SLIDE_EYE_HEIGHT : MOVEMENT.EYE_HEIGHT) + bobOffset;
-    if (this.renderer.cameraEntity) {
+    if (this.renderer.playerEntity && this.renderer.cameraPitchEntity) {
+      this.renderer.setPlayerTransform(
+        this.playerPos.x,
+        this.playerPos.y,
+        this.playerPos.z,
+        (this.playerYaw * 180) / Math.PI
+      );
+      this.renderer.setEyeHeight(eyeHeight);
+      this.renderer.setCameraPitch((this.playerPitch * 180) / Math.PI);
+    } else if (this.renderer.cameraEntity) {
       this.renderer.cameraEntity.setPosition(this.playerPos.x, this.playerPos.y + eyeHeight, this.playerPos.z);
       this.renderer.cameraEntity.setEulerAngles(
         (this.playerPitch * 180) / Math.PI,
@@ -840,7 +849,8 @@ class GameApp {
       );
     }
 
-    this.hud.updateCrosshairSpread(isMovingInput, this.isSliding);
+    const recoilSpread = Math.abs(this.weaponManager.recoilRotation.x) * 0.04;
+    this.hud.updateCrosshairSpread(isMovingInput, this.isSliding, recoilSpread);
   }
 
   private resolveArenaCollisions(): void {

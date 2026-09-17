@@ -5,8 +5,9 @@ export type GraphicsQuality = 'low' | 'medium' | 'high';
 export class PCRenderer {
   public app!: pc.Application;
   public cameraEntity!: pc.Entity;
+  public playerEntity!: pc.Entity;
+  public cameraPitchEntity!: pc.Entity;
   public sunEntity!: pc.Entity;
-  public ambientLight!: pc.Entity;
   public viewmodelLight!: pc.Entity;
   public canvas!: HTMLCanvasElement;
   private currentQuality: GraphicsQuality = 'high';
@@ -54,19 +55,27 @@ export class PCRenderer {
   }
 
   private setupCamera(): void {
-    this.cameraEntity = new pc.Entity('MainCamera');
-    this.cameraEntity.addComponent('camera', {
+    // Player root entity (controls ground translation and Yaw rotation around Y axis)
+    this.playerEntity = new pc.Entity('PlayerRoot');
+    this.playerEntity.setPosition(0, 0, 0);
+    this.app.root.addChild(this.playerEntity);
+
+    // Camera pitch entity (child of PlayerRoot, at eye level ~1.6m, controls Pitch rotation around X axis)
+    this.cameraPitchEntity = new pc.Entity('CameraPitch');
+    this.cameraPitchEntity.setLocalPosition(0, 1.6, 0);
+    this.cameraPitchEntity.addComponent('camera', {
       clearColor: new pc.Color(0.01, 0.08, 0.13),
       fov: 75,
       nearClip: 0.1,
       farClip: 500,
       frustumCulling: true
     });
+    this.playerEntity.addChild(this.cameraPitchEntity);
 
-    this.cameraEntity.setPosition(0, 1.6, 0);
-    this.app.root.addChild(this.cameraEntity);
+    // Alias cameraEntity to cameraPitchEntity for backwards-compatibility
+    this.cameraEntity = this.cameraPitchEntity;
 
-    // Dedicated viewmodel light so first-person weapon meshes are vibrantly lit
+    // Dedicated viewmodel light attached to camera pitch entity
     this.viewmodelLight = new pc.Entity('ViewmodelLight');
     this.viewmodelLight.addComponent('light', {
       type: 'omni',
@@ -76,7 +85,26 @@ export class PCRenderer {
       castShadows: false
     });
     this.viewmodelLight.setLocalPosition(0.25, 0.2, -0.3);
-    this.cameraEntity.addChild(this.viewmodelLight);
+    this.cameraPitchEntity.addChild(this.viewmodelLight);
+  }
+
+  public setPlayerTransform(x: number, y: number, z: number, yawDeg: number): void {
+    if (this.playerEntity) {
+      this.playerEntity.setPosition(x, y, z);
+      this.playerEntity.setEulerAngles(0, yawDeg, 0);
+    }
+  }
+
+  public setCameraPitch(pitchDeg: number): void {
+    if (this.cameraPitchEntity) {
+      this.cameraPitchEntity.setLocalEulerAngles(pitchDeg, 0, 0);
+    }
+  }
+
+  public setEyeHeight(eyeHeight: number): void {
+    if (this.cameraPitchEntity) {
+      this.cameraPitchEntity.setLocalPosition(0, eyeHeight, 0);
+    }
   }
 
   private setupLighting(): void {

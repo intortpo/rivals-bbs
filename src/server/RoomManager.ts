@@ -28,7 +28,7 @@ export class RoomManager {
     playerName: string,
     mode: GameMode = '1v1',
     fragLimit?: number,
-    mapName: string = 'Cartoon City',
+    mapName: string = 'Facility',
     outfitIndex: number = 0,
     customization?: CharacterCustomization
   ): { roomId: string; session: GameSession; hostSecret: string } {

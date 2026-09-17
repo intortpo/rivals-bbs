@@ -185,7 +185,7 @@ export class PCNetworkClient {
     playerName: string,
     mode: GameMode,
     fragLimit: number = 10,
-    mapName: string = 'Cartoon City',
+    mapName: string = 'Facility',
     outfitIndex: number = 0,
     customization?: CharacterCustomization
   ): Promise<{ success: boolean; roomId?: string; error?: string }> {

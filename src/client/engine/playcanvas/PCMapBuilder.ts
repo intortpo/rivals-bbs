@@ -59,7 +59,7 @@ export class PCMapBuilder {
   public mapName: string;
   public skyTheme: string;
 
-  constructor(app: pc.Application | undefined, mapName: string = 'Cartoon City', skyTheme: string = 'twilight') {
+  constructor(app: pc.Application | undefined, mapName: string = 'Facility', skyTheme: string = 'twilight') {
     this.app = app;
     this.mapName = mapName;
     this.skyTheme = skyTheme;
@@ -212,6 +212,9 @@ export class PCMapBuilder {
     this.teleportPorts = [];
 
     switch (name) {
+      case 'Facility':
+        this.buildFacilityArena();
+        break;
       case 'Arena Classic':
         this.buildClassicArena();
         break;
@@ -225,10 +228,74 @@ export class PCMapBuilder {
         this.buildSubzeroStation();
         break;
       case 'Cartoon City':
-      default:
         this.buildCartoonCity();
         break;
+      default:
+        this.buildFacilityArena();
+        break;
     }
+  }
+
+  private buildFacilityArena(): void {
+    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
+    this.hasGroundPlane = true;
+
+    // Heavy concrete floor grid
+    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#181b24');
+
+    // Blue and Red Depot floor accents
+    this.addBox(-22, 0.02, 0, 8, 0.05, 16, '#00d2ff');
+    this.addBox(22, 0.02, 0, 8, 0.05, 16, '#ff2a55');
+
+    // Perimeter Containment Walls
+    this.addBox(0, 4, 32, 66, 8, 2, '#1e2230');
+    this.addBox(0, 4, -32, 66, 8, 2, '#1e2230');
+    this.addBox(-32, 4, 0, 2, 8, 66, '#1e2230');
+    this.addBox(32, 4, 0, 2, 8, 66, '#1e2230');
+
+    // Central Catwalk (at Y=3.35m, width 6m, length 24m)
+    this.addBox(0, 3.35, 0, 6, 0.3, 24, '#2d3748', true);
+
+    // Catwalk High Safety Railings
+    this.addBox(-3, 3.9, 0, 0.2, 0.8, 24, '#ff9900');
+    this.addBox(3, 3.9, 0, 0.2, 0.8, 24, '#ff9900');
+
+    // Access Ramps (North & South)
+    this.addBox(0, 0.6, -16.5, 5, 1.2, 3, '#3a4454', true);
+    this.addBox(0, 1.8, -13.5, 5, 1.2, 3, '#3a4454', true);
+    this.addBox(0, 3.0, -10.5, 5, 1.2, 3, '#3a4454', true);
+
+    this.addBox(0, 0.6, 16.5, 5, 1.2, 3, '#3a4454', true);
+    this.addBox(0, 1.8, 13.5, 5, 1.2, 3, '#3a4454', true);
+    this.addBox(0, 3.0, 10.5, 5, 1.2, 3, '#3a4454', true);
+
+    // 4 Structural Support Pillars
+    this.addBox(-8, 5, -10, 2, 10, 2, '#1a202c');
+    this.addBox(8, 5, -10, 2, 10, 2, '#1a202c');
+    this.addBox(-8, 5, 10, 2, 10, 2, '#1a202c');
+    this.addBox(8, 5, 10, 2, 10, 2, '#1a202c');
+
+    // Shipping Containers
+    this.addBox(-15, 1.5, -6.5, 6, 3, 3, '#2b4c7e', true);
+    this.addBox(-15, 1.5, 6.5, 6, 3, 3, '#2b4c7e', true);
+    this.addBox(15, 1.5, -6.5, 6, 3, 3, '#7e2b2b', true);
+    this.addBox(15, 1.5, 6.5, 6, 3, 3, '#7e2b2b', true);
+
+    // Cargo Crate Clusters
+    this.addBox(-14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true);
+    this.addBox(14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true);
+    this.addBox(-14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true);
+    this.addBox(14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true);
+    this.addBox(0, 0.75, -5, 4, 1.5, 2, '#3182ce', true);
+    this.addBox(0, 0.75, 5, 4, 1.5, 2, '#e53e3e', true);
+
+    // Team Depot Bunker Covers
+    this.addBox(-27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true);
+    this.addBox(27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true);
+
+    // Jump Pads (launching up to upper catwalk)
+    this.createJumpPad(-9, 0, 0, 18.0, 3.5, 0);
+    this.createJumpPad(9, 0, 0, 18.0, -3.5, 0);
   }
 
   private buildCartoonCity(): void {

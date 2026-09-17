@@ -51,9 +51,13 @@ export class PCWeaponManager {
   private muzzleLight!: pc.Entity;
   private flashDuration: number = 0;
 
-  // Recoil recovery
+  // Recoil spring & bobbing state
   public recoilOffset: pc.Vec3 = new pc.Vec3();
   public recoilRotation: pc.Vec3 = new pc.Vec3();
+  public recoilVelocityZ: number = 0;
+  public recoilVelocityRotX: number = 0;
+  public bobTimer: number = 0;
+  public bobOffset: pc.Vec2 = new pc.Vec2();
 
   private app?: pc.Application;
   private fx?: PCFXManager;
@@ -335,7 +339,7 @@ export class PCWeaponManager {
 
     this.triggerMuzzleFlash();
 
-    // Recoil kick impulse
+    // Recoil spring kick impulse
     const kickZ = stats.type === 'sniper' || stats.type === 'railgun' ? 0.18
       : stats.type === 'plasma_launcher' ? 0.15
       : stats.type === 'shotgun' ? 0.14 : 0.09;
@@ -345,6 +349,8 @@ export class PCWeaponManager {
 
     this.recoilOffset.z = kickZ;
     this.recoilRotation.x = kickRotX;
+    this.recoilVelocityZ = kickZ * 8.0;
+    this.recoilVelocityRotX = kickRotX * 6.0;
 
     // Camera raycast
     const camPos = cameraEntity.getPosition();
@@ -431,7 +437,9 @@ export class PCWeaponManager {
     this.flashDuration = 0.05;
   }
 
-  public update(dt: number, _isMoving: boolean = false, _moveSpeed: number = 0): void {
+  public update(dt: number, isMoving: boolean = false, moveSpeed: number = 0): void {
+    const dtClamped = Math.min(dt, 0.05);
+
     // Flash decay
     if (this.flashDuration > 0) {
       this.flashDuration -= dt;
@@ -445,14 +453,38 @@ export class PCWeaponManager {
       this.railgunChargeProgress = Math.min(1.0, this.railgunChargeProgress + dt * 2.2);
     }
 
-    // Recoil recovery
-    this.recoilOffset.z = pc.math.lerp(this.recoilOffset.z, 0, dt * 18);
-    this.recoilRotation.x = pc.math.lerp(this.recoilRotation.x, 0, dt * 18);
+    // Spring-damper integration (critically damped harmonic spring: F = -k*x - c*v)
+    const springK = 140;
+    const damping = 16;
+
+    const accelZ = -springK * this.recoilOffset.z - damping * this.recoilVelocityZ;
+    this.recoilVelocityZ += accelZ * dtClamped;
+    this.recoilOffset.z += this.recoilVelocityZ * dtClamped;
+
+    const accelRotX = -springK * this.recoilRotation.x - damping * this.recoilVelocityRotX;
+    this.recoilVelocityRotX += accelRotX * dtClamped;
+    this.recoilRotation.x += this.recoilVelocityRotX * dtClamped;
+
+    // Parametric Figure-8 Walk Bobbing
+    if (isMoving && moveSpeed > 0.5) {
+      this.bobTimer += dtClamped * Math.min(moveSpeed, 10) * 1.5;
+      const targetBobX = Math.cos(this.bobTimer) * 0.015;
+      const targetBobY = Math.abs(Math.sin(this.bobTimer)) * 0.012;
+      this.bobOffset.x = pc.math.lerp(this.bobOffset.x, targetBobX, dtClamped * 12);
+      this.bobOffset.y = pc.math.lerp(this.bobOffset.y, targetBobY, dtClamped * 12);
+    } else {
+      this.bobOffset.x = pc.math.lerp(this.bobOffset.x, 0, dtClamped * 10);
+      this.bobOffset.y = pc.math.lerp(this.bobOffset.y, 0, dtClamped * 10);
+    }
 
     // Apply to viewmodel pivot
     if (this.viewModelPivot) {
-      this.viewModelPivot.setLocalPosition(0, 0, this.recoilOffset.z);
-      this.viewModelPivot.setLocalEulerAngles(this.recoilRotation.x, 0, 0);
+      this.viewModelPivot.setLocalPosition(this.bobOffset.x, -this.bobOffset.y, this.recoilOffset.z);
+      this.viewModelPivot.setLocalEulerAngles(
+        this.recoilRotation.x,
+        this.bobOffset.x * 6.0,
+        -this.bobOffset.x * 4.0
+      );
     }
   }
 

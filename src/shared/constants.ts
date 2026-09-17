@@ -235,8 +235,21 @@ export const SKY_SANCTUARY_SPAWNS = [
   { x: 0, y: 0.0, z: 8, yaw: Math.PI } // Central Shrine South Lawn
 ];
 
+export const FACILITY_SPAWNS = [
+  { x: -22, y: 0.0, z: -18, yaw: Math.PI / 4 },
+  { x: 22, y: 0.0, z: 18, yaw: -3 * Math.PI / 4 },
+  { x: -18, y: 0.0, z: 18, yaw: 3 * Math.PI / 4 },
+  { x: 18, y: 0.0, z: -18, yaw: -Math.PI / 4 },
+  { x: 0, y: 3.5, z: 0, yaw: 0 },             // Central high catwalk
+  { x: 0, y: 3.5, z: -10, yaw: Math.PI },     // North catwalk overlook
+  { x: 0, y: 3.5, z: 10, yaw: 0 },            // South catwalk overlook
+  { x: 0, y: 0.0, z: 0, yaw: Math.PI / 2 }    // Ground central arena
+];
+
 export function getMapSpawns(mapName?: string) {
   switch (mapName) {
+    case 'Facility':
+      return FACILITY_SPAWNS;
     case 'Cartoon City':
       return CITY_SPAWNS;
     case 'Cyber Spire':
@@ -285,6 +298,23 @@ export const TEAM_SPAWNS: Record<'blue' | 'red', { x: number; y: number; z: numb
 };
 
 export function getTeamSpawn(team: 'blue' | 'red', index: number, mapName?: string) {
+  if (mapName === 'Facility') {
+    const list = team === 'blue'
+      ? [
+          { x: -24, y: 0.0, z: -4, yaw: Math.PI / 2 },
+          { x: -24, y: 0.0, z: 4, yaw: Math.PI / 2 },
+          { x: -20, y: 0.0, z: 0, yaw: Math.PI / 2 },
+          { x: -26, y: 0.0, z: 0, yaw: Math.PI / 2 }
+        ]
+      : [
+          { x: 24, y: 0.0, z: 4, yaw: -Math.PI / 2 },
+          { x: 24, y: 0.0, z: -4, yaw: -Math.PI / 2 },
+          { x: 20, y: 0.0, z: 0, yaw: -Math.PI / 2 },
+          { x: 26, y: 0.0, z: 0, yaw: -Math.PI / 2 }
+        ];
+    return list[index % list.length];
+  }
+
   if (mapName === 'Cartoon City') {
     const list = team === 'blue'
       ? [

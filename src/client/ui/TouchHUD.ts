@@ -374,11 +374,12 @@ export class TouchHUD {
     this.crosshairEl.style.display = active && (weaponType === 'sniper' || weaponType === 'railgun') ? 'none' : 'block';
   }
 
-  public updateCrosshairSpread(moving: boolean, sliding: boolean): void {
-    const scale = sliding ? 1.6 : moving ? 1.3 : 1.0;
-    if (scale === this.lastCrosshairScale) return;
+  public updateCrosshairSpread(moving: boolean, sliding: boolean, recoilKick: number = 0): void {
+    const baseScale = sliding ? 1.5 : moving ? 1.25 : 1.0;
+    const scale = Math.min(2.2, baseScale + recoilKick);
+    if (Math.abs(scale - this.lastCrosshairScale) < 0.01) return;
     this.lastCrosshairScale = scale;
-    this.crosshairEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    this.crosshairEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
   }
 
   public showCountdown(count: number): void {

@@ -177,7 +177,8 @@ export class LobbyUI {
             <div style="flex: 1; text-align: left;">
               <label style="font-size: 11px; font-weight: bold; color: #8da2c0;">MAP</label>
               <select id="select-map-name" class="lobby-select">
-                <option value="Cartoon City" selected>🏙️ Cartoon City</option>
+                <option value="Facility" selected>🏭 Facility (FPS Starter Kit)</option>
+                <option value="Cartoon City">🏙️ Cartoon City</option>
                 <option value="Arena Classic">🏟️ Arena Classic</option>
                 <option value="Neon Warehouse">📦 Neon Warehouse</option>
                 <option value="Cyber Spire">🌆 Cyber Spire</option>
@@ -468,7 +469,7 @@ export class LobbyUI {
         name,
         mode,
         fragGoal,
-        mapSelect?.value || 'Cartoon City',
+        mapSelect?.value || 'Facility',
         skyTheme,
         outfitIdx,
         isCustom || this.customOutfit ? (this.customOutfit || undefined) : undefined

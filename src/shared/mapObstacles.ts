@@ -1283,8 +1283,53 @@ export const SKY_SANCTUARY_OBSTACLES: BoundingBox[] = [
   { min: [-51.5, 0, -51.5], max: [-48.5, 4, -48.5], name: 'OuterShrineSW' }
 ];
 
+export const FACILITY_OBSTACLES: BoundingBox[] = [
+  // Perimeter Containment Walls
+  { min: [-33, 0, 31], max: [33, 8, 33], name: 'WallNorth' },
+  { min: [-33, 0, -33], max: [33, 8, -31], name: 'WallSouth' },
+  { min: [-33, 0, -33], max: [-31, 8, 33], name: 'WallWest' },
+  { min: [31, 0, -33], max: [33, 8, 33], name: 'WallEast' },
+
+  // Central Catwalk & Observation Platform (y=3.5m)
+  { min: [-3, 3.2, -12], max: [3, 3.5, 12], name: 'CatwalkPlatform' },
+  { min: [-3.1, 3.5, -12], max: [-2.9, 4.3, 12], name: 'CatwalkRailWest' },
+  { min: [2.9, 3.5, -12], max: [3.1, 4.3, 12], name: 'CatwalkRailEast' },
+
+  // Access Ramps (North & South)
+  { min: [-2.5, 0, -18], max: [2.5, 1.2, -15], name: 'RampNorthLow' },
+  { min: [-2.5, 0, -15], max: [2.5, 2.4, -12], name: 'RampNorthMid' },
+  { min: [-2.5, 0, 15], max: [2.5, 1.2, 18], name: 'RampSouthLow' },
+  { min: [-2.5, 0, 12], max: [2.5, 2.4, 15], name: 'RampSouthMid' },
+
+  // Structural Support Pillars
+  { min: [-9, 0, -11], max: [-7, 10, -9], name: 'PillarNW' },
+  { min: [7, 0, -11], max: [9, 10, -9], name: 'PillarNE' },
+  { min: [-9, 0, 9], max: [-7, 10, 11], name: 'PillarSW' },
+  { min: [7, 0, 9], max: [9, 10, 11], name: 'PillarSE' },
+
+  // Shipping Containers
+  { min: [-18, 0, -8], max: [-12, 3, -5], name: 'ContainerWestNorth' },
+  { min: [-18, 0, 5], max: [-12, 3, 8], name: 'ContainerWestSouth' },
+  { min: [12, 0, -8], max: [18, 3, -5], name: 'ContainerEastNorth' },
+  { min: [12, 0, 5], max: [18, 3, 8], name: 'ContainerEastSouth' },
+
+  // Cargo Crate Clusters
+  { min: [-16, 0, -20], max: [-13, 2.2, -17], name: 'CratesNW' },
+  { min: [13, 0, -20], max: [16, 2.2, -17], name: 'CratesNE' },
+  { min: [-16, 0, 17], max: [-13, 2.2, 20], name: 'CratesSW' },
+  { min: [13, 0, 17], max: [16, 2.2, 20], name: 'CratesSE' },
+  { min: [-2, 0, -6], max: [2, 1.5, -4], name: 'CoverMidNorth' },
+  { min: [-2, 0, 4], max: [2, 1.5, 6], name: 'CoverMidSouth' },
+
+  // Team Depot Back Covers
+  { min: [-28, 0, -6], max: [-27, 2.5, 6], name: 'DepotCoverBlue' },
+  { min: [27, 0, -6], max: [28, 2.5, 6], name: 'DepotCoverRed' }
+];
+
 export function getMapObstacles(mapName: string): BoundingBox[] {
   switch (mapName) {
+    case 'Facility':
+      return FACILITY_OBSTACLES;
     case 'Cartoon City':
       return CARTOON_CITY_OBSTACLES;
     case 'Cyber Spire':
