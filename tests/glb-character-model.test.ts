@@ -82,4 +82,50 @@ describe('Arena BBS Mixamo GLB Model Integrity', () => {
     assert.strictEqual(state.mode, 'wave', 'Room state mode must be wave');
     assert.strictEqual(state.mapName, 'Facility');
   });
+
+  it('should support overhead UI health updates and billboarding on both GLB and procedural models', () => {
+    const glbModel = new PCGLBCharacterModel(undefined, 'bot_w1_1', 'red', undefined, 'scout', false);
+    const proceduralModel = new PCCharacterModel(undefined, 'bot_w1_2', 'red', false, 'rusher');
+
+    // Verify updateHealth and updateBillboard exist on both models
+    assert.strictEqual(typeof (glbModel as any).updateHealth, 'function');
+    assert.strictEqual(typeof (glbModel as any).updateBillboard, 'function');
+    assert.strictEqual(typeof (proceduralModel as any).updateHealth, 'function');
+    assert.strictEqual(typeof (proceduralModel as any).updateBillboard, 'function');
+
+    // Verify calling updateHealth does not throw
+    glbModel.updateHealth(60, 100, 25, 50);
+    proceduralModel.updateHealth(40, 100, 0, 50);
+
+    // Verify billboarding with dummy camera position does not throw
+    const camPos = new pc.Vec3(0, 1.8, 10);
+    glbModel.updateBillboard(camPos);
+    proceduralModel.updateBillboard(camPos);
+  });
+
+  it('should verify all 11 Mixamo animation tracks in arena_character.glb', () => {
+    const buffer = fs.readFileSync(glbPath);
+    const chunkLen = buffer.readUInt32LE(12);
+    const jsonStr = buffer.toString('utf8', 20, 20 + chunkLen);
+    const glbData = JSON.parse(jsonStr);
+
+    const animNames = (glbData.animations || []).map((a: any) => a.name);
+    const expected = [
+      'idle',
+      'run',
+      'sprint',
+      'slide',
+      'turn180',
+      'strafe_left',
+      'strafe_right',
+      'reload',
+      'stab',
+      'slash',
+      'death'
+    ];
+
+    for (const exp of expected) {
+      assert.ok(animNames.includes(exp), `Animation '${exp}' must be present in GLB, found: ${animNames.join(', ')}`);
+    }
+  });
 });

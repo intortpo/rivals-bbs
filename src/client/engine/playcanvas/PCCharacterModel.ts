@@ -43,17 +43,31 @@ export class PCCharacterModel {
   // Animation state
   private animTimer: number = 0;
   public aimPitch: number = 0;
+  public botRole?: 'scout' | 'rusher' | 'heavy' | 'sniper' | 'boss';
 
-  constructor(app: pc.Application | undefined, playerId: string, team: TeamColor = 'blue', isLocal: boolean = false) {
+  // 3D Overhead Billboard Entity
+  public overheadRoot?: pc.Entity;
+  private hpBarFillEntity?: pc.Entity;
+  private shieldBarFillEntity?: pc.Entity;
+
+  constructor(
+    app: pc.Application | undefined,
+    playerId: string,
+    team: TeamColor = 'blue',
+    isLocal: boolean = false,
+    botRole?: 'scout' | 'rusher' | 'heavy' | 'sniper' | 'boss'
+  ) {
     this.playerId = playerId;
     this.team = team;
     this.isLocalPlayer = isLocal;
+    this.botRole = botRole;
     this.root = new pc.Entity(`Player_${playerId}`);
 
     this.setupHitboxDefinitions();
 
     if (app && !isLocal) {
       this.buildProceduralAvatar();
+      this.setupOverheadUI();
       app.root.addChild(this.root);
     }
   }
@@ -287,6 +301,92 @@ export class PCCharacterModel {
     }
 
     return this.worldHitboxes;
+  }
+
+  private setupOverheadUI(): void {
+    this.overheadRoot = new pc.Entity(`Overhead_${this.playerId}`);
+    this.overheadRoot.setLocalPosition(0, 2.15, 0);
+
+    const isBlue = this.team === 'blue';
+    let beaconCol = isBlue ? new pc.Color(0.0, 0.85, 1.0) : new pc.Color(1.0, 0.2, 0.3);
+    if (this.botRole === 'scout') beaconCol = new pc.Color(0.0, 1.0, 0.5);
+    else if (this.botRole === 'rusher') beaconCol = new pc.Color(1.0, 0.55, 0.0);
+    else if (this.botRole === 'heavy') beaconCol = new pc.Color(1.0, 0.1, 0.1);
+    else if (this.botRole === 'sniper') beaconCol = new pc.Color(0.8, 0.3, 1.0);
+    else if (this.botRole === 'boss') beaconCol = new pc.Color(1.0, 0.8, 0.0);
+
+    // Glowing diamond beacon
+    const beaconMat = new pc.StandardMaterial();
+    beaconMat.diffuse = beaconCol;
+    beaconMat.emissive = beaconCol;
+    beaconMat.emissiveIntensity = 2.5;
+    beaconMat.update();
+
+    const beacon = new pc.Entity('Beacon');
+    beacon.addComponent('render', { type: 'box', material: beaconMat });
+    beacon.setLocalPosition(0, 0.15, 0);
+    beacon.setLocalEulerAngles(45, 45, 0);
+    beacon.setLocalScale(0.12, 0.12, 0.12);
+    this.overheadRoot.addChild(beacon);
+
+    // Background bar
+    const bgMat = new pc.StandardMaterial();
+    bgMat.diffuse = new pc.Color(0.08, 0.10, 0.15);
+    bgMat.update();
+
+    const bgBar = new pc.Entity('BgBar');
+    bgBar.addComponent('render', { type: 'box', material: bgMat });
+    bgBar.setLocalScale(0.72, 0.07, 0.03);
+    this.overheadRoot.addChild(bgBar);
+
+    // Health bar fill
+    const hpMat = new pc.StandardMaterial();
+    hpMat.diffuse = new pc.Color(0.1, 0.85, 0.35);
+    hpMat.emissive = new pc.Color(0.1, 0.85, 0.35);
+    hpMat.emissiveIntensity = 1.0;
+    hpMat.update();
+
+    this.hpBarFillEntity = new pc.Entity('HpFill');
+    this.hpBarFillEntity.addComponent('render', { type: 'box', material: hpMat });
+    this.hpBarFillEntity.setLocalPosition(0, 0, 0.01);
+    this.hpBarFillEntity.setLocalScale(0.68, 0.05, 0.03);
+    this.overheadRoot.addChild(this.hpBarFillEntity);
+
+    // Shield bar fill
+    const shieldMat = new pc.StandardMaterial();
+    shieldMat.diffuse = new pc.Color(0.0, 0.85, 1.0);
+    shieldMat.emissive = new pc.Color(0.0, 0.85, 1.0);
+    shieldMat.emissiveIntensity = 1.2;
+    shieldMat.update();
+
+    this.shieldBarFillEntity = new pc.Entity('ShieldFill');
+    this.shieldBarFillEntity.addComponent('render', { type: 'box', material: shieldMat });
+    this.shieldBarFillEntity.setLocalPosition(0, 0.045, 0.015);
+    this.shieldBarFillEntity.setLocalScale(0.68, 0.02, 0.03);
+    this.overheadRoot.addChild(this.shieldBarFillEntity);
+
+    this.root.addChild(this.overheadRoot);
+  }
+
+  public updateHealth(hp: number, maxHp: number = 100, shield: number = 0, maxShield: number = 50): void {
+    if (this.hpBarFillEntity) {
+      const pct = Math.max(0, Math.min(1, hp / maxHp));
+      this.hpBarFillEntity.setLocalScale(Math.max(0.001, 0.68 * pct), 0.05, 0.03);
+      this.hpBarFillEntity.setLocalPosition(-0.34 * (1 - pct), 0, 0.01);
+    }
+    if (this.shieldBarFillEntity) {
+      const sPct = maxShield > 0 ? Math.max(0, Math.min(1, shield / maxShield)) : 0;
+      this.shieldBarFillEntity.enabled = sPct > 0;
+      if (sPct > 0) {
+        this.shieldBarFillEntity.setLocalScale(Math.max(0.001, 0.68 * sPct), 0.02, 0.03);
+        this.shieldBarFillEntity.setLocalPosition(-0.34 * (1 - sPct), 0.045, 0.015);
+      }
+    }
+  }
+
+  public updateBillboard(camPos: pc.Vec3 | null | undefined): void {
+    if (!this.overheadRoot || !camPos) return;
+    this.overheadRoot.lookAt(camPos.x, camPos.y, camPos.z);
   }
 
   public applyCustomization(_custom: CharacterCustomization): void {

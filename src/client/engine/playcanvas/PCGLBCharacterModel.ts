@@ -22,6 +22,11 @@ export class PCGLBCharacterModel implements PCTargetable {
   private rightHandBone?: pc.Entity;
   public weaponHolder!: pc.Entity;
 
+  // 3D Overhead Billboard Entity
+  public overheadRoot?: pc.Entity;
+  private hpBarFillEntity?: pc.Entity;
+  private shieldBarFillEntity?: pc.Entity;
+
   // Animation controller
   private currentAnimState: string = 'idle';
 
@@ -54,6 +59,7 @@ export class PCGLBCharacterModel implements PCTargetable {
       if (container) {
         this.instantiateFromContainer(container);
       }
+      this.setupOverheadUI();
       app.root.addChild(this.root);
     }
   }
@@ -137,6 +143,8 @@ export class PCGLBCharacterModel implements PCTargetable {
     this.modelEntity = container.instantiateRenderEntity({ castShadows: true });
     // Scale 0.01 converts Mixamo centimeters (180 cm) to game world meters (1.80 m)
     this.modelEntity.setLocalScale(0.01, 0.01, 0.01);
+    // Mixamo characters face +Z, rotate 180 around Y so they face forward (-Z) in game
+    this.modelEntity.setLocalEulerAngles(0, 180, 0);
     this.root.addChild(this.modelEntity);
 
     // 2. Discover key skeleton bones
@@ -174,42 +182,44 @@ export class PCGLBCharacterModel implements PCTargetable {
 
     // Role-specific accents for bots
     if (this.botRole === 'scout') {
-      accentColor = new pc.Color(0.0, 0.9, 0.45); // Emerald Green
-      emissiveColor = new pc.Color(0.0, 0.9, 0.45);
-      baseColor = new pc.Color(0.1, 0.25, 0.15);
+      accentColor = new pc.Color(0.0, 0.95, 0.45); // Emerald Green
+      emissiveColor = new pc.Color(0.0, 0.95, 0.45);
+      baseColor = new pc.Color(0.1, 0.35, 0.18);
     } else if (this.botRole === 'rusher') {
       accentColor = new pc.Color(1.0, 0.55, 0.0); // Blaze Orange
       emissiveColor = new pc.Color(1.0, 0.55, 0.0);
-      baseColor = new pc.Color(0.3, 0.18, 0.08);
+      baseColor = new pc.Color(0.4, 0.2, 0.08);
     } else if (this.botRole === 'heavy') {
-      accentColor = new pc.Color(0.85, 0.0, 0.0); // Deep Crimson
-      emissiveColor = new pc.Color(0.9, 0.1, 0.1);
-      baseColor = new pc.Color(0.2, 0.08, 0.08);
+      accentColor = new pc.Color(0.95, 0.08, 0.08); // Deep Crimson
+      emissiveColor = new pc.Color(0.95, 0.1, 0.1);
+      baseColor = new pc.Color(0.35, 0.08, 0.08);
     } else if (this.botRole === 'sniper') {
-      accentColor = new pc.Color(0.65, 0.2, 1.0); // Violet
-      emissiveColor = new pc.Color(0.65, 0.2, 1.0);
-      baseColor = new pc.Color(0.18, 0.1, 0.28);
+      accentColor = new pc.Color(0.75, 0.25, 1.0); // Neon Violet
+      emissiveColor = new pc.Color(0.75, 0.25, 1.0);
+      baseColor = new pc.Color(0.25, 0.12, 0.38);
     }
 
     const surfaceMat = new pc.StandardMaterial();
     surfaceMat.diffuse = baseColor;
-    surfaceMat.gloss = 0.6;
-    surfaceMat.metalness = 0.25;
+    surfaceMat.gloss = 0.5;
+    surfaceMat.metalness = 0.3;
     surfaceMat.useMetalness = true;
     surfaceMat.update();
 
     const jointMat = new pc.StandardMaterial();
     jointMat.diffuse = accentColor;
     jointMat.emissive = emissiveColor;
-    jointMat.emissiveIntensity = 1.4;
+    jointMat.emissiveIntensity = 2.0;
     jointMat.update();
 
-    const renders = this.modelEntity.findComponents('render') as pc.RenderComponent[];
-    for (const r of renders) {
-      if (r.entity.name.includes('Joints')) {
-        r.material = jointMat;
-      } else {
-        r.material = surfaceMat;
+    const renderComps = this.modelEntity.findComponents('render') as pc.RenderComponent[];
+    for (const r of renderComps) {
+      const isJoint = r.entity.name.toLowerCase().includes('joint');
+      const mat = isJoint ? jointMat : surfaceMat;
+      if (r.meshInstances && r.meshInstances.length > 0) {
+        for (const mi of r.meshInstances) {
+          mi.material = mat;
+        }
       }
     }
   }
@@ -225,18 +235,52 @@ export class PCGLBCharacterModel implements PCTargetable {
       const animComponent = this.modelEntity.anim;
       if (!animComponent) return;
 
+      const stateNames = [
+        'idle',
+        'run',
+        'sprint',
+        'slide',
+        'turn180',
+        'strafe_left',
+        'strafe_right',
+        'reload',
+        'stab',
+        'slash',
+        'death'
+      ];
+
+      const graph = {
+        layers: [
+          {
+            name: 'Base',
+            states: [
+              { name: 'START', speed: 1 },
+              ...stateNames.map((name) => ({
+                name,
+                speed: 1.0,
+                loop: !['slide', 'turn180', 'reload', 'stab', 'slash', 'death'].includes(name),
+                defaultState: name === 'idle'
+              }))
+            ],
+            transitions: [{ from: 'START', to: 'idle' }]
+          }
+        ],
+        parameters: {}
+      };
+
+      animComponent.loadStateGraph(graph);
+
+      // Map track resources into their respective state nodes
       for (const asset of animAssets) {
         if (!asset || !asset.resource) continue;
         const track = asset.resource as pc.AnimTrack;
-        const trackName = track.name || asset.name;
-        const isOneShot =
-          trackName === 'death' ||
-          trackName === 'reload' ||
-          trackName === 'stab' ||
-          trackName === 'slash' ||
-          trackName === 'turn180';
+        const rawName = (track.name || asset.name || '').toLowerCase();
 
-        animComponent.addAnimationState(trackName, track, 1.0, !isOneShot);
+        for (const s of stateNames) {
+          if (rawName === s || rawName.includes(s) || (s === 'turn180' && rawName.includes('180'))) {
+            animComponent.baseLayer?.assignAnimation(s, track);
+          }
+        }
       }
 
       animComponent.baseLayer?.play('idle');
@@ -244,6 +288,92 @@ export class PCGLBCharacterModel implements PCTargetable {
     } catch (err) {
       console.warn('[PCGLBCharacterModel] Could not initialize anim component:', err);
     }
+  }
+
+  private setupOverheadUI(): void {
+    this.overheadRoot = new pc.Entity(`Overhead_${this.playerId}`);
+    this.overheadRoot.setLocalPosition(0, 2.15, 0);
+
+    const isBlue = this.team === 'blue';
+    let beaconCol = isBlue ? new pc.Color(0.0, 0.85, 1.0) : new pc.Color(1.0, 0.2, 0.3);
+    if (this.botRole === 'scout') beaconCol = new pc.Color(0.0, 1.0, 0.5);
+    else if (this.botRole === 'rusher') beaconCol = new pc.Color(1.0, 0.55, 0.0);
+    else if (this.botRole === 'heavy') beaconCol = new pc.Color(1.0, 0.1, 0.1);
+    else if (this.botRole === 'sniper') beaconCol = new pc.Color(0.8, 0.3, 1.0);
+    else if (this.botRole === 'boss') beaconCol = new pc.Color(1.0, 0.8, 0.0);
+
+    // Glowing diamond beacon
+    const beaconMat = new pc.StandardMaterial();
+    beaconMat.diffuse = beaconCol;
+    beaconMat.emissive = beaconCol;
+    beaconMat.emissiveIntensity = 2.5;
+    beaconMat.update();
+
+    const beacon = new pc.Entity('Beacon');
+    beacon.addComponent('render', { type: 'box', material: beaconMat });
+    beacon.setLocalPosition(0, 0.15, 0);
+    beacon.setLocalEulerAngles(45, 45, 0);
+    beacon.setLocalScale(0.12, 0.12, 0.12);
+    this.overheadRoot.addChild(beacon);
+
+    // Background bar
+    const bgMat = new pc.StandardMaterial();
+    bgMat.diffuse = new pc.Color(0.08, 0.10, 0.15);
+    bgMat.update();
+
+    const bgBar = new pc.Entity('BgBar');
+    bgBar.addComponent('render', { type: 'box', material: bgMat });
+    bgBar.setLocalScale(0.72, 0.07, 0.03);
+    this.overheadRoot.addChild(bgBar);
+
+    // Health bar fill
+    const hpMat = new pc.StandardMaterial();
+    hpMat.diffuse = new pc.Color(0.1, 0.85, 0.35);
+    hpMat.emissive = new pc.Color(0.1, 0.85, 0.35);
+    hpMat.emissiveIntensity = 1.0;
+    hpMat.update();
+
+    this.hpBarFillEntity = new pc.Entity('HpFill');
+    this.hpBarFillEntity.addComponent('render', { type: 'box', material: hpMat });
+    this.hpBarFillEntity.setLocalPosition(0, 0, 0.01);
+    this.hpBarFillEntity.setLocalScale(0.68, 0.05, 0.03);
+    this.overheadRoot.addChild(this.hpBarFillEntity);
+
+    // Shield bar fill
+    const shieldMat = new pc.StandardMaterial();
+    shieldMat.diffuse = new pc.Color(0.0, 0.85, 1.0);
+    shieldMat.emissive = new pc.Color(0.0, 0.85, 1.0);
+    shieldMat.emissiveIntensity = 1.2;
+    shieldMat.update();
+
+    this.shieldBarFillEntity = new pc.Entity('ShieldFill');
+    this.shieldBarFillEntity.addComponent('render', { type: 'box', material: shieldMat });
+    this.shieldBarFillEntity.setLocalPosition(0, 0.045, 0.015);
+    this.shieldBarFillEntity.setLocalScale(0.68, 0.02, 0.03);
+    this.overheadRoot.addChild(this.shieldBarFillEntity);
+
+    this.root.addChild(this.overheadRoot);
+  }
+
+  public updateHealth(hp: number, maxHp: number = 100, shield: number = 0, maxShield: number = 50): void {
+    if (this.hpBarFillEntity) {
+      const pct = Math.max(0, Math.min(1, hp / maxHp));
+      this.hpBarFillEntity.setLocalScale(Math.max(0.001, 0.68 * pct), 0.05, 0.03);
+      this.hpBarFillEntity.setLocalPosition(-0.34 * (1 - pct), 0, 0.01);
+    }
+    if (this.shieldBarFillEntity) {
+      const sPct = maxShield > 0 ? Math.max(0, Math.min(1, shield / maxShield)) : 0;
+      this.shieldBarFillEntity.enabled = sPct > 0;
+      if (sPct > 0) {
+        this.shieldBarFillEntity.setLocalScale(Math.max(0.001, 0.68 * sPct), 0.02, 0.03);
+        this.shieldBarFillEntity.setLocalPosition(-0.34 * (1 - sPct), 0.045, 0.015);
+      }
+    }
+  }
+
+  public updateBillboard(camPos: pc.Vec3 | null | undefined): void {
+    if (!this.overheadRoot || !camPos) return;
+    this.overheadRoot.lookAt(camPos.x, camPos.y, camPos.z);
   }
 
   public setPosition(x: number, y: number, z: number): void {

@@ -377,7 +377,7 @@ export class PCNetworkClient {
             false
           );
         } else {
-          model = new PCCharacterModel(this.app, id, pState.team || (pState.isBot ? 'red' : 'blue'), false);
+          model = new PCCharacterModel(this.app, id, pState.team || (pState.isBot ? 'red' : 'blue'), false, pState.botRole);
         }
 
         model.setPosition(pState.x, pState.y, pState.z);
@@ -425,7 +425,7 @@ export class PCNetworkClient {
             false
           );
         } else {
-          model = new PCCharacterModel(this.app, id, data.team || (data.isBot ? 'red' : 'blue'), false);
+          model = new PCCharacterModel(this.app, id, data.team || (data.isBot ? 'red' : 'blue'), false, data.botRole);
         }
         model.setPosition(data.x, data.y, data.z);
         model.setRotation((data.yaw * 180) / Math.PI);
@@ -451,6 +451,15 @@ export class PCNetworkClient {
       remote.isSliding = data.isSliding;
       remote.isJumping = data.isJumping;
 
+      if ('updateHealth' in remote.model) {
+        (remote.model as any).updateHealth(
+          data.health,
+          (data as any).maxHealth || 100,
+          data.shieldHp ?? 0,
+          50
+        );
+      }
+
       if (remote.isDead && !data.isDead) {
         remote.isDead = false;
         remote.model.setVisible(true);
@@ -474,8 +483,15 @@ export class PCNetworkClient {
   }
 
   public update(delta: number): void {
+    const cam = this.app?.root.findComponent('camera') as pc.CameraComponent | null;
+    const camPos = cam?.entity?.getPosition();
+
     for (const remote of this.remotePlayers.values()) {
       if (remote.isDead) continue;
+
+      if (camPos && 'updateBillboard' in remote.model) {
+        (remote.model as any).updateBillboard(camPos);
+      }
 
       // Position interpolation
       const curPos = remote.model.root.getPosition();

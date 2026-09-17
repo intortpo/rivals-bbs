@@ -37,6 +37,7 @@ export class LobbyUI {
   public selectedOutfit: number = 0;
   public customOutfit: CharacterCustomization | null = null;
   public selectedSky: string = 'twilight';
+  public autoStartSolo: boolean = false;
   private currentOpenRooms: OpenRoomSummary[] = [];
 
   constructor(container: HTMLElement, callbacks: LobbyCallbacks) {
@@ -201,6 +202,10 @@ export class LobbyUI {
 
         <!-- Action Buttons -->
         <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button id="btn-play-solo" class="btn" style="padding: 14px; font-size: 16px; font-weight: 900; letter-spacing: 1px; background: linear-gradient(135deg, #00d2ff, #2563eb); color: #ffffff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+            <span>⚡</span> PLAY SOLO WAVE (INSTANT ACTION)
+          </button>
+
           <button id="btn-create-room" class="btn btn-primary" style="padding: 14px; font-size: 17px; letter-spacing: 1px;">
             🎮 CREATE MATCH
           </button>
@@ -455,6 +460,33 @@ export class LobbyUI {
       }
     });
 
+    // Play Solo Wave (Instant Match Start)
+    const soloBtn = document.getElementById('btn-play-solo');
+    soloBtn?.addEventListener('click', () => {
+      this.autoStartSolo = true;
+      const name = nameInput?.value.trim() || 'Rival';
+      const mapSelect = document.getElementById('select-map-name') as HTMLSelectElement;
+      const outfitSelect = document.getElementById('select-character-outfit') as HTMLSelectElement;
+      const skySelect = document.getElementById('select-sky-theme') as HTMLSelectElement;
+
+      const isCustom = outfitSelect?.value === 'custom';
+      const outfitIdx = isCustom ? 0 : parseInt(outfitSelect?.value || '0', 10);
+      const skyTheme = skySelect?.value || 'twilight';
+
+      this.selectedOutfit = outfitIdx;
+      this.selectedSky = skyTheme;
+
+      this.callbacks.onCreateRoom(
+        name,
+        'wave',
+        10,
+        mapSelect?.value || 'Facility',
+        skyTheme,
+        outfitIdx,
+        isCustom || this.customOutfit ? (this.customOutfit || undefined) : undefined
+      );
+    });
+
     // Create room
     const createBtn = document.getElementById('btn-create-room');
     createBtn?.addEventListener('click', () => {
@@ -667,6 +699,13 @@ export class LobbyUI {
   }
 
   public showInRoomLobby(state: RoomNetworkState, isHost: boolean): void {
+    if (this.autoStartSolo && isHost) {
+      this.autoStartSolo = false;
+      this.hideLobby();
+      this.callbacks.onStartMatch();
+      return;
+    }
+
     const mainMenu = document.getElementById('section-main-menu');
     const openRoomsSec = document.getElementById('section-open-rooms');
     const inRoom = document.getElementById('section-in-room');

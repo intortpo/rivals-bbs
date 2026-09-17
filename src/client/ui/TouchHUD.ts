@@ -61,6 +61,7 @@ export class TouchHUD {
   private lastTeamRed: number = -1;
   private lastWaveNum: number = -1;
   private lastAliveBots: number = -1;
+  private lastNearestDist: number = -1;
 
   public onPowerupClick?: () => void;
   public onOpenDashboard?: () => void;
@@ -519,7 +520,8 @@ export class TouchHUD {
     scoreB: number,
     goal: number,
     teamScores?: { blue: number; red: number },
-    waveState?: any
+    waveState?: any,
+    nearestBotDist?: number
   ): void {
     const modeEl = this.modeEl || document.getElementById('hud-match-mode');
     const scoreEl = this.scoreEl || document.getElementById('hud-match-score');
@@ -528,17 +530,22 @@ export class TouchHUD {
     if (mode === 'wave') {
       const waveNum = waveState?.currentWave || 1;
       const aliveBots = waveState?.aliveBotsCount ?? 0;
+      const distRounded = nearestBotDist !== undefined ? Math.round(nearestBotDist) : -1;
       if (
         this.lastMatchMode !== 'wave' ||
         this.lastWaveNum !== waveNum ||
-        this.lastAliveBots !== aliveBots
+        this.lastAliveBots !== aliveBots ||
+        this.lastNearestDist !== distRounded
       ) {
         this.lastMatchMode = 'wave';
         this.lastWaveNum = waveNum;
         this.lastAliveBots = aliveBots;
+        this.lastNearestDist = distRounded;
         if (modeEl) modeEl.textContent = '🧟 WAVE SURVIVAL';
         if (scoreEl) scoreEl.textContent = `WAVE ${waveNum}`;
-        if (fragEl) fragEl.textContent = `🤖 BOTS: ${aliveBots}`;
+        if (fragEl) {
+          fragEl.textContent = distRounded >= 0 ? `🤖 ${aliveBots} LEFT • 🎯 ${distRounded}m` : `🤖 BOTS: ${aliveBots}`;
+        }
       }
       return;
     }

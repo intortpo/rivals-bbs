@@ -150,11 +150,14 @@ class GameApp {
           this.mapBuilder = new PCMapBuilder(this.renderer.app, mapName, skyTheme);
           this.powerupManager.spawnWorldPickups(mapName);
         }
+        const isSolo = this.lobbyUI.autoStartSolo;
         const res = await this.networkClient.createRoom(name, mode, fragLimit, mapName, outfitIndex, customization);
         if (res.success && res.roomId) {
           if (this.networkClient.currentRoomState) {
             this.lobbyUI.showInRoomLobby(this.networkClient.currentRoomState, true);
-            this.qrManager.showQRModal(res.roomId);
+            if (!isSolo) {
+              this.qrManager.showQRModal(res.roomId);
+            }
           }
         } else {
           alert(res.error || 'Failed to create room');
@@ -625,13 +628,28 @@ class GameApp {
     const players = Object.values(state.players) as any[];
     const scoreA = players[0]?.score || 0;
     const scoreB = players[1]?.score || 0;
+
+    let nearestBotDist: number | undefined;
+    if (state.mode === 'wave') {
+      const myPos = this.playerPos;
+      let minDist = Infinity;
+      for (const remote of (this.networkClient as any).remotePlayers.values()) {
+        if (!remote.isDead) {
+          const d = myPos.distance(remote.targetPos);
+          if (d < minDist) minDist = d;
+        }
+      }
+      if (minDist !== Infinity) nearestBotDist = minDist;
+    }
+
     this.hud.updateMatchHeader(
       state.mode,
       scoreA,
       scoreB,
       state.fragLimit,
       state.teamScores,
-      state.waveState
+      state.waveState,
+      nearestBotDist
     );
   }
 
