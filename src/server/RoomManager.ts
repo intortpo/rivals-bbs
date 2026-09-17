@@ -30,9 +30,11 @@ export class RoomManager {
     fragLimit?: number,
     mapName: string = 'Facility',
     outfitIndex: number = 0,
-    customization?: CharacterCustomization
+    customization?: CharacterCustomization,
+    forceRoomId?: string
+    
   ): { roomId: string; session: GameSession; hostSecret: string } {
-    const roomId = (mapName === "Sky Islands" && mode === "wave") ? "GLOBAL" : this.generateRoomId();
+    const roomId = forceRoomId || this.generateRoomId();
     const color = PLAYER_COLORS[0];
     const defaultFrag = mode === '4v4' ? 20 : mode === 'wave' ? (fragLimit || 10) : (fragLimit || NETWORK.DEFAULT_FRAG_LIMIT);
 
@@ -72,7 +74,8 @@ export class RoomManager {
     roomId: string,
     playerName: string,
     outfitIndex: number = 0,
-    customization?: CharacterCustomization
+    customization?: CharacterCustomization,
+    
   ): { success: boolean; error?: string; session?: GameSession } {
     const session = this.rooms.get(roomId.toUpperCase());
     if (!session) {

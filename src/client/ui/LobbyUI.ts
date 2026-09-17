@@ -18,6 +18,7 @@ export interface LobbyCallbacks {
     customization?: CharacterCustomization
   ) => void;
   onOpenQRScanner: () => void;
+  onGlobalMatch?: (playerName: string, customization?: CharacterCustomization) => void;
   onOpenQRDisplay: (roomId: string) => void;
   onStartMatch: () => void;
   onAuthClick?: () => void;
@@ -176,6 +177,10 @@ export class LobbyUI {
 
         <!-- Action Buttons -->
         <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button id="btn-global-match" class="btn" style="padding: 14px; font-size: 16px; font-weight: 900; letter-spacing: 1px; background: linear-gradient(135deg, #ff0055, #a200ff); color: #ffffff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 0, 85, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+            <span>🌍</span> JOIN GLOBAL BULLET HELL
+          </button>
+
           <button id="btn-play-solo" class="btn" style="padding: 14px; font-size: 16px; font-weight: 900; letter-spacing: 1px; background: linear-gradient(135deg, #00d2ff, #2563eb); color: #ffffff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
             <span>⚡</span> PLAY SOLO WAVE (INSTANT ACTION)
           </button>
@@ -424,6 +429,13 @@ export class LobbyUI {
       if (this.callbacks.onAuthClick) {
         this.callbacks.onAuthClick();
       }
+    });
+
+    // Global Match (Join or Create)
+    const globalBtn = document.getElementById('btn-global-match');
+    globalBtn?.addEventListener('click', () => {
+      const name = nameInput?.value.trim() || 'Rival';
+      this.callbacks.onGlobalMatch?.(name);
     });
 
     // Play Solo Wave (Instant Match Start)

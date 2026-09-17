@@ -147,6 +147,18 @@ class GameApp {
 
     // 3. Lobby UI
     this.lobbyUI = new LobbyUI(this.appContainer, {
+      onGlobalMatch: async (name, customization) => {
+        this.audio.touchUnlock();
+        const res = await this.networkClient.joinRoom('GLOBAL', name, 0, customization);
+        if (!res.success) {
+          // If GLOBAL doesn't exist, create it
+          this.networkClient.createRoom(name, 'wave', 99, 'Sky Islands', 0, customization).then(createRes => {
+              if (createRes.success && createRes.roomId) {
+                  this.networkClient.startCountdown();
+              }
+          });
+        }
+      },
       onCreateRoom: async (name, mode, fragLimit, mapName, skyTheme = 'twilight', outfitIndex = 0, customization) => {
         this.audio.touchUnlock();
         if (this.mapBuilder.mapName !== mapName || this.mapBuilder.skyTheme !== skyTheme) {
@@ -257,22 +269,7 @@ class GameApp {
       },
       () => {
         this.input.unlockCursor();
-        // AUTO JOIN GLOBAL BULLET HELL SERVER
-        const name = this.authUI?.currentUser?.displayName || 'InvaderHunter_' + Math.floor(Math.random() * 1000);
-        
-        // Attempt to join the persistent GLOBAL room
-        this.networkClient.joinRoom('GLOBAL', name, 0, undefined).then(res => {
-          if (!res.success) {
-            // Room does not exist yet; create the global room. 
-            // We'll let the server randomly name the room, but everyone else will see it in the open rooms list and can join.
-            // Wait, we can modify the roomID on the server, but for now we'll just create a wave mode game and auto-start it.
-            this.networkClient.createRoom(name, 'wave', 99, 'Sky Islands', 0, undefined).then(createRes => {
-                if (createRes.success && createRes.roomId) {
-                   this.networkClient.startCountdown();
-                }
-            });
-          }
-        });
+        this.dashboardUI.open(this.authUI?.currentUser || null);
       }
     );
     this.grammarReloadUI = new GrammarReloadUI(this.appContainer);

@@ -219,7 +219,7 @@ io.on('connection', (socket) => {
 
   socket.on('create_room', (data, callback) => {
     try {
-      const { playerName, mode, fragLimit, mapName, outfitIndex, customization } = data || {};
+      const { playerName, mode, fragLimit, mapName, outfitIndex, customization, forceRoomId } = data || {};
       const { roomId, session, hostSecret } = roomManager.createRoom(
         socket,
         playerName,
@@ -227,7 +227,8 @@ io.on('connection', (socket) => {
         fragLimit,
         mapName,
         outfitIndex,
-        customization
+        customization,
+        forceRoomId
       );
       console.log(`[RoomManager] Room created: ${roomId} by ${playerName || 'Anonymous'}`);
       if (callback) {
