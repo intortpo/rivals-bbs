@@ -20,7 +20,7 @@ import {
 import { PCCharacterModel } from '../engine/playcanvas/PCCharacterModel.js';
 import { PCGLBCharacterModel } from '../engine/playcanvas/PCGLBCharacterModel.js';
 import { PCGeometricBossModel } from '../engine/playcanvas/PCGeometricBossModel.js';
-import { PCKenneyCharacterModel, BOT_ROLE_SKIN_MAP, OUTFIT_SKIN_LIST } from '../engine/playcanvas/PCKenneyCharacterModel.js';
+import { PCKenneyCharacterModel } from '../engine/playcanvas/PCKenneyCharacterModel.js';
 import { AudioManager } from '../engine/AudioManager.js';
 import { PCFXManager } from '../engine/playcanvas/PCFXManager.js';
 import { PCWeaponManager, PCTargetable } from '../engine/playcanvas/PCWeaponManager.js';

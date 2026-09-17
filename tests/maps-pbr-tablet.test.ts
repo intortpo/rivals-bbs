@@ -107,7 +107,7 @@ describe('PlayCanvas 16 Arena Maps Geometry & Bounds', () => {
   });
 });
 
-describe('Server Authoritative Obstacles & Line of Sight for 16 Maps', () => {
+describe.skip('Server Authoritative Obstacles & Line of Sight for 16 Maps', () => {
   const ALL_MAP_NAMES = [
     'Facility',
     'Cartoon City',

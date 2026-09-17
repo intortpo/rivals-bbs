@@ -198,7 +198,7 @@ export class PCKenneyCharacterModel implements PCTargetable {
     this.setupAnimations(container);
   }
 
-  private applySkinTexture(skinName: KenneySkin): void {
+  private applySkinTexture(_skinName: KenneySkin): void {
     return;
   }
 

@@ -268,7 +268,7 @@ class GameApp {
             // Wait, we can modify the roomID on the server, but for now we'll just create a wave mode game and auto-start it.
             this.networkClient.createRoom(name, 'wave', 99, 'Sky Islands', 0, undefined).then(createRes => {
                 if (createRes.success && createRes.roomId) {
-                   this.networkClient.startMatch(createRes.roomId);
+                   this.networkClient.startCountdown();
                 }
             });
           }

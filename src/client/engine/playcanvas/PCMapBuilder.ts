@@ -815,512 +815,145 @@ export class PCMapBuilder {
     this.platformerPlacements = [];
 
     switch (name) {
-      case 'Facility':
-        this.buildFacilityArena();
-        break;
       case 'Cartoon City':
-        this.buildCartoonCity();
-        break;
-      case 'Arena Classic':
-        this.buildClassicArena();
-        break;
       case 'Neon Warehouse':
-        this.buildNeonWarehouse();
+      case 'Urban Slums':
+      case 'Metro Underpass':
+      case 'Skyline Penthouse':
+      case 'Metro Underpass (Neon Subways)':
+      case 'Skyline Penthouse (Vertigo Lounge)':
+        this.generateUrbanCity();
         break;
-      case 'Cyber Spire':
-        this.buildCyberSpire();
-        break;
-      case 'Quantum Lab':
-      case 'Quantum Lab (Dimension)':
-        this.buildQuantumLab();
-        break;
-      case 'Magma Foundry':
-      case 'Magma Foundry (Onyx)':
-        this.buildMagmaFoundry();
-        break;
-      case 'Subzero Station':
-        this.buildSubzeroStation();
-        break;
-      case 'Sky Sanctuary':
-        this.buildSkySanctuary();
-        break;
-      case 'Orbital Station':
-        this.buildOrbitalStation();
-        break;
+        
       case 'Bio-Dome':
       case 'Bio-Dome (Neo Arboretum)':
-        this.buildBioDome();
-        break;
-      case 'Metro Underpass':
-      case 'Metro Underpass (Neon Subways)':
-        this.buildMetroUnderpass();
-        break;
+      case 'Sky Sanctuary':
+      case 'Sky Islands':
       case 'Sunken Atoll':
       case 'Sunken Atoll (Ancient Coral Ruins)':
-        this.buildSunkenAtoll();
-        break;
       case 'Scrapyard Canyon':
       case 'Scrapyard Canyon (Rust Basin)':
-        this.buildScrapyardCanyon();
+        this.generateNatureBiome();
         break;
-      case 'Solar Relay':
-      case 'Solar Relay (Helios Mirror Array)':
-        this.buildSolarRelay();
-        break;
-      case 'Skyline Penthouse':
-      case 'Skyline Penthouse (Vertigo Lounge)':
-        this.buildSkylinePenthouse();
-        break;
+
       default:
-        this.buildFacilityArena();
+        this.generateTechFacility();
         break;
     }
+  }
 
-    if (this.app && (this.app as any).batcher && this.staticBatchGroupId !== undefined) {
-      try {
-        (this.app as any).batcher.generate([this.staticBatchGroupId]);
-      } catch (err) {
-        // Safe fallback in headless/test environments
+  private generateUrbanCity(): void {
+    this.bounds = { minX: -150, maxX: 150, minZ: -150, maxZ: 150 };
+    this.hasGroundPlane = true;
+    
+    // Base Asphalt
+    this.addBox(0, -0.1, 0, 300, 0.2, 300, '#11141e', false, { metalness: 0.1, gloss: 0.5 });
+    
+    // Grid of roads and buildings
+    const gridSize = 10;
+    for (let x = -140; x <= 140; x += gridSize) {
+      for (let z = -140; z <= 140; z += gridSize) {
+        // Leave center open
+        if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
+        
+        const rand = Math.random();
+        if (rand < 0.2) {
+          // Intersection
+          this.addPlatformerProp('road-asphalt-center.glb', x, 0, z, 1.2);
+        } else if (rand < 0.4) {
+          // Road straight
+          this.addPlatformerProp('road-asphalt-straight.glb', x, 0, z, 1.2);
+        } else if (rand < 0.7) {
+          // Building
+          const bldg = `building-${String.fromCharCode(97 + Math.floor(Math.random() * 10))}.glb`; // building-a to building-j
+          // We can set collider height massive so players can grapple up
+          this.addPlatformerProp(bldg, x, 0, z, 2.0 + Math.random() * 2.0);
+          
+          // Occasional roof jump pad
+          if (Math.random() < 0.1) {
+             this.createJumpPad(x, 15, z, 20); // rough roof height
+          }
+        }
       }
     }
+    
+    // Central Monument
+    this.addBox(0, 5, 0, 10, 10, 10, '#00d2ff', true, { emissive: '#00d2ff', emissiveIntensity: 2.0 });
+    this.createJumpPad(-12, 0, 0, 25);
+    this.createJumpPad(12, 0, 0, 25);
+    this.createJumpPad(0, 0, -12, 25);
+    this.createJumpPad(0, 0, 12, 25);
   }
 
-  // 1. Facility Arena (PlayCanvas FPS Starter Kit level)
-  private buildFacilityArena(): void {
-    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
+  private generateNatureBiome(): void {
+    this.bounds = { minX: -150, maxX: 150, minZ: -150, maxZ: 150 };
     this.hasGroundPlane = true;
+    
+    // Base Grass/Dirt
+    this.addBox(0, -0.1, 0, 300, 0.2, 300, '#14532d', false, { metalness: 0.05, gloss: 0.2 });
+    
+    // Scatter trees and ruins
+    for (let i = 0; i < 600; i++) {
+       const x = (Math.random() - 0.5) * 280;
+       const z = (Math.random() - 0.5) * 280;
+       if (Math.abs(x) < 20 && Math.abs(z) < 20) continue; // Keep center clear
 
-    // Heavy concrete floor grid with specular PBR sheen
-    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#181b24', false, { metalness: 0.15, gloss: 0.45 });
-
-    // Blue and Red Depot floor accents
-    this.addBox(-22, 0.02, 0, 8, 0.05, 16, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 1.2 });
-    this.addBox(22, 0.02, 0, 8, 0.05, 16, '#ff2a55', false, { emissive: '#ff2a55', emissiveIntensity: 1.2 });
-
-    // Perimeter Containment Walls
-    this.addBox(0, 4, 32, 66, 8, 2, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
-    this.addBox(0, 4, -32, 66, 8, 2, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
-    this.addBox(-32, 4, 0, 2, 8, 66, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
-    this.addBox(32, 4, 0, 2, 8, 66, '#1e2230', false, { metalness: 0.3, gloss: 0.4 });
-
-    // Central Catwalk (at Y=3.35m, width 6m, length 24m)
-    this.addBox(0, 3.35, 0, 6, 0.3, 24, '#2d3748', true, { metalness: 0.6, gloss: 0.65 });
-
-    // Catwalk High Safety Railings
-    this.addBox(-3, 3.9, 0, 0.2, 0.8, 24, '#ff9900', false, { emissive: '#ff9900', emissiveIntensity: 2.0 });
-    this.addBox(3, 3.9, 0, 0.2, 0.8, 24, '#ff9900', false, { emissive: '#ff9900', emissiveIntensity: 2.0 });
-
-    // Access Ramps (North & South)
-    this.addBox(0, 0.6, -16.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 1.8, -13.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 3.0, -10.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
-
-    this.addBox(0, 0.6, 16.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 1.8, 13.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 3.0, 10.5, 5, 1.2, 3, '#3a4454', true, { metalness: 0.4, gloss: 0.5 });
-
-    // 4 Structural Support Pillars
-    this.addBox(-8, 5, -10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
-    this.addBox(8, 5, -10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
-    this.addBox(-8, 5, 10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
-    this.addBox(8, 5, 10, 2, 10, 2, '#1a202c', false, { metalness: 0.7, gloss: 0.7 });
-
-    // Shipping Containers
-    this.addBox(-15, 1.5, -6.5, 6, 3, 3, '#2b4c7e', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(-15, 1.5, 6.5, 6, 3, 3, '#2b4c7e', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(15, 1.5, -6.5, 6, 3, 3, '#7e2b2b', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(15, 1.5, 6.5, 6, 3, 3, '#7e2b2b', true, { metalness: 0.5, gloss: 0.6 });
-
-    // Cargo Crate Clusters
-    this.addBox(-14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(14.5, 1.1, -18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(-14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(14.5, 1.1, 18.5, 3, 2.2, 3, '#4a5568', true, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(0, 0.75, -5, 4, 1.5, 2, '#3182ce', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 0.75, 5, 4, 1.5, 2, '#e53e3e', true, { metalness: 0.4, gloss: 0.5 });
-
-    // Team Depot Bunker Covers
-    this.addBox(-27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(27.5, 1.25, 0, 1, 2.5, 12, '#1e2230', true, { metalness: 0.5, gloss: 0.6 });
-
-    // 3D Kenney Platformer Props
-    this.addPlatformerProp('crate-strong.glb', -14.5, 2.2, -18.5, 1.5);
-    this.addPlatformerProp('crate.glb', 14.5, 2.2, -18.5, 1.5);
-    this.addPlatformerProp('crate.glb', -14.5, 2.2, 18.5, 1.5);
-    this.addPlatformerProp('crate-strong.glb', 14.5, 2.2, 18.5, 1.5);
-    this.addPlatformerProp('barrel.glb', -17, 0, -8, 1.3);
-    this.addPlatformerProp('barrel.glb', 17, 0, 8, 1.3);
-    this.addPlatformerProp('barrel.glb', -17, 0, 8, 1.3);
-    this.addPlatformerProp('barrel.glb', 17, 0, -8, 1.3);
-    this.addLadder(-3, 0, -10.5, 3.4, 0);
-    this.addLadder(3, 0, 10.5, 3.4, 180);
-
-    // Jump Pads (launching up to upper catwalk)
-    this.createJumpPad(-9, 0, 0, 18.0, 3.5, 0);
-    this.createJumpPad(9, 0, 0, 18.0, -3.5, 0);
+       const r = Math.random();
+       if (r < 0.3) {
+           this.addPlatformerProp('tree-pine-large.glb', x, 0, z, 2.0 + Math.random() * 1.5);
+       } else if (r < 0.6) {
+           this.addPlatformerProp('tree-park-large.glb', x, 0, z, 1.5 + Math.random());
+       } else if (r < 0.8) {
+           this.addPlatformerProp('tree.glb', x, 0, z, 1.5 + Math.random());
+       } else {
+           // Ruins / ancient column
+           this.addPlatformerProp('column-rounded.glb', x, 0, z, 2.0);
+           this.addPlatformerProp('column.glb', x + 2, 0, z + 2, 2.0);
+           if (Math.random() < 0.1) {
+              this.createJumpPad(x, 0, z, 18);
+           }
+       }
+    }
+    
+    // River / Void crevice
+    this.addBox(0, -0.5, 0, 20, 0.1, 300, '#0891b2', false, { emissive: '#06b6d4', emissiveIntensity: 1.0 });
+    this.createJumpPad(-15, 0, 0, 20, 15, 0);
+    this.createJumpPad(15, 0, 0, 20, -15, 0);
   }
 
-  // 2. Cartoon City (Urban Metropolis)
-  private buildCartoonCity(): void {
-    this.bounds = { minX: -60, maxX: 60, minZ: -60, maxZ: 60 };
-    this.hasGroundPlane = true;
-
-    // Asphalt Street Grid
-    this.addBox(0, -0.1, 0, 130, 0.2, 130, '#11141e', false, { metalness: 0.05, gloss: 0.4 });
-
-    // Central Plaza Fountain & Marble Rim
-    this.addBox(0, 0.5, 0, 6, 1.0, 6, '#28314e', true, { metalness: 0.3, gloss: 0.7 });
-    this.addBox(0, 1.5, 0, 3, 1.0, 3, '#00d2ff', true, { emissive: '#00d2ff', emissiveIntensity: 2.0 });
-
-    // City Buildings (North, South, East, West blocks)
-    this.addBox(-24, 6, -24, 18, 12, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
-    this.addBox(24, 7, -24, 18, 14, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
-    this.addBox(-24, 5, 24, 18, 10, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
-    this.addBox(24, 8, 24, 18, 16, 18, '#1e2438', true, { metalness: 0.4, gloss: 0.6 });
-
-    // Vehicles / Low tactical cover
-    this.addBox(8, 0.75, 4, 2.2, 1.5, 4.5, '#ef4444', true, { metalness: 0.8, gloss: 0.75 });
-    this.addBox(-8, 0.75, -6, 2.2, 1.5, 4.5, '#3b82f6', true, { metalness: 0.8, gloss: 0.75 });
-    this.addBox(14, 0.6, -10, 2.0, 1.2, 4.0, '#f59e0b', true, { metalness: 0.8, gloss: 0.75 });
-    this.addBox(-12, 0.6, 12, 2.0, 1.2, 4.0, '#10b981', true, { metalness: 0.8, gloss: 0.75 });
-
-    // 3D Kenney Urban Platformer Props
-    this.addPlatformerProp('tree.glb', -12, 0, -12, 1.8);
-    this.addPlatformerProp('tree.glb', 12, 0, 12, 1.8);
-    this.addPlatformerProp('tree.glb', -12, 0, 12, 1.8);
-    this.addPlatformerProp('tree.glb', 12, 0, -12, 1.8);
-    this.addPlatformerProp('fence-straight.glb', -15, 0, 0, 1.5, 90);
-    this.addPlatformerProp('fence-straight.glb', 15, 0, 0, 1.5, 90);
-    this.addPlatformerProp('crate.glb', 8, 1.5, 4, 1.2);
-    this.addPlatformerProp('crate.glb', -8, 1.5, -6, 1.2);
-
-    // Rooftop Jump Pads
-    this.createJumpPad(-12, 0, -24, 18.0);
-    this.createJumpPad(12, 0, -24, 19.5);
-    this.createJumpPad(-12, 0, 24, 17.5);
-    this.createJumpPad(12, 0, 24, 20.5);
-  }
-
-  // 3. Arena Classic (Symmetrical Cyber Colosseum)
-  private buildClassicArena(): void {
-    this.bounds = { minX: -46, maxX: 46, minZ: -46, maxZ: 46 };
-    this.hasGroundPlane = true;
-
-    // Floor
-    this.addBox(0, -0.1, 0, 96, 0.2, 96, '#1a1d2e', false, { metalness: 0.2, gloss: 0.5 });
-
-    // Central Platform
-    this.addBox(0, 1.25, 0, 12, 2.5, 12, '#28314e', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(0, 2.6, 0, 8, 0.2, 8, '#00d2ff', true, { emissive: '#00d2ff', emissiveIntensity: 2.5 });
-
-    // 4 Symmetrical Cover Pillars around center
-    const d = 14;
-    [-d, d].forEach((x) => {
-      [-d, d].forEach((z) => {
-        this.addBox(x, 2.5, z, 3, 5, 3, '#ff2a55', false, { metalness: 0.6, gloss: 0.7, emissive: '#ff2a55', emissiveIntensity: 1.2 });
-        this.addBox(x + (x > 0 ? -3 : 3), 1, z, 3, 2, 2, '#384260', true, { metalness: 0.4, gloss: 0.5 });
-      });
-    });
-
-    // 3D Kenney Arena Colosseum Props
-    this.addPlatformerProp('crate-strong.glb', -5, 2.6, -5, 1.4);
-    this.addPlatformerProp('crate-strong.glb', 5, 2.6, 5, 1.4);
-    this.addPlatformerProp('barrel.glb', -14, 0, 0, 1.4);
-    this.addPlatformerProp('barrel.glb', 14, 0, 0, 1.4);
-
-    // 4 High-Velocity Central Jump Pads
-    this.createJumpPad(-12, 0, 0, 19.0);
-    this.createJumpPad(12, 0, 0, 19.0);
-    this.createJumpPad(0, 0, -12, 19.0);
-    this.createJumpPad(0, 0, 12, 19.0);
-
-    // 4 Corner Bastions and Pads
-    [-32, 32].forEach((bx) => {
-      [-32, 32].forEach((bz) => {
-        this.addBox(bx, 1.5, bz, 10, 3.0, 10, '#242b44', true, { metalness: 0.5, gloss: 0.6 });
-      });
-    });
-
-    this.createJumpPad(24, 0, 24, 17.0, 6, 6);
-    this.createJumpPad(-24, 0, 24, 17.0, -6, 6);
-    this.createJumpPad(24, 0, -24, 17.0, 6, -6);
-    this.createJumpPad(-24, 0, -24, 17.0, -6, -6);
-  }
-
-  // 4. Neon Warehouse (High-Bay Storage & Conveyor Gantry)
-  private buildNeonWarehouse(): void {
-    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
-    this.hasGroundPlane = true;
-
-    // Floor with cyber reflective sheen
-    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#10141f', false, { metalness: 0.2, gloss: 0.55 });
-
-    // Perimeter Containment Walls
-    this.addBox(0, 4, 32, 66, 8, 2, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 4, -32, 66, 8, 2, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(-32, 4, 0, 2, 8, 66, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(32, 4, 0, 2, 8, 66, '#181e2e', false, { metalness: 0.4, gloss: 0.5 });
-
-    // Overhead Conveyor Gantry Catwalk (y=3.25m, width 8m, length 30m)
-    this.addBox(0, 3.25, 0, 8, 0.3, 30, '#2b3548', true, { metalness: 0.7, gloss: 0.65 });
-
-    // Glowing Neon Safety Railings
-    this.addBox(-4, 3.8, 0, 0.2, 0.8, 30, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 2.5 });
-    this.addBox(4, 3.8, 0, 0.2, 0.8, 30, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 2.5 });
-
-    // Industrial Shelving Racks (North & South Wings)
-    this.addBox(-17, 2.75, -16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
-    this.addBox(17, 2.75, -16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
-    this.addBox(-17, 2.75, 16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
-    this.addBox(17, 2.75, 16.5, 6, 5.5, 3, '#1f273d', false, { metalness: 0.8, gloss: 0.7 });
-
-    // Shipping Container Bays
-    this.addBox(-13, 1.6, 0, 6, 3.2, 8, '#2563eb', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(13, 1.6, 0, 6, 3.2, 8, '#dc2626', true, { metalness: 0.5, gloss: 0.6 });
-
-    // Pallets and Low Barriers
-    this.addBox(-3, 0.7, -4.5, 4, 1.4, 3, '#475569', true, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(3, 0.7, 4.5, 4, 1.4, 3, '#475569', true, { metalness: 0.3, gloss: 0.5 });
-
-    // 3D Kenney Industrial Warehouse Props
-    this.addPlatformerProp('crate-strong.glb', -13, 3.2, 0, 1.6);
-    this.addPlatformerProp('crate-strong.glb', 13, 3.2, 0, 1.6);
-    this.addPlatformerProp('barrel.glb', -15, 0, 10, 1.4);
-    this.addPlatformerProp('barrel.glb', 15, 0, -10, 1.4);
-    this.addPlatformerProp('conveyor-belt.glb', 0, 3.4, -6, 2.0);
-    this.addPlatformerProp('conveyor-belt.glb', 0, 3.4, 6, 2.0);
-
-    // Dock Terminals
-    this.addBox(-27, 1.25, 0, 2, 2.5, 16, '#1e293b', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(27, 1.25, 0, 2, 2.5, 16, '#1e293b', true, { metalness: 0.5, gloss: 0.6 });
-
-    // Jump pads launching onto conveyor bridge
-    this.createJumpPad(-9, 0, 0, 18.0, 3.5, 0);
-    this.createJumpPad(9, 0, 0, 18.0, -3.5, 0);
-  }
-
-  // 5. Cyber Spire (Floating Multi-tier Skyscraper)
-  private buildCyberSpire(): void {
-    this.bounds = { minX: -36, maxX: 36, minZ: -36, maxZ: 36 };
-    // Void fall abyss
-    this.hasGroundPlane = false;
-
-    // Tier 1 Base Plaza
-    this.addBox(0, 0.5, 0, 20, 1.0, 20, '#1a1e2e', true, { metalness: 0.4, gloss: 0.6 });
-
-    // Tier 2 Central Tower Terrace
-    this.addBox(0, 4.0, 0, 12, 6.0, 12, '#242a42', true, { metalness: 0.6, gloss: 0.7 });
-
-    // Glowing Central Spire Needle
-    this.addBox(0, 12.0, 0, 4, 10.0, 4, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 3.5 });
-
-    // Outer Satellite Platforms
-    this.addBox(0, 3.0, -22, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 3.0, 22, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(-22, 2.0, 0, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(22, 2.0, 0, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
-
-    // Sky Bridge walkways
-    this.addBox(0, 2.8, -14, 4, 0.4, 8, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(0, 2.8, 14, 4, 0.4, 8, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(-14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
-
-    // 3D Kenney Cyber Platforms & Spire Details
-    this.addPlatformerProp('platform-fortified.glb', 0, 7.0, 0, 2.0);
-    this.addPlatformerProp('poles.glb', -5, 7.0, -5, 1.5);
-    this.addPlatformerProp('poles.glb', 5, 7.0, 5, 1.5);
-
-    // Jump pads launching players up to Tier 2 Terrace
-    this.createJumpPad(0, 1.0, -8, 18.0, 0, 3.0);
-    this.createJumpPad(0, 1.0, 8, 18.0, 0, -3.0);
-    this.createJumpPad(-8, 1.0, 0, 18.0, 3.0, 0);
-    this.createJumpPad(8, 1.0, 0, 18.0, -3.0, 0);
-
-    // Cross-spire teleporters
-    this.createTeleportPort('SpireNorth', 'SpireSouth', 0, 3.0, -25, new pc.Vec3(0, 3.5, 20), Math.PI, '#00f0ff');
-    this.createTeleportPort('SpireSouth', 'SpireNorth', 0, 3.0, 25, new pc.Vec3(0, 3.5, -20), 0, '#ff2a55');
-  }
-
-  // 6. Quantum Lab (Dimension Research & Teleport Slipstream)
-  private buildQuantumLab(): void {
-    this.bounds = { minX: -55, maxX: 55, minZ: -55, maxZ: 55 };
-    this.hasGroundPlane = true;
-
-    // High-tech floor
-    this.addBox(0, -0.1, 0, 110, 0.2, 110, '#0a101d', false, { metalness: 0.3, gloss: 0.65 });
-
-    // Central Core Reactor
-    this.addBox(0, 3, 0, 8, 6, 8, '#00f0ff', true, { emissive: '#00f0ff', emissiveIntensity: 3.5 });
-
-    // Quantum Teleport Slipstream Gates (Port A <-> Port B)
-    this.createTeleportPort('PortA', 'PortB', -22, 0, 0, new pc.Vec3(22, 1.0, 0), Math.PI / 2, '#00f0ff');
-    this.createTeleportPort('PortB', 'PortA', 22, 0, 0, new pc.Vec3(-22, 1.0, 0), -Math.PI / 2, '#d946ef');
-
-    // Floating Observation Platforms
-    this.addBox(-15, 3.5, -15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
-    this.addBox(15, 3.5, 15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
-    this.addBox(-15, 3.5, 15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
-    this.addBox(15, 3.5, -15, 8, 0.5, 8, '#1f293d', true, { metalness: 0.6, gloss: 0.7 });
-
-    // 3D Kenney Quantum Lab Props
-    this.addPlatformerProp('crate-item.glb', -15, 4.0, -15, 1.3);
-    this.addPlatformerProp('crate-item.glb', 15, 4.0, 15, 1.3);
-    this.addPlatformerProp('button-round.glb', 0, 0, -6, 2.0);
-    this.addPlatformerProp('button-round.glb', 0, 0, 6, 2.0);
-
-    // Jump pads launching onto catwalk platforms
-    this.createJumpPad(-15, 0, 0, 17.5);
-    this.createJumpPad(15, 0, 0, 17.5);
-  }
-
-  // 7. Magma Foundry (Onyx Crucible over Molten Abyss)
-  private buildMagmaFoundry(): void {
-    this.bounds = { minX: -50, maxX: 50, minZ: -50, maxZ: 50 };
-    // Void hazard below y = 0
-    this.hasGroundPlane = false;
-
-    // Central Floating Crucible
-    this.addBox(0, 0.5, 0, 16, 1.0, 16, '#3a1a1a', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(0, 2.0, 0, 6, 2.0, 6, '#ef4444', true, { emissive: '#ff3b00', emissiveIntensity: 3.0 });
-
-    // 4 Corner Spawn Islands
-    const d = 30;
-    [-d, d].forEach((x) => {
-      [-d, d].forEach((z) => {
-        this.addBox(x, 0.5, z, 12, 1.0, 12, '#2d1515', true, { metalness: 0.3, gloss: 0.4 });
-      });
-    });
-
-    // 3D Kenney Magma Foundry Props
-    this.addPlatformerProp('platform-fortified.glb', 0, 1.0, 0, 1.8);
-    this.addPlatformerProp('rocks.glb', -28, 1.0, -28, 1.5);
-    this.addPlatformerProp('rocks.glb', 28, 1.0, 28, 1.5);
-    this.addPlatformerProp('crate-strong.glb', -28, 1.0, 28, 1.4);
-    this.addPlatformerProp('crate-strong.glb', 28, 1.0, -28, 1.4);
-
-    // Jump pads launching into central crucible
-    this.createJumpPad(-24, 1.0, -24, 18.0, 12, 12);
-    this.createJumpPad(24, 1.0, -24, 18.0, -12, 12);
-    this.createJumpPad(-24, 1.0, 24, 18.0, 12, -12);
-    this.createJumpPad(24, 1.0, 24, 18.0, -12, -12);
-  }
-
-  // 8. Subzero Station (Arctic Freight Terminal)
-  private buildSubzeroStation(): void {
-    this.bounds = { minX: -60, maxX: 60, minZ: -45, maxZ: 45 };
-    this.hasGroundPlane = true;
-
-    // Snow Ground with icy gloss
-    this.addBox(0, -0.1, 0, 120, 0.2, 90, '#dbeafe', false, { metalness: 0.1, gloss: 0.8 });
-
-    // Train Station Tracks & Cargo Trains
-    this.addBox(0, 1.5, -12, 35, 3.0, 4.5, '#475569', true, { metalness: 0.6, gloss: 0.6 }); // Train 1
-    this.addBox(10, 1.5, 12, 30, 3.0, 4.5, '#334155', true, { metalness: 0.6, gloss: 0.6 }); // Train 2
-
-    // Station Depot Platform & Roof
-    this.addBox(-35, 1.0, 0, 16, 2.0, 40, '#1e293b', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(-35, 5.5, 0, 14, 0.4, 38, '#0f172a', true, { metalness: 0.7, gloss: 0.7 });
-
-    // 4 Outer Satellite Radar Outposts matching SUBZERO_STATION_OBSTACLES
-    this.addBox(40, 1.5, 40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(40, 1.5, -40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(-40, 1.5, 40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(-40, 1.5, -40, 10, 3.0, 10, '#334155', true, { metalness: 0.5, gloss: 0.6 });
-
-    // Snow Berms
-    this.addBox(0, 1.25, -20, 12, 2.5, 4, '#e2e8f0', true, { metalness: 0.1, gloss: 0.4 });
-    this.addBox(0, 1.25, 20, 12, 2.5, 4, '#e2e8f0', true, { metalness: 0.1, gloss: 0.4 });
-
-    // 3D Kenney Subzero Props (Snow Pines & Winter Blocks)
-    this.addPlatformerProp('tree-snow.glb', -15, 0, -25, 1.8);
-    this.addPlatformerProp('tree-snow.glb', 15, 0, 25, 1.8);
-    this.addPlatformerProp('tree-pine-snow.glb', -25, 0, 25, 2.0);
-    this.addPlatformerProp('tree-pine-snow.glb', 25, 0, -25, 2.0);
-    this.addPlatformerProp('crate-strong.glb', -35, 2.0, -10, 1.5);
-    this.addPlatformerProp('crate.glb', -35, 2.0, 10, 1.5);
-
-    // Jump pads
-    this.createJumpPad(-22, 0, 0, 17.5);
-    this.createJumpPad(22, 0, 0, 17.5);
-  }
-
-  // 9. Sky Sanctuary (Floating Temple Shrines in Clouds)
-  private buildSkySanctuary(): void {
-    this.bounds = { minX: -60, maxX: 60, minZ: -60, maxZ: 60 };
-    this.hasGroundPlane = true;
-
-    // Sacred Cloud Platform
-    this.addBox(0, -0.1, 0, 120, 0.2, 120, '#1e2638', false, { metalness: 0.1, gloss: 0.4 });
-
-    // Central Shrine Pagoda
-    this.addBox(0, 2.0, 0, 10, 4.0, 10, '#7f1d1d', true, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(0, 4.5, 0, 8, 0.8, 8, '#dc2626', true, { emissive: '#dc2626', emissiveIntensity: 1.5 });
-
-    // Torii Arches (North & South)
-    this.addBox(0, 2.5, -18, 8, 5.0, 0.8, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.2 });
-    this.addBox(0, 2.5, 18, 8, 5.0, 0.8, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.2 });
-
-    // Meditation Terraces (NW, NE, SW, SE)
-    this.addBox(-26, 1.2, -26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(26, 1.2, -26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(-26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
-
-    // 3D Kenney Sanctuary Garden Props
-    this.addPlatformerProp('plant.glb', -5, 0, -5, 1.5);
-    this.addPlatformerProp('plant.glb', 5, 0, 5, 1.5);
-    this.addPlatformerProp('stones.glb', 0, 0, -8, 1.8);
-    this.addPlatformerProp('stones.glb', 0, 0, 8, 1.8);
-    this.addPlatformerProp('flowers.glb', -26, 2.4, -26, 1.5);
-    this.addPlatformerProp('flowers.glb', 26, 2.4, 26, 1.5);
-
-    // Jump pads to Pagoda and terraces
-    this.createJumpPad(0, 0, -10, 18.5);
-    this.createJumpPad(0, 0, 10, 18.5);
-    this.createJumpPad(-16, 0, 0, 17.0);
-    this.createJumpPad(16, 0, 0, 17.0);
-  }
-
-  // 10. Orbital Station (Zero-G Space Hangar & Vantage Decks)
-  private buildOrbitalStation(): void {
-    this.bounds = { minX: -36, maxX: 36, minZ: -36, maxZ: 36 };
-    this.hasGroundPlane = true;
-
-    // Metallic Hull Grid
-    this.addBox(0, -0.1, 0, 72, 0.2, 72, '#0c101c', false, { metalness: 0.7, gloss: 0.8 });
-
-    // Perimeter Containment Bulkheads
-    this.addBox(0, 5, 35, 72, 10, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(0, 5, -35, 72, 10, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(-35, 5, 0, 2, 10, 72, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(35, 5, 0, 2, 10, 72, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
-
-    // Central Gravity Core & Observation Spire
-    this.addBox(0, 2.5, 0, 10, 5.0, 10, '#00f0ff', true, { emissive: '#00f0ff', emissiveIntensity: 3.5 });
-    this.addBox(0, 0.4, 0, 16, 0.8, 16, '#1e293b', true, { metalness: 0.6, gloss: 0.7 });
-
-    // Solar Control Terminal Wings
-    this.addBox(-14.5, 1.6, 18, 7, 3.2, 8, '#2563eb', true, { metalness: 0.6, gloss: 0.7 });
-    this.addBox(14.5, 1.6, -18, 7, 3.2, 8, '#dc2626', true, { metalness: 0.6, gloss: 0.7 });
-
-    // Airlock Chambers
-    this.addBox(-25, 1.8, 0, 6, 3.6, 12, '#1e293b', true, { metalness: 0.6, gloss: 0.6 });
-    this.addBox(25, 1.8, 0, 6, 3.6, 12, '#1e293b', true, { metalness: 0.6, gloss: 0.6 });
-
-    // Elevated Sniper Vantage Decks (y=3.75m)
-    this.addBox(-12, 3.75, -15, 6, 0.3, 6, '#38bdf8', true, { metalness: 0.7, gloss: 0.8, emissive: '#0284c7', emissiveIntensity: 1.5 });
-    this.addBox(12, 3.75, 15, 6, 0.3, 6, '#f43f5e', true, { metalness: 0.7, gloss: 0.8, emissive: '#e11d48', emissiveIntensity: 1.5 });
-
-    // 3D Kenney Orbital Station Props
-    this.addPlatformerProp('barrel.glb', -14.5, 3.2, 18, 1.3);
-    this.addPlatformerProp('barrel.glb', 14.5, 3.2, -18, 1.3);
-    this.addPlatformerProp('crate-item.glb', -12, 3.9, -15, 1.4);
-    this.addPlatformerProp('crate-item.glb', 12, 3.9, 15, 1.4);
-
-    // Gravity Lift Jump Pads
-    this.createJumpPad(-12, 0, -8, 18.0, 0, -3.5);
-    this.createJumpPad(12, 0, 8, 18.0, 0, 3.5);
+  private generateTechFacility(): void {
+    this.bounds = { minX: -150, maxX: 150, minZ: -150, maxZ: 150 };
+    this.hasGroundPlane = false; // Void underneath
+    
+    // Massive scaffolding platforms
+    for (let i = 0; i < 80; i++) {
+        const x = (Math.random() - 0.5) * 280;
+        const z = (Math.random() - 0.5) * 280;
+        const y = Math.random() * 25; // Massive verticality
+        const w = 15 + Math.random() * 25;
+        const d = 15 + Math.random() * 25;
+        
+        this.addBox(x, y, z, w, 1, d, '#1e293b', true, { metalness: 0.8, gloss: 0.7 });
+        
+        // Add random tech props from prototype-kit
+        if (Math.random() < 0.5) {
+            this.addPlatformerProp('barrel.glb', x, y + 0.5, z, 1.5);
+        }
+        if (Math.random() < 0.3) {
+            this.addPlatformerProp('crate-color.glb', x + 2, y + 0.5, z - 2, 1.5);
+        }
+        
+        // Jump pads connecting verticality
+        if (Math.random() < 0.5) {
+            this.createJumpPad(x, y + 0.5, z, 22);
+        }
+    }
+    
+    // Central Hub
+    this.addBox(0, 0, 0, 50, 2, 50, '#0f172a', true, { metalness: 0.9, gloss: 0.9, emissive: '#0284c7', emissiveIntensity: 0.3 });
+    this.addBox(0, 5, 0, 10, 20, 10, '#f43f5e', true, { emissive: '#e11d48', emissiveIntensity: 1.5 });
+    this.createJumpPad(-12, 1, 0, 25);
+    this.createJumpPad(12, 1, 0, 25);
   }
 
   public checkJumpPads(pos: { x: number; y: number; z: number } | pc.Vec3): { impulseY: number; impulseX: number; impulseZ: number } | null {
@@ -1332,20 +965,6 @@ export class PCMapBuilder {
           impulseX: jp.impulseX || 0,
           impulseZ: jp.impulseZ || 0
         };
-      }
-    }
-    return null;
-  }
-
-  public checkTeleportPorts(pos: { x: number; y: number; z: number } | pc.Vec3, lastTeleportTime: number): PCTeleportPort | null {
-    const now = performance.now();
-    if (lastTeleportTime > 0 && now - lastTeleportTime < 1500) {
-      return null;
-    }
-    const pt = pos instanceof pc.Vec3 ? pos : new pc.Vec3(pos.x, pos.y, pos.z);
-    for (const port of this.teleportPorts) {
-      if (port.box.containsPoint(pt)) {
-        return port;
       }
     }
     return null;
@@ -1372,230 +991,18 @@ export class PCMapBuilder {
     return null;
   }
 
-  // 11. Bio-Dome (Neo Arboretum)
-  private buildBioDome(): void {
-    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
-    this.hasGroundPlane = true;
-
-    // Biosphere moss concrete floor
-    this.addBox(0, -0.1, 0, 66, 0.2, 66, '#13281e', false, { metalness: 0.1, gloss: 0.4 });
-
-    // Perimeter geodesic containment walls
-    this.addBox(0, 4, 32, 66, 8, 2, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
-    this.addBox(0, 4, -32, 66, 8, 2, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
-    this.addBox(-32, 4, 0, 2, 8, 66, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
-    this.addBox(32, 4, 0, 2, 8, 66, '#182b22', false, { metalness: 0.3, gloss: 0.4 });
-
-    // Central Hydroponic Spire (Glass tower with upper suspended ring)
-    this.addBox(0, 3, 0, 8, 6, 8, '#2d4a3e', false, { metalness: 0.4, gloss: 0.7, emissive: '#10b981', emissiveIntensity: 0.5 });
-    this.addBox(0, 6.8, 0, 16, 0.4, 16, '#38bdf8', true, { opacity: 0.85, emissive: '#0284c7', emissiveIntensity: 0.8 });
-
-    // Terraced Botanical Planters
-    this.addBox(0, 1.2, -18, 14, 2.4, 6, '#22543d', true, { gloss: 0.6 });
-    this.addBox(0, 1.2, 18, 14, 2.4, 6, '#22543d', true, { gloss: 0.6 });
-    this.addBox(-18, 1.2, 0, 6, 2.4, 14, '#22543d', true, { gloss: 0.6 });
-    this.addBox(18, 1.2, 0, 6, 2.4, 14, '#22543d', true, { gloss: 0.6 });
-
-    // Research Stations
-    this.addBox(-16, 1.5, -16, 6, 3, 6, '#f8fafc', true, { metalness: 0.2, gloss: 0.8 });
-    this.addBox(16, 1.5, 16, 6, 3, 6, '#f8fafc', true, { metalness: 0.2, gloss: 0.8 });
-
-    // 3D Kenney Bio-Dome Arboretum Props
-    this.addPlatformerProp('plant.glb', 0, 1.2, -18, 1.8);
-    this.addPlatformerProp('plant.glb', 0, 1.2, 18, 1.8);
-    this.addPlatformerProp('mushrooms.glb', -18, 1.2, 0, 1.6);
-    this.addPlatformerProp('flowers-tall.glb', 18, 1.2, 0, 1.6);
-    this.addPlatformerProp('tree.glb', -16, 3.0, -16, 1.6);
-    this.addPlatformerProp('tree.glb', 16, 3.0, 16, 1.6);
-
-    // Planter Jump Pads launching toward Upper Ring
-    this.createJumpPad(0, 2.4, -18, 17.0, 0, 6);
-    this.createJumpPad(0, 2.4, 18, 17.0, 0, -6);
-  }
-
-  // 12. Metro Underpass (Neon Subways)
-  private buildMetroUnderpass(): void {
-    this.bounds = { minX: -30, maxX: 30, minZ: -32, maxZ: 32 };
-    this.hasGroundPlane = true;
-
-    // Sunken Track Bed
-    this.addBox(0, -0.2, 0, 12, 0.4, 64, '#11141c', false, { metalness: 0.5, gloss: 0.3 });
-    this.addBox(-2, 0.05, 0, 0.3, 0.1, 64, '#71717a', false, { metalness: 0.9, gloss: 0.6 });
-    this.addBox(2, 0.05, 0, 0.3, 0.1, 64, '#71717a', false, { metalness: 0.9, gloss: 0.6 });
-
-    // West and East Passenger Platforms
-    this.addBox(-18, 0.6, 0, 14, 1.2, 64, '#27272a', true, { metalness: 0.2, gloss: 0.4 });
-    this.addBox(18, 0.6, 0, 14, 1.2, 64, '#27272a', true, { metalness: 0.2, gloss: 0.4 });
-
-    // Perimeter Tunnel Walls
-    this.addBox(0, 4, 32, 60, 8, 2, '#090d16', false);
-    this.addBox(0, 4, -32, 60, 8, 2, '#090d16', false);
-    this.addBox(-26, 4, 0, 2, 8, 64, '#090d16', false);
-    this.addBox(26, 4, 0, 2, 8, 64, '#090d16', false);
-
-    // Stationary Subway Train Cars (Walkable elevated cover)
-    this.addBox(0, 1.8, -14, 4.2, 3.2, 16, '#0284c7', true, { metalness: 0.7, gloss: 0.6 });
-    this.addBox(0, 1.8, 14, 4.2, 3.2, 16, '#0284c7', true, { metalness: 0.7, gloss: 0.6 });
-
-    // Station Columns
-    this.addBox(-12, 3, -16, 1.5, 6, 1.5, '#3f3f46');
-    this.addBox(-12, 3, 16, 1.5, 6, 1.5, '#3f3f46');
-    this.addBox(12, 3, -16, 1.5, 6, 1.5, '#3f3f46');
-    this.addBox(12, 3, 16, 1.5, 6, 1.5, '#3f3f46');
-
-    // Overhead Footbridges
-    this.addBox(0, 4.5, -24, 28, 0.4, 4, '#18181b', true);
-    this.addBox(0, 4.5, 24, 28, 0.4, 4, '#18181b', true);
-
-    // 3D Kenney Metro Props
-    this.addPlatformerProp('crate.glb', -18, 1.2, -10, 1.4);
-    this.addPlatformerProp('crate.glb', 18, 1.2, 10, 1.4);
-    this.addPlatformerProp('barrel.glb', -18, 1.2, 10, 1.3);
-    this.addPlatformerProp('barrel.glb', 18, 1.2, -10, 1.3);
-
-    // Track bed jump pads
-    this.createJumpPad(0, 0.0, -4, 16.0, 0, -6);
-    this.createJumpPad(0, 0.0, 4, 16.0, 0, 6);
-  }
-
-  // 13. Sunken Atoll (Ancient Coral Ruins)
-  private buildSunkenAtoll(): void {
-    this.bounds = { minX: -34, maxX: 34, minZ: -34, maxZ: 34 };
-    this.hasGroundPlane = true;
-
-    // Lagoon Water Floor
-    this.addBox(0, -0.1, 0, 70, 0.2, 70, '#0e7490', false, { metalness: 0.3, gloss: 0.85, emissive: '#0891b2', emissiveIntensity: 0.4 });
-
-    // Central Temple Altar
-    this.addBox(0, 0.8, 0, 16, 1.6, 16, '#d6d3d1', true, { metalness: 0.1, gloss: 0.3 });
-    this.addBox(0, 3.8, -8, 8, 4.4, 2, '#a8a29e', false);
-    this.addBox(0, 3.8, 8, 8, 4.4, 2, '#a8a29e', false);
-
-    // Sandy Dunes & Coral Bastions
-    this.addBox(-20, 1.0, 0, 8, 2.0, 24, '#fef08a', true, { metalness: 0.05, gloss: 0.2 });
-    this.addBox(20, 1.0, 0, 8, 2.0, 24, '#fef08a', true, { metalness: 0.05, gloss: 0.2 });
-    this.addBox(0, 1.2, -22, 14, 2.4, 8, '#78716c', true);
-    this.addBox(0, 1.2, 22, 14, 2.4, 8, '#78716c', true);
-
-    // Perimeter Reef Barriers
-    this.addBox(0, 3, 34, 70, 6, 2, '#155e75', false);
-    this.addBox(0, 3, -34, 70, 6, 2, '#155e75', false);
-    this.addBox(-34, 3, 0, 2, 6, 70, '#155e75', false);
-    this.addBox(34, 3, 0, 2, 6, 70, '#155e75', false);
-
-    // 3D Kenney Island Coral Props
-    this.addPlatformerProp('rocks.glb', -20, 2.0, -8, 1.8);
-    this.addPlatformerProp('rocks.glb', 20, 2.0, 8, 1.8);
-    this.addPlatformerProp('chest.glb', 0, 1.6, 0, 1.5);
-    this.addPlatformerProp('plant.glb', -20, 2.0, 8, 1.5);
-    this.addPlatformerProp('plant.glb', 20, 2.0, -8, 1.5);
-
-    // Jump pads from sand dunes to temple altar
-    this.createJumpPad(-14, 2.0, 0, 15.0, 8, 0);
-    this.createJumpPad(14, 2.0, 0, 15.0, -8, 0);
-  }
-
-  // 14. Scrapyard Canyon (Rust Basin)
-  private buildScrapyardCanyon(): void {
-    this.bounds = { minX: -34, maxX: 34, minZ: -34, maxZ: 34 };
-    this.hasGroundPlane = true;
-
-    // Rust Basin Floor
-    this.addBox(0, -0.1, 0, 70, 0.2, 70, '#451a03', false, { metalness: 0.2, gloss: 0.3 });
-
-    // Canyon Rim Ridges
-    this.addBox(-26, 4, 0, 10, 8, 70, '#78350f', false);
-    this.addBox(26, 4, 0, 10, 8, 70, '#78350f', false);
-    this.addBox(0, 4, -30, 70, 8, 8, '#78350f', false);
-    this.addBox(0, 4, 30, 70, 8, 8, '#78350f', false);
-
-    // Central Crane Tower & Walkway
-    this.addBox(0, 3.5, 0, 4, 7, 4, '#ea580c', false, { metalness: 0.8, gloss: 0.5 });
-    this.addBox(0, 4.8, 0, 24, 0.4, 5, '#292524', true);
-
-    // Scrapped Container Clusters
-    this.addBox(-12, 1.5, -12, 6, 3, 10, '#b91c1c', true);
-    this.addBox(12, 1.5, 12, 6, 3, 10, '#1d4ed8', true);
-    this.addBox(-10, 1.5, 12, 8, 3, 6, '#b45309', true);
-    this.addBox(10, 1.5, -12, 8, 3, 6, '#047857', true);
-
-    // 3D Kenney Scrapyard Props
-    this.addPlatformerProp('crate-strong.glb', -12, 3.0, -12, 1.5);
-    this.addPlatformerProp('crate-strong.glb', 12, 3.0, 12, 1.5);
-    this.addPlatformerProp('barrel.glb', 0, 0, -10, 1.4);
-    this.addPlatformerProp('barrel.glb', 0, 0, 10, 1.4);
-    this.addPlatformerProp('fence-broken.glb', -10, 0, 0, 1.6);
-    this.addPlatformerProp('fence-broken.glb', 10, 0, 0, 1.6);
-
-    // Jump pads
-    this.createJumpPad(0, 0.0, 8, 18.0, 0, -6);
-    this.createJumpPad(-20, 0.0, -16, 17.0, 8, 6);
-  }
-
-  // 15. Solar Relay (Helios Mirror Array)
-  private buildSolarRelay(): void {
-    this.bounds = { minX: -35, maxX: 35, minZ: -35, maxZ: 35 };
-    this.hasGroundPlane = false; // Void abyss below!
-
-    // Central Relay Hub Platform
-    this.addBox(0, -0.5, 0, 18, 1, 18, '#0f172a', true, { metalness: 0.7, gloss: 0.8 });
-    this.addBox(0, 5, 0, 3, 10, 3, '#38bdf8', false, { emissive: '#0284c7', emissiveIntensity: 2.2 });
-
-    // Solar Mirror Platforms (Floating wings)
-    this.addBox(-20, 2.0, 0, 12, 1, 20, '#0284c7', true, { metalness: 0.95, gloss: 0.95, emissive: '#38bdf8', emissiveIntensity: 0.5 });
-    this.addBox(20, 2.0, 0, 12, 1, 20, '#0284c7', true, { metalness: 0.95, gloss: 0.95, emissive: '#38bdf8', emissiveIntensity: 0.5 });
-    this.addBox(0, 3.0, -22, 14, 1, 8, '#1e293b', true);
-    this.addBox(0, 3.0, 22, 14, 1, 8, '#1e293b', true);
-
-    // 3D Kenney Solar Relay Floating Props
-    this.addPlatformerProp('platform-fortified.glb', -20, 2.5, 0, 1.6);
-    this.addPlatformerProp('platform-fortified.glb', 20, 2.5, 0, 1.6);
-    this.addPlatformerProp('poles.glb', 0, 3.5, -22, 1.5);
-    this.addPlatformerProp('poles.glb', 0, 3.5, 22, 1.5);
-
-    // Teleport Portals between Mirror Wings
-    this.createTeleportPort('Port_W', 'Port_E', -18, 2.0, 0, new pc.Vec3(18, 2.5, 0), -Math.PI / 2, '#38bdf8');
-    this.createTeleportPort('Port_E', 'Port_W', 18, 2.0, 0, new pc.Vec3(-18, 2.5, 0), Math.PI / 2, '#38bdf8');
-
-    // Void Crossing Jump Pads
-    this.createJumpPad(0, 0.0, -7, 18.0, 0, -12);
-    this.createJumpPad(0, 0.0, 7, 18.0, 0, 12);
-  }
-
-  // 16. Skyline Penthouse (Vertigo Lounge)
-  private buildSkylinePenthouse(): void {
-    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
-    this.hasGroundPlane = true;
-
-    // Indoor Lounge Marble Floor
-    this.addBox(-12, -0.1, 0, 24, 0.2, 48, '#0f172a', false, { metalness: 0.6, gloss: 0.9 });
-    this.addBox(-16, 3.8, 0, 14, 0.4, 40, '#1e293b', true);
-
-    // Bar Counter & Elevator Shaft
-    this.addBox(-8, 0.6, 0, 2, 1.2, 12, '#e11d48', true, { emissive: '#e11d48', emissiveIntensity: 1.2 });
-    this.addBox(-22, 4, 0, 4, 8, 8, '#020617', false);
-
-    // Outdoor Helipad Deck
-    this.addBox(14, -0.1, 0, 24, 0.2, 48, '#18181b', false, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(14, 0.02, 0, 12, 0.04, 12, '#f59e0b', false, { emissive: '#f59e0b', emissiveIntensity: 1.0 });
-
-    // Glass Balcony Perimeters
-    this.addBox(26, 0.6, 0, 0.4, 1.2, 48, '#38bdf8', false, { opacity: 0.5 });
-    this.addBox(14, 0.6, 24, 24, 1.2, 0.4, '#38bdf8', false, { opacity: 0.5 });
-    this.addBox(14, 0.6, -24, 24, 1.2, 0.4, '#38bdf8', false, { opacity: 0.5 });
-
-    // High Billboard Gantry
-    this.addBox(18, 6.5, -18, 10, 0.4, 4, '#334155', true);
-
-    // 3D Kenney Penthouse Lounge Props
-    this.addPlatformerProp('plant.glb', -8, 1.2, -5, 1.4);
-    this.addPlatformerProp('plant.glb', -8, 1.2, 5, 1.4);
-    this.addPlatformerProp('crate-item.glb', 14, 0, -8, 1.4);
-    this.addPlatformerProp('crate-item.glb', 14, 0, 8, 1.4);
-
-    // Jump Pads
-    this.createJumpPad(18, 0.0, -10, 19.0, 0, -6);
-    this.createJumpPad(4, 0.0, 12, 17.0, -12, 0);
+  public checkTeleportPorts(pos: { x: number; y: number; z: number } | pc.Vec3, lastTeleportTime: number): PCTeleportPort | null {
+    const now = performance.now();
+    if (lastTeleportTime > 0 && now - lastTeleportTime < 1500) {
+      return null;
+    }
+    const pt = pos instanceof pc.Vec3 ? pos : new pc.Vec3(pos.x, pos.y, pos.z);
+    for (const port of this.teleportPorts) {
+      if (port.box.containsPoint(pt)) {
+        return port;
+      }
+    }
+    return null;
   }
 
   public getGroundLevel(pos: { x: number; y: number; z: number } | pc.Vec3): number {
