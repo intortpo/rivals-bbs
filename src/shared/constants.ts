@@ -142,23 +142,12 @@ export const WEAPON_ORDER: WeaponType[] = [
 ];
 
 export const MAP_NAMES = [
-  'Facility',
-  'Neon Warehouse',
-  'Magma Foundry',
-  'Bio-Dome',
-  'Quantum Lab',
-  'Orbital Station',
-  'Subzero Station',
-  'Scrapyard Canyon',
   'Cyber Spire',
-  'Desert Outpost',
-  'Toxic Sludge',
-  'Crystal Caverns',
-  'Ruined Temple',
-  'Sky Islands',
-  'Cartoon City',
-  'Pixel Plaza',
-  'Void Arena'
+  'Skyline Penthouse',
+  'Sky Sanctuary',
+  'Solar Relay',
+  'Orbital Station',
+  'Arena TDM'
 ] as const;
 
 export const MOVEMENT = {
@@ -375,13 +364,37 @@ export const SKY_ISLANDS_SPAWNS = [
   { x: 0, y: 14.0, z: 35, yaw: Math.PI },
 
   { x: 40, y: 16.0, z: 0, yaw: Math.PI / 2 },
-
   { x: 20, y: 6.0, z: 0, yaw: Math.PI / 2 }
+];
 
+export const ARENA_TDM_SPAWNS = [
+  { x: -4.0, y: 0.0, z: 12.0, yaw: Math.PI },       // North Courtyard spawn
+  { x: 4.0, y: 0.0, z: -12.0, yaw: 0 },            // South Courtyard spawn
+  { x: -10.5, y: 0.0, z: -16.0, yaw: Math.PI / 4 }, // South-West Flank
+  { x: 10.5, y: 0.0, z: 16.0, yaw: -3 * Math.PI / 4 }, // North-East Flank
+  { x: -8.0, y: 3.2, z: 0.0, yaw: Math.PI / 2 },    // West Walkway Gantries (Elevated)
+  { x: 8.0, y: 3.2, z: 0.0, yaw: -Math.PI / 2 },    // East Walkway Gantries (Elevated)
+  { x: 0.0, y: 0.0, z: 0.0, yaw: 0 },              // Center Arena Intersection
+  { x: 0.0, y: 3.2, z: -6.0, yaw: 0 }             // South Bridge Overlook (Elevated)
 ];
 
 export function getMapSpawns(mapName?: string) {
   switch (mapName) {
+    case 'Cyber Spire':
+      return CYBER_SPIRE_SPAWNS;
+    case 'Skyline Penthouse':
+    case 'Skyline Penthouse (Vertigo Lounge)':
+      return SKYLINE_PENTHOUSE_SPAWNS;
+    case 'Sky Sanctuary':
+      return SKY_SANCTUARY_SPAWNS;
+    case 'Solar Relay':
+    case 'Solar Relay (Helios Mirror Array)':
+      return SOLAR_RELAY_SPAWNS;
+    case 'Orbital Station':
+      return ORBITAL_STATION_SPAWNS;
+    case 'Arena TDM':
+    case 'Arena TDM (Tactical)':
+      return ARENA_TDM_SPAWNS;
     case 'Facility':
       return FACILITY_SPAWNS;
     case 'Cartoon City':
@@ -390,40 +403,22 @@ export function getMapSpawns(mapName?: string) {
       return MAP_SPAWNS;
     case 'Neon Warehouse':
       return NEON_WAREHOUSE_SPAWNS;
-    case 'Cyber Spire':
-      return CYBER_SPIRE_SPAWNS;
     case 'Quantum Lab':
       return QUANTUM_LAB_SPAWNS;
     case 'Magma Foundry':
       return MAGMA_FOUNDRY_SPAWNS;
     case 'Subzero Station':
       return SUBZERO_STATION_SPAWNS;
-    case 'Sky Sanctuary':
-      return SKY_SANCTUARY_SPAWNS;
-    case 'Orbital Station':
-      return ORBITAL_STATION_SPAWNS;
     case 'Bio-Dome':
-    case 'Bio-Dome (Neo Arboretum)':
       return BIODOME_SPAWNS;
     case 'Metro Underpass':
-    case 'Metro Underpass (Neon Subways)':
       return METRO_UNDERPASS_SPAWNS;
     case 'Sunken Atoll':
-    case 'Sunken Atoll (Ancient Coral Ruins)':
       return SUNKEN_ATOLL_SPAWNS;
     case 'Scrapyard Canyon':
-    case 'Scrapyard Canyon (Rust Basin)':
       return SCRAPYARD_CANYON_SPAWNS;
-    case 'Solar Relay':
-    case 'Solar Relay (Helios Mirror Array)':
-      return SOLAR_RELAY_SPAWNS;
-    case 'Sky Islands':
-      return SKY_ISLANDS_SPAWNS;
-    case 'Skyline Penthouse':
-    case 'Skyline Penthouse (Vertigo Lounge)':
-      return SKYLINE_PENTHOUSE_SPAWNS;
     default:
-      return FACILITY_SPAWNS;
+      return CYBER_SPIRE_SPAWNS;
   }
 }
 
@@ -726,6 +721,23 @@ export function getTeamSpawn(team: 'blue' | 'red', index: number, mapName?: stri
           { x: 16, y: 0.0, z: -16, yaw: 0 },
           { x: 14, y: 0.0, z: -18, yaw: 0 },
           { x: 14, y: 0.0, z: -14, yaw: 0 }
+        ];
+    return list[index % list.length];
+  }
+
+  if (mapName === 'Arena TDM' || mapName === 'Arena TDM (Tactical)') {
+    const list = team === 'blue'
+      ? [
+          { x: -4, y: 0.0, z: 14, yaw: Math.PI },
+          { x: 4, y: 0.0, z: 14, yaw: Math.PI },
+          { x: 0, y: 0.0, z: 16, yaw: Math.PI },
+          { x: 0, y: 3.2, z: 12, yaw: Math.PI }
+        ]
+      : [
+          { x: -4, y: 0.0, z: -14, yaw: 0 },
+          { x: 4, y: 0.0, z: -14, yaw: 0 },
+          { x: 0, y: 0.0, z: -16, yaw: 0 },
+          { x: 0, y: 3.2, z: -12, yaw: 0 }
         ];
     return list[index % list.length];
   }

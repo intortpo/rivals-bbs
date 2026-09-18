@@ -1497,8 +1497,45 @@ export const SKYLINE_PENTHOUSE_OBSTACLES: BoundingBox[] = [
   { min: [13, 6.3, -20], max: [23, 6.7, -16], name: 'BillboardGantry' }
 ];
 
+export const ARENA_TDM_OBSTACLES: BoundingBox[] = [
+  // Perimeter Urban Concrete Boundaries
+  { min: [-16.5, 0, -25.5], max: [13.5, 6, -24.5], name: 'WallSouth' },
+  { min: [-16.5, 0, 24.5], max: [13.5, 6, 25.5], name: 'WallNorth' },
+  { min: [-16.5, 0, -25.5], max: [-15.5, 6, 25.5], name: 'WallWest' },
+  { min: [12.5, 0, -25.5], max: [13.5, 6, 25.5], name: 'WallEast' },
+
+  // Center Compound & Second-Floor Elevated Walkways
+  { min: [-4, 0, -5], max: [4, 2.5, 5], name: 'CenterCompoundGround' },
+  { min: [-5, 3.0, -7], max: [5, 3.4, 7], name: 'CenterCatwalkGantry' },
+
+  // West Flank Tactical Shipping Crates & Up2 Ramps
+  { min: [-12, 0, -18], max: [-8, 2.4, -14], name: 'WestCargoStackSouth' },
+  { min: [-12, 0, 14], max: [-8, 2.4, 18], name: 'WestCargoStackNorth' },
+  { min: [-12, 0, -3], max: [-8, 3.2, 3], name: 'WestOverlookDepot' },
+
+  // East Flank Elevated Sniping Containers & Barricades
+  { min: [6, 0, -18], max: [10, 2.4, -14], name: 'EastCargoStackSouth' },
+  { min: [6, 0, 14], max: [10, 2.4, 18], name: 'EastCargoStackNorth' },
+  { min: [5, 0, -3], max: [10, 3.2, 3], name: 'EastOverlookDepot' }
+];
+
 export function getMapObstacles(mapName: string): BoundingBox[] {
   switch (mapName) {
+    case 'Cyber Spire':
+      return CYBER_SPIRE_OBSTACLES;
+    case 'Skyline Penthouse':
+    case 'Skyline Penthouse (Vertigo Lounge)':
+      return SKYLINE_PENTHOUSE_OBSTACLES;
+    case 'Sky Sanctuary':
+      return SKY_SANCTUARY_OBSTACLES;
+    case 'Solar Relay':
+    case 'Solar Relay (Helios Mirror Array)':
+      return SOLAR_RELAY_OBSTACLES;
+    case 'Orbital Station':
+      return ORBITAL_STATION_OBSTACLES;
+    case 'Arena TDM':
+    case 'Arena TDM (Tactical)':
+      return ARENA_TDM_OBSTACLES;
     case 'Facility':
       return FACILITY_OBSTACLES;
     case 'Cartoon City':
@@ -1507,18 +1544,12 @@ export function getMapObstacles(mapName: string): BoundingBox[] {
       return CLASSIC_ARENA_OBSTACLES;
     case 'Neon Warehouse':
       return NEON_WAREHOUSE_OBSTACLES;
-    case 'Cyber Spire':
-      return CYBER_SPIRE_OBSTACLES;
     case 'Quantum Lab':
       return QUANTUM_LAB_OBSTACLES;
     case 'Magma Foundry':
       return MAGMA_FOUNDRY_OBSTACLES;
     case 'Subzero Station':
       return SUBZERO_STATION_OBSTACLES;
-    case 'Sky Sanctuary':
-      return SKY_SANCTUARY_OBSTACLES;
-    case 'Orbital Station':
-      return ORBITAL_STATION_OBSTACLES;
     case 'Bio-Dome':
     case 'Bio-Dome (Neo Arboretum)':
       return BIODOME_OBSTACLES;
@@ -1531,12 +1562,8 @@ export function getMapObstacles(mapName: string): BoundingBox[] {
     case 'Scrapyard Canyon':
     case 'Scrapyard Canyon (Rust Basin)':
       return SCRAPYARD_CANYON_OBSTACLES;
-    case 'Solar Relay':
-    case 'Solar Relay (Helios Mirror Array)':
-      return SOLAR_RELAY_OBSTACLES;
-    case 'Skyline Penthouse':
-    case 'Skyline Penthouse (Vertigo Lounge)':
-      return SKYLINE_PENTHOUSE_OBSTACLES;
+    case 'TestArena':
+      return [];
     default:
       return FACILITY_OBSTACLES;
   }

@@ -416,7 +416,7 @@ export class PCMapBuilder {
     }
   }
 
-  constructor(app: pc.Application | undefined, mapName: string = 'Facility', skyTheme: string = 'twilight') {
+  constructor(app: pc.Application | undefined, mapName: string = 'Cyber Spire', skyTheme: string = 'twilight') {
     this.app = app;
     this.mapName = mapName;
     this.skyTheme = skyTheme;
@@ -607,7 +607,7 @@ export class PCMapBuilder {
     await Promise.all(
       uniqueAssets.map(async (assetName) => {
         try {
-          const url = `/models/platformer/${assetName}`;
+          const url = assetName.startsWith('/') ? assetName : `/models/platformer/${assetName}`;
           await loader.load(url);
         } catch (err) {
           console.warn(`[PCMapBuilder] Could not preload platformer asset ${assetName}:`, err);
@@ -617,7 +617,7 @@ export class PCMapBuilder {
 
     for (const p of this.platformerPlacements) {
       try {
-        const url = `/models/platformer/${p.asset}`;
+        const url = p.asset.startsWith('/') ? p.asset : `/models/platformer/${p.asset}`;
         const container = loader.get(url);
         if (container) {
           const ent = container.instantiateRenderEntity({ castShadows: true });
@@ -801,8 +801,12 @@ export class PCMapBuilder {
       case 'Skyline Penthouse (Vertigo Lounge)':
         this.buildSkylinePenthouse();
         break;
+      case 'Arena TDM':
+      case 'Arena TDM (Tactical)':
+        this.buildArenaTDM();
+        break;
       default:
-        this.buildFacilityArena();
+        this.buildCyberSpire();
         break;
     }
 
@@ -1623,6 +1627,49 @@ export class PCMapBuilder {
     this.createJumpPad(18, 0.0, -10, 19.0, 0, -6);
     this.createJumpPad(18, 0.0, 10, 19.0, 0, 6);
     this.createJumpPad(4, 0.0, 0, 18.0, -8, 0);
+  }
+
+  // 17. Arena TDM (Low-Poly Urban Tactical Map from Asset Pack)
+  private buildArenaTDM(): void {
+    this.bounds = { minX: -16.5, maxX: 13.5, minZ: -25.5, maxZ: 25.5 };
+    this.hasGroundPlane = true;
+
+    // Ground Pavement Base
+    this.addBox(-1.5, -0.1, 0, 30, 0.2, 51, '#1e222d', false, { metalness: 0.15, gloss: 0.45 });
+
+    // Perimeter Containment Boundaries
+    this.addBox(-1.5, 3.0, -25.5, 30, 6.0, 1.0, '#0f172a', false);
+    this.addBox(-1.5, 3.0, 25.5, 30, 6.0, 1.0, '#0f172a', false);
+    this.addBox(-16.5, 3.0, 0, 1.0, 6.0, 51, '#0f172a', false);
+    this.addBox(13.5, 3.0, 0, 1.0, 6.0, 51, '#0f172a', false);
+
+    // Center Tactical Compound Obstacles
+    this.addBox(0, 1.25, 0, 8, 2.5, 10, '#334155', true, { metalness: 0.3, gloss: 0.5 });
+
+    // Center Catwalk Gantry (Walkable Rooftop Deck at y=3.2m)
+    this.addBox(0, 3.2, 0, 10, 0.3, 14, '#1e293b', true, { metalness: 0.5, gloss: 0.6 });
+
+    // West Flank Cargo Stacks
+    this.addBox(-10, 1.2, -16, 4, 2.4, 4, '#475569', true);
+    this.addBox(-10, 1.2, 16, 4, 2.4, 4, '#475569', true);
+    this.addBox(-10, 1.6, 0, 4, 3.2, 6, '#334155', true);
+
+    // East Flank Cargo Stacks
+    this.addBox(8, 1.2, -16, 4, 2.4, 4, '#475569', true);
+    this.addBox(8, 1.2, 16, 4, 2.4, 4, '#475569', true);
+    this.addBox(7.5, 1.6, 0, 5, 3.2, 6, '#334155', true);
+
+    // Climbable ladders to elevated walkways
+    this.addLadder(-5.1, 0, 0, 3.2, 90);
+    this.addLadder(5.1, 0, 0, 3.2, -90);
+
+    // Super Jump pads to launch onto the center catwalk
+    this.createJumpPad(0, 0, -10, 19.0, 0, 5);
+    this.createJumpPad(0, 0, 10, 19.0, 0, -5);
+
+    // Instantiate the complete 3D lowpoly map GLB model with injected PBR materials
+    // Rotated [-90, 0, 0] with scale [3, 3, 3] matching the PlayCanvas level template
+    this.addPlatformerProp('/models/maps/arena_tdm_map.glb', 0, 0, 0, 3, 0, -90, 0, 3, 3);
   }
 
   public getGroundLevel(pos: { x: number; y: number; z: number } | pc.Vec3): number {

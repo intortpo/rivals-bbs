@@ -159,17 +159,7 @@ export class LobbyUI {
                 <option value="Sky Sanctuary">⛩️ Sky Sanctuary (Celestial Pagoda)</option>
                 <option value="Solar Relay">☀️ Solar Relay (Helios Array)</option>
                 <option value="Orbital Station">🛰️ Orbital Station (Zero-G Spire)</option>
-                <option value="Facility">🏭 Facility (FPS Starter Kit)</option>
-                <option value="Cartoon City">🏙️ Cartoon City</option>
-                <option value="Arena Classic">🏟️ Arena Classic</option>
-                <option value="Neon Warehouse">📦 Neon Warehouse</option>
-                <option value="Quantum Lab">🔬 Quantum Lab</option>
-                <option value="Magma Foundry">🌋 Magma Foundry</option>
-                <option value="Subzero Station">❄️ Subzero Station</option>
-                <option value="Bio-Dome">🌿 Bio-Dome (Neo Arboretum)</option>
-                <option value="Metro Underpass">🚇 Metro Underpass (Neon Subways)</option>
-                <option value="Sunken Atoll">🏝️ Sunken Atoll (Coral Ruins)</option>
-                <option value="Scrapyard Canyon">🏗️ Scrapyard Canyon (Rust Basin)</option>
+                <option value="Arena TDM">🎯 Arena TDM (Tactical Urban)</option>
               </select>
             </div>
           </div>
@@ -457,7 +447,7 @@ export class LobbyUI {
         name,
         'wave',
         10,
-        mapSelect?.value || 'Facility',
+        mapSelect?.value || 'Cyber Spire',
         skyTheme,
         outfitIdx
       );
@@ -484,7 +474,7 @@ export class LobbyUI {
         name,
         mode,
         fragGoal,
-        mapSelect?.value || 'Facility',
+        mapSelect?.value || 'Cyber Spire',
         skyTheme,
         outfitIdx
       );

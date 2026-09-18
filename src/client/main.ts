@@ -117,7 +117,7 @@ class GameApp {
     this.loadingScreenUI = new LoadingScreenUI(this.appContainer);
     this.glbLoader = new PCGLBLoader(this.renderer.app);
     this.qrManager = new QRManager();
-    this.mapBuilder = new PCMapBuilder(this.renderer.app, 'Facility', 'twilight');
+    this.mapBuilder = new PCMapBuilder(this.renderer.app, 'Cyber Spire', 'twilight');
     this.powerupManager.spawnWorldPickups(this.mapBuilder.mapName);
 
     // Wire HUD top-right quick access and powerup buttons
@@ -603,7 +603,7 @@ class GameApp {
     this.hud.setVisible(true);
     this.lobbyUI.hideLobby();
 
-    const chosenMap = state.mapName || 'Facility';
+    const chosenMap = state.mapName || 'Cyber Spire';
     if (this.mapBuilder.mapName !== chosenMap) {
       this.mapBuilder.dispose();
       this.mapBuilder = new PCMapBuilder(this.renderer.app, chosenMap);

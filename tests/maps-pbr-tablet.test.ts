@@ -33,24 +33,14 @@ import {
 
 console.log('🧪 Starting 16 Maps, PBR Graphics & Tablet Optimization Tests...');
 
-describe('PlayCanvas 16 Arena Maps Geometry & Bounds', () => {
+describe('PlayCanvas 6 Arena Maps Geometry & Bounds', () => {
   const ALL_MAP_NAMES = [
-    'Facility',
-    'Cartoon City',
-    'Arena Classic',
-    'Neon Warehouse',
     'Cyber Spire',
-    'Quantum Lab',
-    'Magma Foundry',
-    'Subzero Station',
+    'Skyline Penthouse',
     'Sky Sanctuary',
-    'Orbital Station',
-    'Bio-Dome',
-    'Metro Underpass',
-    'Sunken Atoll',
-    'Scrapyard Canyon',
     'Solar Relay',
-    'Skyline Penthouse'
+    'Orbital Station',
+    'Arena TDM'
   ];
 
   it('should verify all 16 maps instantiate in PCMapBuilder with colliders and jump pads', () => {
@@ -291,22 +281,12 @@ describe('Tablet Controls & Aim-Drag Physics Simulation', () => {
 
 describe('In-World 3D Powerup Pickups & Map Distribution', () => {
   const ALL_MAP_NAMES = [
-    'Facility',
-    'Cartoon City',
-    'Arena Classic',
-    'Neon Warehouse',
     'Cyber Spire',
-    'Quantum Lab',
-    'Magma Foundry',
-    'Subzero Station',
+    'Skyline Penthouse',
     'Sky Sanctuary',
-    'Orbital Station',
-    'Bio-Dome',
-    'Metro Underpass',
-    'Sunken Atoll',
-    'Scrapyard Canyon',
     'Solar Relay',
-    'Skyline Penthouse'
+    'Orbital Station',
+    'Arena TDM'
   ];
 
   it('should define tactical 3D powerup pickup locations for all 16 maps', async () => {

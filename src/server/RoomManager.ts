@@ -28,7 +28,7 @@ export class RoomManager {
     playerName: string,
     mode: GameMode = '1v1',
     fragLimit?: number,
-    mapName: string = 'Facility',
+    mapName: string = 'Cyber Spire',
     outfitIndex: number = 0,
     customization?: CharacterCustomization,
     forceRoomId?: string

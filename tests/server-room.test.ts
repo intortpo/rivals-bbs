@@ -14,7 +14,7 @@ async function runTest() {
 
   io.on('connection', (socket) => {
     socket.on('create_room', (data, cb) => {
-      const { roomId, session, hostSecret } = roomManager.createRoom(socket, data.playerName, data.mode, data.fragLimit);
+      const { roomId, session, hostSecret } = roomManager.createRoom(socket, data.playerName, data.mode, data.fragLimit, data.mapName);
       if (cb) cb({ success: true, roomId, roomState: session.roomState, playerId: socket.id, hostSecret });
       session.broadcastRoomState();
     });
@@ -68,7 +68,7 @@ async function runTest() {
 
   // Step 1: Create Room
   const createRes = await new Promise<any>((res) => {
-    clientA.emit('create_room', { playerName: 'PlayerAlpha', mode: '1v1', fragLimit: 5 }, (response: any) => {
+    clientA.emit('create_room', { playerName: 'PlayerAlpha', mode: '1v1', fragLimit: 5, mapName: 'TestArena' }, (response: any) => {
       res(response);
     });
   });
@@ -175,7 +175,7 @@ async function runTest() {
   // Step 8: Test 4v4 Mode Team Auto-Assignment & Friendly Fire
   console.log('🧪 Testing 4v4 Team Mechanics...');
   const create4v4Res = await new Promise<any>((res) => {
-    clientA.emit('create_room', { playerName: 'TeamHost', mode: '4v4', fragLimit: 20 }, (response: any) => {
+    clientA.emit('create_room', { playerName: 'TeamHost', mode: '4v4', fragLimit: 20, mapName: 'TestArena' }, (response: any) => {
       res(response);
     });
   });
@@ -221,7 +221,7 @@ async function runTest() {
   // Step 10: Test Host Game Deletion & Security Authorization
   console.log('🧪 Testing Host Game Deletion & Security Authorization...');
   const createDeleteRes = await new Promise<any>((res) => {
-    clientA.emit('create_room', { playerName: 'HostBoss', mode: '1v1', fragLimit: 5 }, (response: any) => {
+    clientA.emit('create_room', { playerName: 'HostBoss', mode: '1v1', fragLimit: 5, mapName: 'TestArena' }, (response: any) => {
       res(response);
     });
   });
