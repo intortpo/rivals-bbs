@@ -1031,24 +1031,33 @@ export class PCMapBuilder {
 
   // 5. Cyber Spire (Floating Multi-tier Skyscraper)
   private buildCyberSpire(): void {
-    this.bounds = { minX: -36, maxX: 36, minZ: -36, maxZ: 36 };
+    this.bounds = { minX: -40, maxX: 40, minZ: -40, maxZ: 40 };
     // Void fall abyss
     this.hasGroundPlane = false;
 
     // Tier 1 Base Plaza
     this.addBox(0, 0.5, 0, 20, 1.0, 20, '#1a1e2e', true, { metalness: 0.4, gloss: 0.6 });
 
-    // Tier 2 Central Tower Terrace
+    // Tier 2 Central Tower Terrace (y=4.0m)
     this.addBox(0, 4.0, 0, 12, 6.0, 12, '#242a42', true, { metalness: 0.6, gloss: 0.7 });
 
-    // Glowing Central Spire Needle
-    this.addBox(0, 12.0, 0, 4, 10.0, 4, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 3.5 });
+    // Tier 3 High Catwalk Ring & Antenna Deck (y=8.5m)
+    this.addBox(0, 8.5, 0, 8, 0.5, 8, '#0f172a', true, { metalness: 0.8, gloss: 0.85 });
+    this.addBox(0, 8.8, -4, 8, 0.8, 0.3, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 1.5 });
+    this.addBox(0, 8.8, 4, 8, 0.8, 0.3, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 1.5 });
 
-    // Outer Satellite Platforms
+    // Glowing Central Spire Needle (y=14.0m)
+    this.addBox(0, 14.0, 0, 3, 12.0, 3, '#00d2ff', false, { emissive: '#00d2ff', emissiveIntensity: 3.5 });
+
+    // Outer Satellite Platforms (Elevated at y=3.0m)
     this.addBox(0, 3.0, -22, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
     this.addBox(0, 3.0, 22, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
     this.addBox(-22, 2.0, 0, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
     this.addBox(22, 2.0, 0, 10, 1.0, 10, '#1c2136', true, { metalness: 0.4, gloss: 0.5 });
+
+    // High Perch Sniper Outposts (y=6.0m)
+    this.addBox(-26, 6.0, -18, 6, 0.6, 6, '#1e293b', true, { metalness: 0.7, gloss: 0.8 });
+    this.addBox(26, 6.0, 18, 6, 0.6, 6, '#1e293b', true, { metalness: 0.7, gloss: 0.8 });
 
     // Sky Bridge walkways
     this.addBox(0, 2.8, -14, 4, 0.4, 8, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
@@ -1056,21 +1065,34 @@ export class PCMapBuilder {
     this.addBox(-14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
     this.addBox(14, 1.8, 0, 8, 0.4, 4, '#2d3748', true, { metalness: 0.5, gloss: 0.6 });
 
-    // 3D Kenney Cyber Platforms & Spire Details
-    this.addPlatformerProp('platform-fortified.glb', 0, 7.0, 0, 2.0);
-    this.addPlatformerProp('poles.glb', -5, 7.0, -5, 1.5);
-    this.addPlatformerProp('poles.glb', 5, 7.0, 5, 1.5);
-    this.addPlatformerProp('building-skyscraper-c.glb', 0, -18.0, 0, 1.8);
+    // Climbable service ladders to Tier 2 & Tier 3
+    this.addLadder(-5.8, 1.0, 0, 3.2, 90);
+    this.addLadder(5.8, 1.0, 0, 3.2, -90);
+
+    // 3D Kenney Cyber Platforms, Skyscrapers & Industrial Conduit Props
+    this.addPlatformerProp('platform-fortified.glb', 0, 8.6, 0, 2.0);
+    this.addPlatformerProp('poles.glb', -4, 8.6, -4, 1.5);
+    this.addPlatformerProp('poles.glb', 4, 8.6, 4, 1.5);
+    this.addPlatformerProp('building-skyscraper-c.glb', 0, -20.0, 0, 1.8);
+    this.addPlatformerProp('building-skyscraper-a.glb', -34, -22.0, 24, 1.4);
+    this.addPlatformerProp('building-skyscraper-b.glb', 34, -22.0, -24, 1.4);
     this.addPlatformerProp('scaffolding-structure.glb', -12, 1.0, -12, 1.4);
     this.addPlatformerProp('scaffolding-structure.glb', 12, 1.0, 12, 1.4);
+    this.addPlatformerProp('scaffolding-poles.glb', -26, 0, -18, 2.0);
+    this.addPlatformerProp('scaffolding-poles.glb', 26, 0, 18, 2.0);
     this.addPlatformerProp('pipe-section.glb', -22, 2.5, 5, 1.5, 90);
     this.addPlatformerProp('pipe-section.glb', 22, 2.5, -5, 1.5, 90);
+    this.addPlatformerProp('pipe-corner.glb', 0, 4.0, -6, 1.5);
+    this.addPlatformerProp('pipe-corner.glb', 0, 4.0, 6, 1.5, 180);
 
-    // Jump pads launching players up to Tier 2 Terrace
+    // Jump pads launching players up to Tier 2 Terrace & High Outposts
     this.createJumpPad(0, 1.0, -8, 18.0, 0, 3.0);
     this.createJumpPad(0, 1.0, 8, 18.0, 0, -3.0);
     this.createJumpPad(-8, 1.0, 0, 18.0, 3.0, 0);
     this.createJumpPad(8, 1.0, 0, 18.0, -3.0, 0);
+    // Apex vertical launches to Tier 3 rooftop deck
+    this.createJumpPad(0, 4.0, -4, 21.0, 0, 2.0);
+    this.createJumpPad(0, 4.0, 4, 21.0, 0, -2.0);
 
     // Cross-spire teleporters
     this.createTeleportPort('SpireNorth', 'SpireSouth', 0, 3.0, -25, new pc.Vec3(0, 3.5, 20), Math.PI, '#00f0ff');
@@ -1180,64 +1202,86 @@ export class PCMapBuilder {
     this.createJumpPad(22, 0, 0, 17.5);
   }
 
-  // 9. Sky Sanctuary (Floating Temple Shrines in Clouds)
+  // 9. Sky Sanctuary (Floating Celestial Pagoda & Tiered Spire Terraces)
   private buildSkySanctuary(): void {
     this.bounds = { minX: -60, maxX: 60, minZ: -60, maxZ: 60 };
     this.hasGroundPlane = true;
 
-    // Sacred Cloud Platform
-    this.addBox(0, -0.1, 0, 120, 0.2, 120, '#1e2638', false, { metalness: 0.1, gloss: 0.4 });
+    // Sacred Cloud Platform (y=0.0m)
+    this.addBox(0, -0.1, 0, 120, 0.2, 120, '#1a1b26', false, { metalness: 0.1, gloss: 0.4 });
 
-    // Central Shrine Pagoda
-    this.addBox(0, 2.0, 0, 10, 4.0, 10, '#7f1d1d', true, { metalness: 0.3, gloss: 0.5 });
-    this.addBox(0, 4.5, 0, 8, 0.8, 8, '#dc2626', true, { emissive: '#dc2626', emissiveIntensity: 1.5 });
+    // Tier 1: Meditation Courtyard Terraces (y=3.2m)
+    this.addBox(-26, 1.6, -26, 14, 3.2, 14, '#283446', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(26, 1.6, -26, 14, 3.2, 14, '#283446', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(-26, 1.6, 26, 14, 3.2, 14, '#283446', true, { metalness: 0.4, gloss: 0.5 });
+    this.addBox(26, 1.6, 26, 14, 3.2, 14, '#283446', true, { metalness: 0.4, gloss: 0.5 });
 
-    // Torii Arches (North & South)
-    this.addBox(0, 2.5, -18, 8, 5.0, 0.8, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.2 });
-    this.addBox(0, 2.5, 18, 8, 5.0, 0.8, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.2 });
+    // Tier 2: Central Pagoda Base & Outer Ring Deck (y=4.2m)
+    this.addBox(0, 2.1, 0, 18, 4.2, 18, '#7f1d1d', true, { metalness: 0.3, gloss: 0.5 });
+    this.addBox(0, 4.3, 0, 19, 0.3, 19, '#dc2626', true, { emissive: '#ef4444', emissiveIntensity: 0.8 });
 
-    // Meditation Terraces (NW, NE, SW, SE)
-    this.addBox(-26, 1.2, -26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(26, 1.2, -26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(-26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
-    this.addBox(26, 1.2, 26, 10, 2.4, 10, '#2d3748', true, { metalness: 0.4, gloss: 0.5 });
+    // Tier 3: Celestial Pagoda Spire Pinnacle (y=8.4m, walkable roof at y=8.5m)
+    this.addBox(0, 6.3, 0, 10, 4.2, 10, '#991b1b', true, { metalness: 0.4, gloss: 0.6 });
+    this.addBox(0, 8.5, 0, 11, 0.3, 11, '#f87171', true, { emissive: '#f87171', emissiveIntensity: 1.2 });
 
-    // 3D Kenney Sanctuary Garden Props
+    // Apex Relic Spire Needle (y=13.0m)
+    this.addBox(0, 11.0, 0, 2.5, 5.0, 2.5, '#fbbf24', true, { emissive: '#fbbf24', emissiveIntensity: 1.8 });
+
+    // High Sky Bridges connecting Pagoda Tier 2 to Meditation Terraces
+    this.addBox(-17, 4.2, 0, 16, 0.3, 3.5, '#334155', true, { metalness: 0.6, gloss: 0.5 });
+    this.addBox(17, 4.2, 0, 16, 0.3, 3.5, '#334155', true, { metalness: 0.6, gloss: 0.5 });
+
+    // Torii Gate Arches (North & South)
+    this.addBox(0, 3.5, -28, 10, 7.0, 1.0, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.4 });
+    this.addBox(0, 3.5, 28, 10, 7.0, 1.0, '#b91c1c', false, { emissive: '#ef4444', emissiveIntensity: 1.4 });
+
+    // Ladders to Terraces and Pagoda
+    this.addLadder(-19, 0, -26, 3.2, 90);
+    this.addLadder(19, 0, 26, 3.2, -90);
+    this.addLadder(0, 4.2, -5.1, 4.3, 0); // Pagoda Tier 2 -> Tier 3 Spire
+    this.addLadder(0, 4.2, 5.1, 4.3, 180);
+
+    // 3D Kenney Sanctuary Garden & High Props
     this.addPlatformerProp('plant.glb', -5, 0, -5, 1.5);
     this.addPlatformerProp('plant.glb', 5, 0, 5, 1.5);
-    this.addPlatformerProp('stones.glb', 0, 0, -8, 1.8);
-    this.addPlatformerProp('stones.glb', 0, 0, 8, 1.8);
-    this.addPlatformerProp('flowers.glb', -26, 2.4, -26, 1.5);
-    this.addPlatformerProp('flowers.glb', 26, 2.4, 26, 1.5);
-    this.addPlatformerProp('tree-park-pine-large.glb', -18, 0, -18, 2.0);
-    this.addPlatformerProp('tree-park-pine-large.glb', 18, 0, 18, 2.0);
+    this.addPlatformerProp('stones.glb', 0, 0, -12, 1.8);
+    this.addPlatformerProp('stones.glb', 0, 0, 12, 1.8);
+    this.addPlatformerProp('flowers.glb', -26, 3.2, -26, 1.5);
+    this.addPlatformerProp('flowers.glb', 26, 3.2, 26, 1.5);
+    this.addPlatformerProp('tree-park-pine-large.glb', -26, 3.2, -20, 2.0);
+    this.addPlatformerProp('tree-park-pine-large.glb', 26, 3.2, 20, 2.0);
     this.addPlatformerProp('tree-park-large.glb', -18, 0, 18, 1.8);
     this.addPlatformerProp('tree-park-large.glb', 18, 0, -18, 1.8);
 
-    // Jump pads to Pagoda and terraces
-    this.createJumpPad(0, 0, -10, 18.5);
-    this.createJumpPad(0, 0, 10, 18.5);
-    this.createJumpPad(-16, 0, 0, 17.0);
-    this.createJumpPad(16, 0, 0, 17.0);
+    // Super Jump pads launching players to Pagoda Pinnacle & Terraces
+    this.createJumpPad(0, 0, -14, 21.0, 0, 5); // Launches up & toward pagoda
+    this.createJumpPad(0, 0, 14, 21.0, 0, -5);
+    this.createJumpPad(-26, 0, 0, 18.0, 4, 0);
+    this.createJumpPad(26, 0, 0, 18.0, -4, 0);
+    // Pagoda Tier 2 Super Launch to Spire Apex (y=13.0m)
+    this.createJumpPad(0, 4.2, -6, 22.0, 0, 4);
+    this.createJumpPad(0, 4.2, 6, 22.0, 0, -4);
   }
 
   // 10. Orbital Station (Zero-G Space Hangar & Vantage Decks)
   private buildOrbitalStation(): void {
-    this.bounds = { minX: -36, maxX: 36, minZ: -36, maxZ: 36 };
+    this.bounds = { minX: -38, maxX: 38, minZ: -38, maxZ: 38 };
     this.hasGroundPlane = true;
 
-    // Metallic Hull Grid
-    this.addBox(0, -0.1, 0, 72, 0.2, 72, '#0c101c', false, { metalness: 0.7, gloss: 0.8 });
+    // Metallic Hull Grid (y=0.0m)
+    this.addBox(0, -0.1, 0, 76, 0.2, 76, '#0c101c', false, { metalness: 0.7, gloss: 0.8 });
 
     // Perimeter Containment Bulkheads
-    this.addBox(0, 5, 35, 72, 10, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(0, 5, -35, 72, 10, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(-35, 5, 0, 2, 10, 72, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
-    this.addBox(35, 5, 0, 2, 10, 72, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(0, 6, 37, 76, 12, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(0, 6, -37, 76, 12, 2, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(-37, 6, 0, 2, 12, 76, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
+    this.addBox(37, 6, 0, 2, 12, 76, '#151b2e', false, { metalness: 0.5, gloss: 0.6 });
 
     // Central Gravity Core & Observation Spire
     this.addBox(0, 2.5, 0, 10, 5.0, 10, '#00f0ff', true, { emissive: '#00f0ff', emissiveIntensity: 3.5 });
     this.addBox(0, 0.4, 0, 16, 0.8, 16, '#1e293b', true, { metalness: 0.6, gloss: 0.7 });
+    // High Observation Gantry Ring (y=6.8m)
+    this.addBox(0, 6.8, 0, 8, 0.4, 8, '#0f172a', true, { metalness: 0.85, gloss: 0.9 });
 
     // Solar Control Terminal Wings
     this.addBox(-14.5, 1.6, 18, 7, 3.2, 8, '#2563eb', true, { metalness: 0.6, gloss: 0.7 });
@@ -1247,24 +1291,30 @@ export class PCMapBuilder {
     this.addBox(-25, 1.8, 0, 6, 3.6, 12, '#1e293b', true, { metalness: 0.6, gloss: 0.6 });
     this.addBox(25, 1.8, 0, 6, 3.6, 12, '#1e293b', true, { metalness: 0.6, gloss: 0.6 });
 
-    // Elevated Sniper Vantage Decks (y=3.75m)
-    this.addBox(-12, 3.75, -15, 6, 0.3, 6, '#38bdf8', true, { metalness: 0.7, gloss: 0.8, emissive: '#0284c7', emissiveIntensity: 1.5 });
-    this.addBox(12, 3.75, 15, 6, 0.3, 6, '#f43f5e', true, { metalness: 0.7, gloss: 0.8, emissive: '#e11d48', emissiveIntensity: 1.5 });
+    // Elevated Sniper Vantage Decks (y=4.0m)
+    this.addBox(-12, 4.0, -15, 6, 0.4, 6, '#38bdf8', true, { metalness: 0.7, gloss: 0.8, emissive: '#0284c7', emissiveIntensity: 1.5 });
+    this.addBox(12, 4.0, 15, 6, 0.4, 6, '#f43f5e', true, { metalness: 0.7, gloss: 0.8, emissive: '#e11d48', emissiveIntensity: 1.5 });
+
+    // Catwalk Access Ladders
+    this.addLadder(-12, 0, -12, 4.0, 0);
+    this.addLadder(12, 0, 12, 4.0, 180);
 
     // 3D Kenney Orbital Station Props
     this.addPlatformerProp('barrel.glb', -14.5, 3.2, 18, 1.3);
     this.addPlatformerProp('barrel.glb', 14.5, 3.2, -18, 1.3);
-    this.addPlatformerProp('crate-item.glb', -12, 3.9, -15, 1.4);
-    this.addPlatformerProp('crate-item.glb', 12, 3.9, 15, 1.4);
+    this.addPlatformerProp('crate-item.glb', -12, 4.2, -15, 1.4);
+    this.addPlatformerProp('crate-item.glb', 12, 4.2, 15, 1.4);
     this.addPlatformerProp('scaffolding-floor.glb', 0, 2.8, 0, 1.6);
-    this.addPlatformerProp('scaffolding-poles.glb', -12, 0, -15, 1.6);
-    this.addPlatformerProp('scaffolding-poles.glb', 12, 0, 15, 1.6);
+    this.addPlatformerProp('scaffolding-poles.glb', -12, 0, -15, 1.8);
+    this.addPlatformerProp('scaffolding-poles.glb', 12, 0, 15, 1.8);
     this.addPlatformerProp('detail-pipe.glb', -25, 2.5, 0, 1.5);
     this.addPlatformerProp('detail-pipe.glb', 25, 2.5, 0, 1.5);
+    this.addPlatformerProp('pipe-split.glb', 0, 7.0, 0, 1.8);
 
     // Gravity Lift Jump Pads
-    this.createJumpPad(-12, 0, -8, 18.0, 0, -3.5);
-    this.createJumpPad(12, 0, 8, 18.0, 0, 3.5);
+    this.createJumpPad(-12, 0, -8, 19.0, 0, -4.0);
+    this.createJumpPad(12, 0, 8, 19.0, 0, 4.0);
+    this.createJumpPad(0, 0.8, 0, 22.0, 0, 0);
   }
 
   public checkJumpPads(pos: { x: number; y: number; z: number } | pc.Vec3): { impulseY: number; impulseX: number; impulseZ: number } | null {
@@ -1478,26 +1528,36 @@ export class PCMapBuilder {
 
   // 15. Solar Relay (Helios Mirror Array)
   private buildSolarRelay(): void {
-    this.bounds = { minX: -35, maxX: 35, minZ: -35, maxZ: 35 };
+    this.bounds = { minX: -38, maxX: 38, minZ: -38, maxZ: 38 };
     this.hasGroundPlane = false; // Void abyss below!
 
-    // Central Relay Hub Platform
+    // Central Relay Hub Platform (y=0.0m)
     this.addBox(0, -0.5, 0, 18, 1, 18, '#0f172a', true, { metalness: 0.7, gloss: 0.8 });
-    this.addBox(0, 5, 0, 3, 10, 3, '#38bdf8', false, { emissive: '#0284c7', emissiveIntensity: 2.2 });
+    // Upper Generator Deck (y=4.5m)
+    this.addBox(0, 4.5, 0, 10, 0.5, 10, '#1e293b', true, { metalness: 0.85, gloss: 0.9 });
+    // Radiant Solar Core Spire (y=12.0m)
+    this.addBox(0, 6.0, 0, 3, 12, 3, '#38bdf8', false, { emissive: '#0284c7', emissiveIntensity: 2.5 });
 
-    // Solar Mirror Platforms (Floating wings)
+    // Solar Mirror Collector Wings (y=2.0m)
     this.addBox(-20, 2.0, 0, 12, 1, 20, '#0284c7', true, { metalness: 0.95, gloss: 0.95, emissive: '#38bdf8', emissiveIntensity: 0.5 });
     this.addBox(20, 2.0, 0, 12, 1, 20, '#0284c7', true, { metalness: 0.95, gloss: 0.95, emissive: '#38bdf8', emissiveIntensity: 0.5 });
-    this.addBox(0, 3.0, -22, 14, 1, 8, '#1e293b', true);
-    this.addBox(0, 3.0, 22, 14, 1, 8, '#1e293b', true);
+    // Outpost Perches (y=3.5m)
+    this.addBox(0, 3.5, -22, 14, 1, 8, '#1e293b', true);
+    this.addBox(0, 3.5, 22, 14, 1, 8, '#1e293b', true);
+
+    // High Solar Vantage Gantries (y=7.0m)
+    this.addBox(-24, 7.0, 0, 6, 0.5, 10, '#0f172a', true, { metalness: 0.8, gloss: 0.85 });
+    this.addBox(24, 7.0, 0, 6, 0.5, 10, '#0f172a', true, { metalness: 0.8, gloss: 0.85 });
 
     // 3D Kenney Solar Relay Floating Props
     this.addPlatformerProp('platform-fortified.glb', -20, 2.5, 0, 1.6);
     this.addPlatformerProp('platform-fortified.glb', 20, 2.5, 0, 1.6);
-    this.addPlatformerProp('poles.glb', 0, 3.5, -22, 1.5);
-    this.addPlatformerProp('poles.glb', 0, 3.5, 22, 1.5);
+    this.addPlatformerProp('poles.glb', 0, 4.0, -22, 1.5);
+    this.addPlatformerProp('poles.glb', 0, 4.0, 22, 1.5);
     this.addPlatformerProp('scaffolding-structure.glb', 0, -2.0, 0, 1.8);
-    this.addPlatformerProp('pipe-split.glb', 0, 4.0, 0, 1.6);
+    this.addPlatformerProp('scaffolding-poles.glb', -24, 2.5, 0, 1.8);
+    this.addPlatformerProp('scaffolding-poles.glb', 24, 2.5, 0, 1.8);
+    this.addPlatformerProp('pipe-split.glb', 0, 4.8, 0, 1.6);
     this.addPlatformerProp('pipe-section.glb', -12, 1.5, 0, 1.5, 90);
     this.addPlatformerProp('pipe-section.glb', 12, 1.5, 0, 1.5, 90);
 
@@ -1506,22 +1566,27 @@ export class PCMapBuilder {
     this.createTeleportPort('Port_E', 'Port_W', 18, 2.0, 0, new pc.Vec3(-18, 2.5, 0), Math.PI / 2, '#38bdf8');
 
     // Void Crossing Jump Pads
-    this.createJumpPad(0, 0.0, -7, 18.0, 0, -12);
-    this.createJumpPad(0, 0.0, 7, 18.0, 0, 12);
+    this.createJumpPad(0, 0.0, -7, 19.0, 0, -12);
+    this.createJumpPad(0, 0.0, 7, 19.0, 0, 12);
+    this.createJumpPad(-16, 2.0, 0, 20.0, -4, 0);
+    this.createJumpPad(16, 2.0, 0, 20.0, 4, 0);
   }
 
   // 16. Skyline Penthouse (Vertigo Lounge)
   private buildSkylinePenthouse(): void {
-    this.bounds = { minX: -32, maxX: 32, minZ: -32, maxZ: 32 };
+    this.bounds = { minX: -36, maxX: 36, minZ: -36, maxZ: 36 };
     this.hasGroundPlane = true;
 
-    // Indoor Lounge Marble Floor
+    // Indoor Lounge Marble Floor (y=0.0m)
     this.addBox(-12, -0.1, 0, 24, 0.2, 48, '#0f172a', false, { metalness: 0.6, gloss: 0.9 });
+    // Split-level Mezzanine Deck (y=3.8m)
     this.addBox(-16, 3.8, 0, 14, 0.4, 40, '#1e293b', true);
+    // VIP Skylight Overlook Terrace (y=7.2m)
+    this.addBox(-16, 7.2, 0, 10, 0.4, 18, '#0f172a', true, { metalness: 0.8, gloss: 0.8 });
 
-    // Bar Counter & Elevator Shaft
+    // Bar Counter & Elevator Shaft Core
     this.addBox(-8, 0.6, 0, 2, 1.2, 12, '#e11d48', true, { emissive: '#e11d48', emissiveIntensity: 1.2 });
-    this.addBox(-22, 4, 0, 4, 8, 8, '#020617', false);
+    this.addBox(-22, 5, 0, 4, 10, 8, '#020617', false);
 
     // Outdoor Helipad Deck
     this.addBox(14, -0.1, 0, 24, 0.2, 48, '#18181b', false, { metalness: 0.3, gloss: 0.5 });
@@ -1532,22 +1597,32 @@ export class PCMapBuilder {
     this.addBox(14, 0.6, 24, 24, 1.2, 0.4, '#38bdf8', false, { opacity: 0.5 });
     this.addBox(14, 0.6, -24, 24, 1.2, 0.4, '#38bdf8', false, { opacity: 0.5 });
 
-    // High Billboard Gantry
+    // High Billboard Gantries (North & South)
     this.addBox(18, 6.5, -18, 10, 0.4, 4, '#334155', true);
+    this.addBox(18, 6.5, 18, 10, 0.4, 4, '#334155', true);
+
+    // Vertical Access Ladders
+    this.addLadder(-9.2, 0, -18, 3.8, 0);
+    this.addLadder(-9.2, 0, 18, 3.8, 180);
+    this.addLadder(-20.5, 3.8, 0, 3.4, 90);
 
     // 3D Kenney Penthouse Lounge Props
     this.addPlatformerProp('plant.glb', -8, 1.2, -5, 1.4);
     this.addPlatformerProp('plant.glb', -8, 1.2, 5, 1.4);
     this.addPlatformerProp('crate-item.glb', 14, 0, -8, 1.4);
     this.addPlatformerProp('crate-item.glb', 14, 0, 8, 1.4);
-    this.addPlatformerProp('building-skyscraper-a.glb', -26, -18.0, 0, 1.5);
-    this.addPlatformerProp('building-skyscraper-b.glb', 28, -20.0, 0, 1.5);
+    this.addPlatformerProp('building-skyscraper-a.glb', -30, -20.0, 0, 1.6);
+    this.addPlatformerProp('building-skyscraper-b.glb', 30, -22.0, 0, 1.6);
+    this.addPlatformerProp('building-skyscraper-d.glb', 0, -24.0, -32, 1.5);
     this.addPlatformerProp('roof-metal-type-a.glb', 18, 6.7, -18, 1.8);
+    this.addPlatformerProp('roof-metal-type-b.glb', 18, 6.7, 18, 1.8);
     this.addPlatformerProp('scaffolding-floor.glb', 14, 3.8, 0, 1.5);
+    this.addPlatformerProp('pipe-section.glb', -22, 10.0, 0, 1.5, 90);
 
     // Jump Pads
     this.createJumpPad(18, 0.0, -10, 19.0, 0, -6);
-    this.createJumpPad(4, 0.0, 12, 17.0, -12, 0);
+    this.createJumpPad(18, 0.0, 10, 19.0, 0, 6);
+    this.createJumpPad(4, 0.0, 0, 18.0, -8, 0);
   }
 
   public getGroundLevel(pos: { x: number; y: number; z: number } | pc.Vec3): number {
